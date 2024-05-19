@@ -20,12 +20,14 @@ struct command {
 static int ignore(struct maildir *, struct options *, char *);
 static int unignore(struct maildir *, struct options *, char *);
 static int more(struct maildir *, struct options *, char *);
+static int unsee(struct maildir *, struct options *, char *);
 
 static struct command commands[] =
 {
 	{ "ignore", ignore },
 	{ "more", more },
 	{ "unignore", unignore },
+	{ "x", unsee },
 };
 
 #define nitems(a) (sizeof((a)) / sizeof((*a)))
@@ -141,4 +143,14 @@ more(struct maildir *maildir, struct options *options, char *args)
 			unlink(template);
 			return 0;
 	}
+}
+
+static int
+unsee(struct maildir *maildir, struct options *options, char *args)
+{
+	struct maildir_letter *letter = &maildir->letters[options->msg];
+
+	if (maildir_letter_set_flag(maildir, letter, '\0') == -1)
+		return -1;
+	return 0;
 }

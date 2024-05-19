@@ -319,8 +319,8 @@ const struct options *options)
 	return -1;
 }
 
-static int
-mark_letter_read(struct maildir *maildir, struct maildir_letter *letter)
+int
+maildir_letter_set_flag(struct maildir *maildir, struct maildir_letter *letter, char f)
 {
 	char name[NAME_MAX], *flags, flag, *t;
 	int n, dfd;
@@ -333,7 +333,7 @@ mark_letter_read(struct maildir *maildir, struct maildir_letter *letter)
 	if (len > INT_MAX)
 		return -1;
 
-	n = snprintf(name, NAME_MAX, "%.*s:2,S", (int) len, letter->path);
+	n = snprintf(name, NAME_MAX, "%.*s:2,%c", (int) len, letter->path, f);
 	if (n < 0 || n >= NAME_MAX)
 		return -1;
 
@@ -395,7 +395,7 @@ FILE *out)
 			goto headers;
 	}
 
-	if (mark_letter_read(maildir, letter) == -1)
+	if (maildir_letter_set_flag(maildir, letter, 'S') == -1)
 		goto headers;
 
 	rv = 0;
