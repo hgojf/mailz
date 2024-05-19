@@ -16,7 +16,7 @@
 #include "maildir.h"
 #include "commands.h"
 
-static int configure(struct options *);
+static int configure(struct maildir *, struct options *);
 static int header_ignore(struct header *, const struct options *);
 static void usage(void);
 static int letter_print(size_t, struct maildir_letter *);
@@ -65,7 +65,9 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if ((cfg = getenv("MAILZRC")) != NULL && unveil(cfg, "r") == -1)
 		err(1, "unveil");
-	if (pledge("stdio rpath cpath", NULL) == -1)
+	if (unveil("/usr/bin/less", "x") == -1)
+		err(1, "unveil");
+	if (pledge("stdio rpath cpath proc exec tmppath", NULL) == -1)
 		err(1, "pledge");
 
 	if ((fd = open(argv[0], O_RDONLY)) == -1)
@@ -101,7 +103,7 @@ main(int argc, char *argv[])
 		return 0;
 	}
 
-	configure(&options);
+	configure(&maildir, &options);
 
 	mail_print(&maildir, 0, maildir.nletters);
 
@@ -114,22 +116,22 @@ main(int argc, char *argv[])
 				continue;
 			}
 			maildir_letter_print_read(&maildir, &maildir.letters[options.msg++],
-				&options);
+				&options, stdout);
 		}
 		else if (isdigit(*line)) {
-			size_t nth;
 			const char *errstr;
 
-			nth = strtonum(line, 1, maildir.nletters, &errstr);
+			options.msg = strtonum(line, 1, maildir.nletters, &errstr);
 			if (errstr != NULL)
 				warnx("Message number was %s", errstr);
 			else {
-				maildir_letter_print_read(&maildir, &maildir.letters[nth - 1],
-					&options);
+				options.msg -= 1;
+				maildir_letter_print_read(&maildir, &maildir.letters[options.msg],
+					&options, stdout);
 			}
 		}
 		else {
-			command_run(line, &options);
+			command_run(line, &maildir, &options);
 		}
 	}
 
@@ -148,7 +150,7 @@ main(int argc, char *argv[])
 }
 
 static int
-configure(struct options *options)
+configure(struct maildir *maildir, struct options *options)
 {
 	const char *mailrc;
 	FILE *fp;
@@ -167,7 +169,7 @@ configure(struct options *options)
 	while ((len = getline(&line, &n, fp)) != -1) {
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
-		command_run(line, options);
+		command_run(line, maildir, options);
 	}
 
 	rv = ferror(fp) ? -1 : 0;

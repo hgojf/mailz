@@ -17,6 +17,6 @@ struct maildir {
 int maildir_setup(int, struct maildir *);
 int maildir_read(struct maildir *, const struct options *);
 int maildir_letter_print_read(struct maildir *, struct maildir_letter *, 
-const struct options *);
+const struct options *, FILE *);
 void maildir_free(struct maildir *);
 #endif /* MAILZ_MAILDIR_H */

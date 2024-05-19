@@ -1,22 +1,30 @@
 #include <sys/tree.h>
+#include <sys/wait.h>
 
+#include <dirent.h>
 #include <err.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "mail.h"
+#include "maildir.h"
 
 struct command {
 	const char *ident;
-	int (*fn) (struct options *, char *);
+	int (*fn) (struct maildir *, struct options *, char *);
 };
 
-static int ignore(struct options *, char *);
-static int unignore(struct options *, char *);
+static int ignore(struct maildir *, struct options *, char *);
+static int unignore(struct maildir *, struct options *, char *);
+static int more(struct maildir *, struct options *, char *);
 
 static struct command commands[] =
 {
 	{ "ignore", ignore },
+	{ "more", more },
 	{ "unignore", unignore },
 };
 
@@ -32,7 +40,7 @@ command_cmp(const void *one, const void *two)
 }
 
 int
-command_run(char *args, struct options *options)
+command_run(char *args, struct maildir *maildir, struct options *options)
 {
 	const struct command *cmd;
 	char *command;
@@ -45,11 +53,11 @@ command_run(char *args, struct options *options)
 		warnx("unknown command %s", command);
 		return -1;
 	}
-	return cmd->fn(options, args);
+	return cmd->fn(maildir, options, args);
 }
 
 static int
-ignore(struct options *options, char *args)
+ignore(struct maildir *maildir, struct options *options, char *args)
 {
 	char *arg;
 
@@ -75,7 +83,7 @@ ignore(struct options *options, char *args)
 }
 
 static int
-unignore(struct options *options, char *args)
+unignore(struct maildir *maildir, struct options *options, char *args)
 {
 	char *arg;
 
@@ -98,4 +106,39 @@ unignore(struct options *options, char *args)
 		options->nunignore++;
 	}
 	return 0;
+}
+
+static int
+more(struct maildir *maildir, struct options *options, char *args)
+{
+	int tfd;
+	pid_t pid;
+	FILE *fp;
+	struct maildir_letter *letter = &maildir->letters[options->msg];
+	char template[] = "/tmp/mailz.XXXXXX";
+
+	if ((tfd = mkstemp(template)) == -1)
+		return -1;
+	if ((fp = fdopen(tfd, "w")) == NULL) {
+		close(tfd);
+		return -1;
+	}
+
+	if (maildir_letter_print_read(maildir, letter, options, fp) == -1)
+		return -1;
+
+	switch (pid = fork()) {
+		case -1:
+			fclose(fp);
+			return -1;
+		case 0:
+			execl("/usr/bin/less", "less", "--", template, NULL);
+			err(1, "execl");
+			/* NOTREACHED */
+		default:
+			fclose(fp);
+			waitpid(pid, NULL, 0);
+			unlink(template);
+			return 0;
+	}
 }

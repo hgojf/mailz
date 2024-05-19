@@ -353,7 +353,8 @@ mark_letter_read(struct maildir *maildir, struct maildir_letter *letter)
 
 int
 maildir_letter_print_read(struct maildir *maildir,
-struct maildir_letter *letter, const struct options *options)
+struct maildir_letter *letter, const struct options *options,
+FILE *out)
 {
 	FILE *fp;
 	char *line = NULL;
@@ -385,12 +386,12 @@ struct maildir_letter *letter, const struct options *options)
 	}
 
 	RB_FOREACH(h, headers, &headers) {
-		if (printf("%s: %s\n", h->key, h->val) < 0)
+		if (fprintf(out, "%s: %s\n", h->key, h->val) < 0)
 			goto headers;
 	}
 
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
-		if (fputs(buf, stdout) == -1)
+		if (fputs(buf, out) == -1)
 			goto headers;
 	}
 
