@@ -19,6 +19,12 @@ struct mail {
 
 struct options {
 	int view_seen;
+
+	size_t nignore;
+	char **ignore;
+
+	size_t nunignore;
+	char **unignore;
 };
 
 RB_PROTOTYPE(headers, header, entry, header_cmp);
