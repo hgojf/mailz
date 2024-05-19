@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <err.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +18,7 @@
 #include "commands.h"
 
 static int configure(struct maildir *, struct options *);
+static const char *config_location(void);
 static int header_ignore(struct header *, const struct options *);
 static void usage(void);
 static int letter_print(size_t, struct maildir_letter *);
@@ -63,7 +65,7 @@ main(int argc, char *argv[])
 
 	if (unveil(argv[0], "rc") == -1)
 		err(1, "unveil");
-	if ((cfg = getenv("MAILZRC")) != NULL && unveil(cfg, "r") == -1)
+	if ((cfg = config_location()) != NULL && unveil(cfg, "r") == -1)
 		err(1, "unveil");
 	if (unveil("/usr/bin/less", "x") == -1)
 		err(1, "unveil");
@@ -154,17 +156,44 @@ main(int argc, char *argv[])
 	assert(getdtablecount() == 3);
 }
 
+static const char *
+config_location(void)
+{
+	static char path[PATH_MAX];
+	const char *mailrc, *home;
+	static const char *ret = NULL;
+	int n;
+
+	if (ret != NULL)
+		return ret;
+
+	if ((mailrc = getenv("MAILZRC")) != NULL) {
+		ret = mailrc;
+		return mailrc;
+	}
+	if ((home = getenv("HOME")) == NULL)
+		return NULL;
+	n = snprintf(path, PATH_MAX, "%s/.mailzrc", home);
+	if (n < 0 || n >= PATH_MAX)
+		return NULL;
+
+	ret = path;
+
+	return ret;
+}
+
 static int
 configure(struct maildir *maildir, struct options *options)
 {
-	const char *mailrc;
+	const char *mailrc, *home;
+	char path[PATH_MAX];
 	FILE *fp;
 	char *line = NULL;
 	size_t n = 0;
 	ssize_t len;
-	int rv;
+	int rv, np;
 
-	if ((mailrc = getenv("MAILZRC")) == NULL)
+	if ((mailrc = config_location()) == NULL)
 		return 0;
 	if ((fp = fopen(mailrc, "r")) == NULL) {
 		warn("fopen %s", mailrc);
