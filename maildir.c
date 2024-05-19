@@ -322,7 +322,7 @@ const struct options *options)
 static int
 mark_letter_read(struct maildir *maildir, struct maildir_letter *letter)
 {
-	char name[NAME_MAX], *flags, flag;
+	char name[NAME_MAX], *flags, flag, *t;
 	int n, dfd;
 	size_t len;
 
@@ -339,7 +339,16 @@ mark_letter_read(struct maildir *maildir, struct maildir_letter *letter)
 
 	dfd = dirfd(maildir->cur);
 
-	return renameat(dfd, letter->path, dfd, name);
+	if (renameat(dfd, letter->path, dfd, name) == -1)
+		return -1;
+
+	/* need to dup in case flags changed, could be more selective */
+	t = strdup(name);
+	if (t == NULL)
+		return -1;
+	free(letter->path);
+	letter->path = t;
+	return 0;
 }
 
 int
