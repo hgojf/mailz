@@ -126,8 +126,10 @@ more(struct maildir *maildir, struct options *options, char *args)
 		return -1;
 	}
 
-	if (maildir_letter_print_read(maildir, letter, options, fp) == -1)
+	if (maildir_letter_print_read(maildir, letter, options, fp) == -1) {
+		fclose(fp);
 		return -1;
+	}
 
 	switch (pid = fork()) {
 		case -1:
