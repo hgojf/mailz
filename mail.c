@@ -33,7 +33,7 @@ main(int argc, char *argv[])
 	struct mail mail;
 	DIR *cur;
 	char *line = NULL;
-	size_t n = 0;
+	size_t n = 0, msg = 0;
 	ssize_t len;
 	struct options options;
 	const char *cfg;
@@ -106,7 +106,14 @@ main(int argc, char *argv[])
 	while ((len = getline(&line, &n, stdin)) != -1) {
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
-		if (isdigit(*line)) {
+		if (*line == '\0') {
+			if (msg == mail.nletters) {
+				printf("No more messages\n");
+				continue;
+			}
+			letter_print_read(&mail.letters[msg++], &options);
+		}
+		else if (isdigit(*line)) {
 			size_t nth;
 			const char *errstr;
 
