@@ -7,15 +7,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "mail.h"
+#include "mail-util.h"
 
 static DIR *opendirat(int, const char *);
 static FILE *fopenat(int, const char *);
 
 static int read_header(FILE *, char **, size_t *, struct header *);
 static int read_letter(FILE *, struct letter *);
+
+static int letter_cmp(const void *, const void *);
 
 DIR *
 maildir_setup(int dfd)
@@ -165,6 +169,7 @@ read_letter(FILE *fp, struct letter *letter)
 	ssize_t len;
 	struct header *n1, *n2;
 
+	letter->sent = -1;
 	RB_INIT(&letter->headers);
 	for (;;) {
 		struct header header, *hp, *fh;
@@ -177,7 +182,16 @@ read_letter(FILE *fp, struct letter *letter)
 			break;
 		if (read_header(fp, &line, &n, &header) == -1)
 			goto headers;
-		if ((fh = RB_FIND(headers, &letter->headers, &header)) != NULL) {
+
+		if (!strcmp(header.key, "Date")) {
+			struct tm tm;
+
+			if (strptime(header.val, "%a, %d %b %Y %H:%M:%S %z", &tm) == NULL)
+				goto headers;
+			if ((letter->sent = mktime(&tm)) == -1)
+				goto headers;
+		}
+		else if ((fh = RB_FIND(headers, &letter->headers, &header)) != NULL) {
 			void *t;
 			size_t len, len1;
 
@@ -202,6 +216,9 @@ read_letter(FILE *fp, struct letter *letter)
 		}
 	}
 
+	if (letter->sent == -1)
+		goto headers;
+
 	/* XXX: reading whole file into memory is bad */
 	if (getdelim(&line, &n, EOF, fp) == -1)
 		goto headers;
@@ -216,7 +233,6 @@ read_letter(FILE *fp, struct letter *letter)
 		free(n1->val);
 		free(n1);
 	}
-	line:
 	free(line);
 	return -1;
 }
@@ -258,10 +274,20 @@ maildir_read(DIR *dp, struct mail *mail)
 		mail->nletters++;
 	}
 
+	qsort(mail->letters, mail->nletters, sizeof(*mail->letters), letter_cmp);
+
 	closedir(dp);
 	return 0;
 
 	letters:
 	closedir(dp);
 	return -1;
+}
+
+static int
+letter_cmp(const void *one, const void *two)
+{
+	const struct letter *n1 = one, *n2 = two;
+
+	return n1->sent - n2->sent;
 }

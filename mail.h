@@ -9,6 +9,7 @@ struct header {
 struct letter {
 	RB_HEAD(headers, header) headers;
 	char *text;
+	time_t sent;
 };
 
 struct mail {

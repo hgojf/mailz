@@ -121,14 +121,22 @@ static int
 letter_print(size_t nth, struct letter *letter)
 {
 	const char *subject, *from;
-	int n;
+	char date[30];
+	struct tm *tm;
+
+	if ((tm = localtime(&letter->sent)) == NULL) {
+		strlcpy(date, "Unknown date", sizeof(date));
+	}
+	else {
+		if (strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
+			strlcpy(date, "Unknown date", sizeof(date));
+	}
 
 	if ((from = header_find(letter, "From")) == NULL)
 		from = "Unknown sender";
 	if ((subject = header_find(letter, "Subject")) == NULL)
 		subject = "No subject";
-	n = strlen(subject);
-	return printf("%zu    %s %s\n", nth, from, subject);
+	return printf("%zu    %s %s %s\n", nth, date, from, subject);
 }
 
 static void
