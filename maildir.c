@@ -1,6 +1,5 @@
 #include <sys/tree.h>
 
-#include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -17,47 +16,10 @@
 static DIR *opendirat(int, const char *);
 static FILE *fopenat(int, const char *);
 
-static int read_header(FILE *, char **, size_t *, struct header *);
-static int read_letter(FILE *, struct letter *);
-static int push_header(struct header *, struct letter *);
-
+static int header_push(struct header *, struct maildir_letter *);
+static int read_letter(const char *, FILE *, struct maildir_letter *);
+static int push_letter(struct maildir_letter *, struct maildir *);
 static int letter_cmp(const void *, const void *);
-
-DIR *
-maildir_setup(int dfd)
-{
-	DIR *cur, *new;
-	struct dirent *de;
-	char name[NAME_MAX];
-	int n, curfd, newfd;
-
-	if ((cur = opendirat(dfd, "cur")) == NULL)
-		return NULL;
-	if ((new = opendirat(dfd, "new")) == NULL)
-		goto cur;
-
-	curfd = dirfd(cur);
-	newfd = dirfd(new);
-
-	while ((de = readdir(new)) != NULL) {
-		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
-			continue;
-		n =	snprintf(name, NAME_MAX, "%s:2,", de->d_name);
-		if (n < 0 || n >= NAME_MAX)
-			goto new;
-		if (renameat(newfd, de->d_name, curfd, name) == -1)
-			goto new;
-	}
-
-	closedir(new);
-	return cur;
-
-	new:
-	closedir(new);
-	cur:
-	closedir(cur);
-	return NULL;
-}
 
 static DIR *
 opendirat(int at, const char *path)
@@ -87,145 +49,245 @@ fopenat(int at, const char *path)
 	return ret;
 }
 
-static int
-read_header(FILE *fp, char **lp, size_t *np, struct header *out)
+int
+maildir_setup(int dfd, struct maildir *maildir)
 {
-	size_t vlen;
+	DIR *cur, *new;
+	struct dirent *de;
+	char name[NAME_MAX];
+	int n, curfd, newfd;
 
-	if ((out->val = strchr(*lp, ':')) == NULL)
+	if ((cur = opendirat(dfd, "cur")) == NULL)
 		return -1;
-	*out->val++ = '\0';
-	/* strip trailing ws */
-	out->val += strspn(out->val, " \t");
+	if ((new = opendirat(dfd, "new")) == NULL)
+		goto cur;
 
-	out->key = *lp;
-	/* strip trailing ws */
-	out->key[strcspn(out->key, " \t")] = '\0';
+	curfd = dirfd(cur);
+	newfd = dirfd(new);
 
-	for (size_t i = 0; out->key[i] != '\0'; i++) {
-		if (out->key[i] < 33 || out->key[i] > 126)
-			return -1;
+	while ((de = readdir(new)) != NULL) {
+		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+			continue;
+		n =	snprintf(name, NAME_MAX, "%s:2,", de->d_name);
+		if (n < 0 || n >= NAME_MAX)
+			goto new;
+		if (renameat(newfd, de->d_name, curfd, name) == -1)
+			goto new;
 	}
 
-	for (vlen = 0; out->val[vlen] != '\0'; vlen++) {
-		if (out->val[vlen] > 127)
-			return -1;
-	}
+	maildir->cur = cur;
+	maildir->nletters = 0;
+	maildir->letters = NULL;
 
-	if ((out->key = strdup(out->key)) == NULL)
-		return -1;
-	if ((out->val = strndup(out->val, vlen)) == NULL)
-		goto key;
-
-	for (;;) {
-		char c, *line;
-		void *t;
-		ssize_t len, ws;
-
-		if ((c = fgetc(fp)) == EOF)
-			goto val;
-		if (!isspace(c) || c == '\n') {
-			if (ungetc(c, fp) == EOF)
-				goto val;
-			break;
-		}
-
-		if ((len = getline(lp, np, fp)) == -1)
-			goto val;
-		if ((*lp)[len - 1] == '\n') {
-			(*lp)[len - 1] = '\0';
-			len--;
-		}
-
-		ws = strspn(*lp, " \t");
-		len -= ws;
-		line = (*lp) + ws;
-
-		for (size_t i = 0; line[i] != '\0'; i++) {
-			if (line[i] > 127)
-				goto val;
-		}
-
-		t = realloc(out->val, vlen + len + 1);
-		if (t == NULL)
-			goto val;
-		out->val = t;
-		memcpy(&out->val[vlen], line, len);
-		out->val[vlen + len] = '\0';
-	}
-
+	closedir(new);
 	return 0;
 
-	val:
-	free(out->val);
-	key:
-	free(out->key);
+	new:
+	closedir(new);
+	cur:
+	closedir(cur);
+	return -1;
+}
+
+int
+maildir_read(struct maildir *maildir, const struct options *options)
+{
+	struct dirent *de;
+	int dfd = dirfd(maildir->cur);
+
+	while ((de = readdir(maildir->cur)) != NULL) {
+		char *flags, flag;
+		int n, rv;
+		struct maildir_letter letter;
+		FILE *fp;
+		void *t;
+
+		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+			continue;
+
+		if ((flags = strchr(de->d_name, ':')) == NULL)
+			goto letters;
+		flags++;
+		n = sscanf(flags, "2,%c", &flag);
+		if (n == EOF) { /* no flags */
+		}
+		else if (n == 1) {
+			if (flag == 'S' && !options->view_seen)
+				continue;
+		}
+
+		if ((fp = fopenat(dfd, de->d_name)) == NULL)
+			goto letters;
+
+		rv = read_letter(de->d_name, fp, &letter);
+		fclose(fp);
+		if (rv == -1)
+			goto letters;
+		if (push_letter(&letter, maildir) == -1)
+			goto letters;
+	}
+
+	qsort(maildir->letters, maildir->nletters, sizeof(*maildir->letters),
+		letter_cmp);
+	return 0;
+
+	letters:
+	for (size_t i = 0; i < maildir->nletters; i++) {
+		free(maildir->letters[i].path);
+		free(maildir->letters[i].subject);
+		free(maildir->letters[i].from);
+	}
+	free(maildir->letters);
 	return -1;
 }
 
 static int
-read_letter(FILE *fp, struct letter *letter)
+push_letter(struct maildir_letter *letter, struct maildir *maildir)
+{
+	void *t;
+
+	t = reallocarray(maildir->letters, maildir->nletters + 1,
+		sizeof(*maildir->letters));
+	if (t == NULL)
+		goto letter;
+	maildir->letters = t;
+	maildir->letters[maildir->nletters] = *letter;
+	maildir->nletters++;
+
+	return 0;
+
+	letter:
+	free(letter->subject);
+	free(letter->from);
+	free(letter->path);
+	return -1;
+}
+
+static int
+read_letter(const char *name, FILE *fp, struct maildir_letter *letter)
 {
 	char *line = NULL;
 	size_t n = 0;
 	ssize_t len;
-	struct header *n1, *n2;
+	int np;
 
-	letter->sent = -1;
-	RB_INIT(&letter->headers);
+	letter->subject = NULL;
+	letter->from = NULL;
+	letter->date = -1;
 	for (;;) {
-		struct header header, *hp, *fh;
+		struct header header;
 
 		if ((len = getline(&line, &n, fp)) == -1)
-			goto headers;
+			goto letter;
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
 		if (*line == '\0')
 			break;
-		if (read_header(fp, &line, &n, &header) == -1)
-			goto headers;
-		/* push_header takes ownership of 'header' */
-		if (push_header(&header, letter) == -1)
-			goto headers;
+		if (header_read(fp, &line, &n, &header) == -1)
+			goto letter;
+		if (header_push(&header, letter) == -1)
+			goto letter;
 	}
 
-	if (letter->sent == -1)
-		goto headers;
+	if (letter->subject == NULL || letter->from == NULL || letter->date == -1)
+		goto letter;
 
-	/* XXX: reading whole file into memory is bad */
-	if (getdelim(&line, &n, EOF, fp) == -1)
-		goto headers;
-	letter->text = line;
+	if ((letter->path = strdup(name)) == NULL)
+		goto letter;
 
+	free(line);
 	return 0;
 
-	headers:
-	RB_FOREACH_SAFE(n1, headers, &letter->headers, n2) {
-		RB_REMOVE(headers, &letter->headers, n1);
-		free(n1->key);
-		free(n1->val);
-		free(n1);
-	}
+	letter:
+	free(letter->subject);
+	free(letter->from);
+
 	free(line);
 	return -1;
 }
 
 static int
-push_header(struct header *header, struct letter *letter)
+header_push(struct header *header, struct maildir_letter *letter)
 {
-	struct header *fh, *hp;
-
-	if (!strcmp(header->key, "Date")) {
+	if (!strcmp(header->key, "Subject")) {
+		if (letter->subject != NULL)
+			goto header;
+		letter->subject = header->val;
+		free(header->key);
+		return 0;
+	}
+	else if (!strcmp(header->key, "From")) {
+		if (letter->from != NULL)
+			goto header;
+		letter->from = header->val;
+		free(header->key);
+		return 0;
+	}
+	else if (!strcmp(header->key, "Date")) {
+		char date[30];
 		struct tm tm;
+
+		if (letter->date != -1)
+			goto header;
 
 		if (strptime(header->val, "%a, %d %b %Y %H:%M:%S %z", &tm) == NULL)
 			goto header;
-		if ((letter->sent = mktime(&tm)) == -1)
+		if ((letter->date = mktime(&tm)) == -1)
 			goto header;
 		free(header->key);
 		free(header->val);
+		return 0;
 	}
-	else if ((fh = RB_FIND(headers, &letter->headers, header)) != NULL) {
+	else {
+		free(header->key);
+		free(header->val);
+		return 0;
+	}
+
+	header:
+	free(header->key);
+	free(header->val);
+	return -1;
+}
+
+static int
+letter_cmp(const void *one, const void *two)
+{
+	const struct maildir_letter *n1 = one, *n2 = two;
+	return n1->date - n2->date;
+}
+
+static int
+header_ignore(struct header *header, const struct options *options)
+{
+	if (options->nunignore != 0) {
+		for (size_t i = 0; i < options->nunignore; i++) {
+			if (!strcmp(header->key, options->unignore[i]))
+				return 0;
+		}
+		return 1;
+	}
+	else {
+		for (size_t i = 0; i < options->nignore; i++) {
+			if (!strcmp(header->key, options->ignore[i]))
+				return 1;
+		}
+		return 0;
+	}
+}
+
+static int
+header_push2(struct header *header, struct headers *headers,
+const struct options *options)
+{
+	struct header *fh, *hp;
+
+	if (header_ignore(header, options)) {
+		free(header->key);
+		free(header->val);
+		return 0;
+	}
+	else if ((fh = RB_FIND(headers, headers, header)) != NULL) {
 		void *t;
 		size_t len, len1;
 
@@ -246,7 +308,7 @@ push_header(struct header *header, struct letter *letter)
 		if ((hp = malloc(sizeof(*hp))) == NULL)
 			goto header;
 		*hp = *header;
-		(void) RB_INSERT(headers, &letter->headers, hp);
+		(void) RB_INSERT(headers, headers, hp);
 	}
 
 	return 0;
@@ -257,69 +319,97 @@ push_header(struct header *header, struct letter *letter)
 	return -1;
 }
 
-int
-maildir_read(DIR *dp, struct mail *mail, const struct options *options)
+static int
+mark_letter_read(struct maildir *maildir, struct maildir_letter *letter)
 {
-	struct dirent *de;
-	int dfd;
+	char name[NAME_MAX], *flags, flag;
+	int n, dfd;
+	size_t len;
 
-	dfd = dirfd(dp);
+	/* remove existing flags, if they exist */
+	if ((flags = strchr(letter->path, ':')) == NULL)
+		return -1;
+	len = flags - letter->path;
+	if (len > INT_MAX)
+		return -1;
 
-	mail->nletters = 0;
-	mail->letters = NULL;
+	n = snprintf(name, NAME_MAX, "%.*s:2,S", (int) len, letter->path);
+	if (n < 0 || n >= NAME_MAX)
+		return -1;
 
-	while ((de = readdir(dp)) != NULL) {
-		struct letter letter;
-		FILE *fp;
-		void *t;
-		int rv, n;
-		char *flags, flag;
+	dfd = dirfd(maildir->cur);
 
-		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
-			continue;
-
-		if ((flags = strrchr(de->d_name, ':')) == NULL)
-			goto letters;
-		flags++;
-		n = sscanf(flags, "2,%c", &flag);
-		if (n == EOF) { /* no flags */
-		}
-		else if (n == 1) {
-			if (flag == 'S' && !options->view_seen)
-				continue;
-		}
-
-		if ((fp = fopenat(dfd, de->d_name)) == NULL)
-			goto letters;
-		rv = read_letter(fp, &letter);
-		fclose(fp);
-		if (rv == -1)
-			goto letters;
-
-		t = reallocarray(mail->letters, mail->nletters + 1, 
-			sizeof(*mail->letters));
-		if (t == NULL)
-			goto letters;
-
-		mail->letters = t;
-		mail->letters[mail->nletters] = letter;
-		mail->nletters++;
-	}
-
-	qsort(mail->letters, mail->nletters, sizeof(*mail->letters), letter_cmp);
-
-	closedir(dp);
-	return 0;
-
-	letters:
-	closedir(dp);
-	return -1;
+	return renameat(dfd, letter->path, dfd, name);
 }
 
-static int
-letter_cmp(const void *one, const void *two)
+int
+maildir_letter_print_read(struct maildir *maildir,
+struct maildir_letter *letter, const struct options *options)
 {
-	const struct letter *n1 = one, *n2 = two;
+	FILE *fp;
+	char *line = NULL;
+	size_t n = 0;
+	ssize_t len;
+	struct headers headers;
+	struct header *h, *h2;
+	char buf[4096];
+	int rv = -1;
 
-	return n1->sent - n2->sent;
+	if ((fp = fopenat(dirfd(maildir->cur), letter->path)) == NULL)
+		return -1;
+
+	RB_INIT(&headers);
+
+	for (;;) {
+		struct header header;
+
+		if ((len = getline(&line, &n, fp)) == -1)
+			goto headers;
+		if (line[len - 1] == '\n')
+			line[len - 1] = '\0';
+		if (*line == '\0')
+			break;
+		if (header_read(fp, &line, &n, &header) == -1)
+			goto headers;
+		if (header_push2(&header, &headers, options) == -1)
+			goto headers;
+	}
+
+	RB_FOREACH(h, headers, &headers) {
+		if (printf("%s: %s\n", h->key, h->val) < 0)
+			goto headers;
+	}
+
+	while (fgets(buf, sizeof(buf), fp) != NULL) {
+		if (fputs(buf, stdout) == -1)
+			goto headers;
+	}
+
+	if (mark_letter_read(maildir, letter) == -1)
+		goto headers;
+
+	rv = 0;
+	headers:
+	RB_FOREACH_SAFE(h, headers, &headers, h2) {
+		RB_REMOVE(headers, &headers, h);
+		free(h->key);
+		free(h->val);
+		free(h);
+	}
+
+	free(line);
+	fclose(fp);
+	return rv;
+}
+
+void
+maildir_free(struct maildir *maildir)
+{
+	closedir(maildir->cur);
+	for (size_t i = 0; i < maildir->nletters; i++) {
+		free(maildir->letters[i].path);
+		free(maildir->letters[i].subject);
+		free(maildir->letters[i].from);
+	}
+	free(maildir->letters);
 }

@@ -19,9 +19,9 @@
 static int configure(struct options *);
 static int header_ignore(struct header *, const struct options *);
 static void usage(void);
-static int letter_print(size_t, struct letter *);
+static int letter_print(size_t, struct maildir_letter *);
 static int letter_print_read(struct letter *, const struct options *);
-static int mail_print(struct mail *, size_t, size_t);
+static int mail_print(struct maildir *, size_t, size_t);
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
@@ -30,19 +30,20 @@ main(int argc, char *argv[])
 {
 	int ch, fd;
 	struct stat sb;
-	struct mail mail;
 	DIR *cur;
 	char *line = NULL;
-	size_t n = 0, msg = 0;
+	size_t n = 0;
 	ssize_t len;
 	struct options options;
 	const char *cfg;
+	struct maildir maildir;
 
 	options.view_seen = 0;
 	options.nignore = 0;
 	options.ignore = NULL;
 	options.nunignore = 0;
 	options.unignore = NULL;
+	options.msg = 0;
 
 	while ((ch = getopt(argc, argv, "s")) != -1) {
 		switch (ch) {
@@ -77,12 +78,10 @@ main(int argc, char *argv[])
 
 	switch (sb.st_mode & S_IFMT) {
 		case S_IFDIR: /* assume maildir */
-			if ((cur = maildir_setup(fd)) == NULL)
-				err(1, "maildir_setup");
-			if (pledge("stdio rpath", NULL) == -1)
-				err(1, "maildir_setup");
+			if (maildir_setup(fd, &maildir) == -1)
+				err(1, "maildir_setup1");
 			/* mailread_read takes owner of 'cur' */
-			if (maildir_read(cur, &mail, &options) == -1)
+			if (maildir_read(&maildir, &options) == -1)
 				err(1, "maildir_read");
 			break;
 		case S_IFREG: /* assume mbox */
@@ -97,31 +96,36 @@ main(int argc, char *argv[])
 			/* NOTREACHED */
 	}
 
-	configure(&options);
-	if (pledge("stdio", NULL) == -1)
-		err(1, "pledge");
+	if (maildir.nletters == 0) {
+		puts("No mail.");
+		return 0;
+	}
 
-	mail_print(&mail, 0, mail.nletters);
+	configure(&options);
+
+	mail_print(&maildir, 0, maildir.nletters);
 
 	while ((len = getline(&line, &n, stdin)) != -1) {
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
 		if (*line == '\0') {
-			if (msg == mail.nletters) {
+			if (options.msg == maildir.nletters) {
 				printf("No more messages\n");
 				continue;
 			}
-			letter_print_read(&mail.letters[msg++], &options);
+			maildir_letter_print_read(&maildir, &maildir.letters[options.msg++],
+				&options);
 		}
 		else if (isdigit(*line)) {
 			size_t nth;
 			const char *errstr;
 
-			nth = strtonum(line, 1, mail.nletters, &errstr);
+			nth = strtonum(line, 1, maildir.nletters, &errstr);
 			if (errstr != NULL)
 				warnx("Message number was %s", errstr);
 			else {
-				letter_print_read(&mail.letters[nth - 1], &options);
+				maildir_letter_print_read(&maildir, &maildir.letters[nth - 1],
+					&options);
 			}
 		}
 		else {
@@ -131,7 +135,7 @@ main(int argc, char *argv[])
 
 	free(line);
 	close(fd);
-	mail_free(&mail);
+	maildir_free(&maildir);
 	for (size_t i = 0; i < options.nignore; i++) {
 		free(options.ignore[i]);
 	}
@@ -173,44 +177,7 @@ configure(struct options *options)
 }
 
 static int
-letter_print_read(struct letter *letter, const struct options *options)
-{
-	struct header *h;
-
-	RB_FOREACH(h, headers, &letter->headers) {
-		if (header_ignore(h, options))
-			continue;
-		if (printf("%s: %s\n", h->key, h->val) < 0)
-			return -1;
-		skip:
-		continue;
-	}
-	if (fputs(letter->text, stdout) == EOF)
-		return -1;
-	return 0;
-}
-
-static int
-header_ignore(struct header *header, const struct options *options)
-{
-	if (options->nunignore != 0) {
-		for (size_t i = 0; i < options->nunignore; i++) {
-			if (!strcmp(header->key, options->unignore[i]))
-				return 0;
-		}
-		return 1;
-	}
-	else {
-		for (size_t i = 0; i < options->nignore; i++) {
-			if (!strcmp(header->key, options->ignore[i]))
-				return 1;
-		}
-		return 0;
-	}
-}
-
-static int
-mail_print(struct mail *mail, size_t b, size_t e)
+mail_print(struct maildir *mail, size_t b, size_t e)
 {
 	for (size_t i = 0; b < e; i++, b++) {
 		if (letter_print(i + 1, &mail->letters[b]) == -1)
@@ -220,13 +187,12 @@ mail_print(struct mail *mail, size_t b, size_t e)
 }
 
 static int
-letter_print(size_t nth, struct letter *letter)
+letter_print(size_t nth, struct maildir_letter *letter)
 {
-	const char *subject, *from;
 	char date[30];
 	struct tm *tm;
 
-	if ((tm = localtime(&letter->sent)) == NULL) {
+	if ((tm = localtime(&letter->date)) == NULL) {
 		strlcpy(date, "Unknown date", sizeof(date));
 	}
 	else {
@@ -234,11 +200,8 @@ letter_print(size_t nth, struct letter *letter)
 			strlcpy(date, "Unknown date", sizeof(date));
 	}
 
-	if ((from = header_find(letter, "From")) == NULL)
-		from = "Unknown sender";
-	if ((subject = header_find(letter, "Subject")) == NULL)
-		subject = "No subject";
-	return printf("%zu    %s %s %s\n", nth, date, from, subject);
+	return printf("%zu    %s %s %s\n", nth, date, letter->from, 
+		letter->subject);
 }
 
 static void

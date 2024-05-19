@@ -18,6 +18,7 @@ struct mail {
 };
 
 struct options {
+	size_t msg;
 	int view_seen;
 
 	size_t nignore;

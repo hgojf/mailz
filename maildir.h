@@ -1,5 +1,22 @@
 #ifndef MAILZ_MAILDIR_H
 #define MAILZ_MAILDIR_H
-DIR *maildir_setup(int);
-int maildir_read(DIR *, struct mail *, const struct options *);
+struct maildir_letter {
+	char *path;
+	char *subject;
+	char *from;
+	time_t date;
+};
+
+struct maildir {
+	DIR *cur;
+
+	size_t nletters;
+	struct maildir_letter *letters;
+};
+
+int maildir_setup(int, struct maildir *);
+int maildir_read(struct maildir *, const struct options *);
+int maildir_letter_print_read(struct maildir *, struct maildir_letter *, 
+const struct options *);
+void maildir_free(struct maildir *);
 #endif /* MAILZ_MAILDIR_H */
