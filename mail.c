@@ -206,7 +206,7 @@ static int
 mail_print(struct mail *mail, size_t b, size_t e)
 {
 	for (size_t i = 0; b < e; i++, b++) {
-		if (letter_print(i, &mail->letters[b]) == -1)
+		if (letter_print(i + 1, &mail->letters[b]) == -1)
 			return -1;
 	}
 	return 0;
