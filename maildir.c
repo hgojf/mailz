@@ -19,6 +19,7 @@ static FILE *fopenat(int, const char *);
 
 static int read_header(FILE *, char **, size_t *, struct header *);
 static int read_letter(FILE *, struct letter *);
+static int push_header(struct header *, struct letter *);
 
 static int letter_cmp(const void *, const void *);
 
@@ -183,38 +184,9 @@ read_letter(FILE *fp, struct letter *letter)
 			break;
 		if (read_header(fp, &line, &n, &header) == -1)
 			goto headers;
-
-		if (!strcmp(header.key, "Date")) {
-			struct tm tm;
-
-			if (strptime(header.val, "%a, %d %b %Y %H:%M:%S %z", &tm) == NULL)
-				goto headers;
-			if ((letter->sent = mktime(&tm)) == -1)
-				goto headers;
-		}
-		else if ((fh = RB_FIND(headers, &letter->headers, &header)) != NULL) {
-			void *t;
-			size_t len, len1;
-
-			len = strlen(fh->val);
-			len1 = strlen(header.val);
-
-			t = realloc(fh->val, len + len1 + 1);
-			if (t == NULL)
-				goto headers;
-			fh->val = t;
-			memcpy(&fh->val[len], header.val, len1);
-			fh->val[len + len1] = '\0';
-
-			free(header.key);
-			free(header.val);
-		}
-		else {
-			if ((hp = malloc(sizeof(*hp))) == NULL)
-				goto headers;
-			*hp = header;
-			(void) RB_INSERT(headers, &letter->headers, hp);
-		}
+		/* push_header takes ownership of 'header' */
+		if (push_header(&header, letter) == -1)
+			goto headers;
 	}
 
 	if (letter->sent == -1)
@@ -235,6 +207,53 @@ read_letter(FILE *fp, struct letter *letter)
 		free(n1);
 	}
 	free(line);
+	return -1;
+}
+
+static int
+push_header(struct header *header, struct letter *letter)
+{
+	struct header *fh, *hp;
+
+	if (!strcmp(header->key, "Date")) {
+		struct tm tm;
+
+		if (strptime(header->val, "%a, %d %b %Y %H:%M:%S %z", &tm) == NULL)
+			goto header;
+		if ((letter->sent = mktime(&tm)) == -1)
+			goto header;
+		free(header->key);
+		free(header->val);
+	}
+	else if ((fh = RB_FIND(headers, &letter->headers, header)) != NULL) {
+		void *t;
+		size_t len, len1;
+
+		len = strlen(fh->val);
+		len1 = strlen(header->val);
+
+		t = realloc(fh->val, len + len1 + 1);
+		if (t == NULL)
+			goto header;
+		fh->val = t;
+		memcpy(&fh->val[len], header->val, len1);
+		fh->val[len + len1] = '\0';
+
+		free(header->key);
+		free(header->val);
+	}
+	else {
+		if ((hp = malloc(sizeof(*hp))) == NULL)
+			goto header;
+		*hp = *header;
+		(void) RB_INSERT(headers, &letter->headers, hp);
+	}
+
+	return 0;
+
+	header:
+	free(header->val);
+	free(header->key);
 	return -1;
 }
 
