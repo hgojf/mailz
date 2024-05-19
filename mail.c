@@ -107,12 +107,14 @@ main(int argc, char *argv[])
 
 	mail_print(&maildir, 0, maildir.nletters);
 
+	fputs("> ", stdout);
 	while ((len = getline(&line, &n, stdin)) != -1) {
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
 		if (*line == '\0') {
 			if (options.msg == maildir.nletters) {
 				printf("No more messages\n");
+				fputs("> ", stdout);
 				continue;
 			}
 			maildir_letter_print_read(&maildir, &maildir.letters[options.msg++],
@@ -133,7 +135,10 @@ main(int argc, char *argv[])
 		else {
 			command_run(line, &maildir, &options);
 		}
+		fputs("> ", stdout);
 	}
+
+	putchar('\n');
 
 	free(line);
 	close(fd);
