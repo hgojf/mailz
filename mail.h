@@ -17,5 +17,9 @@ struct mail {
 	size_t nletters;
 };
 
+struct options {
+	int view_seen;
+};
+
 RB_PROTOTYPE(headers, header, entry, header_cmp);
 #endif /* MAILZ_MAIL_H */

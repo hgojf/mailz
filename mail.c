@@ -31,9 +31,14 @@ main(int argc, char *argv[])
 	char *line = NULL;
 	size_t n = 0;
 	ssize_t len;
+	struct options options;
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	options.view_seen = 0;
+	while ((ch = getopt(argc, argv, "s")) != -1) {
 		switch (ch) {
+		case 's':
+			options.view_seen = 1;
+			break;
 		default:
 			usage();
 		}
@@ -65,7 +70,7 @@ main(int argc, char *argv[])
 			if (pledge("stdio rpath", NULL) == -1)
 				err(1, "maildir_setup");
 			/* mailread_read takes owner of 'cur' */
-			if (maildir_read(cur, &mail) == -1)
+			if (maildir_read(cur, &mail, &options) == -1)
 				err(1, "maildir_read");
 			break;
 		case S_IFREG: /* assume mbox */
@@ -142,6 +147,6 @@ letter_print(size_t nth, struct letter *letter)
 static void
 usage(void)
 {
-	fprintf(stderr, "using: mailz <mailbox>\n");
+	fprintf(stderr, "usage: mailz [-s] <mailbox>\n");
 	exit(1);
 }

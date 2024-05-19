@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "mail.h"
+#include "maildir.h"
 #include "mail-util.h"
 
 static DIR *opendirat(int, const char *);
@@ -238,7 +239,7 @@ read_letter(FILE *fp, struct letter *letter)
 }
 
 int
-maildir_read(DIR *dp, struct mail *mail)
+maildir_read(DIR *dp, struct mail *mail, const struct options *options)
 {
 	struct dirent *de;
 	int dfd;
@@ -252,10 +253,22 @@ maildir_read(DIR *dp, struct mail *mail)
 		struct letter letter;
 		FILE *fp;
 		void *t;
-		int rv;
+		int rv, n;
+		char *flags, flag;
 
 		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
 			continue;
+
+		if ((flags = strrchr(de->d_name, ':')) == NULL)
+			goto letters;
+		flags++;
+		n = sscanf(flags, "2,%c", &flag);
+		if (n == EOF) { /* no flags */
+		}
+		else if (n == 1) {
+			if (flag == 'S' && !options->view_seen)
+				continue;
+		}
 
 		if ((fp = fopenat(dfd, de->d_name)) == NULL)
 			goto letters;
