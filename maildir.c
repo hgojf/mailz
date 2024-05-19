@@ -42,7 +42,7 @@ maildir_setup(int dfd)
 	while ((de = readdir(new)) != NULL) {
 		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
 			continue;
-		n =	snprintf(name, NAME_MAX, "%s:2,S", de->d_name);
+		n =	snprintf(name, NAME_MAX, "%s:2,", de->d_name);
 		if (n < 0 || n >= NAME_MAX)
 			goto new;
 		if (renameat(newfd, de->d_name, curfd, name) == -1)
