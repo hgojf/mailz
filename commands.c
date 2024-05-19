@@ -117,7 +117,7 @@ more(struct maildir *maildir, struct options *options, char *args)
 	pid_t pid;
 	FILE *fp;
 	struct maildir_letter *letter = &maildir->letters[options->msg];
-	char template[] = "/tmp/mailz.XXXXXX";
+	char template[] = "/tmp/mailz/letter.XXXXXX";
 
 	if ((tfd = mkstemp(template)) == -1)
 		return -1;
