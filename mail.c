@@ -61,17 +61,13 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		usage();
 
-	if (mkdir("/tmp/mailz/", 0700) == -1 && errno != EEXIST)
-		err(1, "mkdir");
-	if (unveil("/tmp/mailz/", "crw") == -1)
-		err(1, "unveil");
 	if (unveil(argv[0], "rc") == -1)
 		err(1, "unveil");
 	if ((cfg = config_location()) != NULL && unveil(cfg, "r") == -1)
 		err(1, "unveil");
 	if (unveil("/usr/bin/less", "x") == -1)
 		err(1, "unveil");
-	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
+	if (pledge("stdio rpath cpath proc exec", NULL) == -1)
 		err(1, "pledge");
 
 	if ((fd = open(argv[0], O_RDONLY)) == -1)
@@ -143,7 +139,6 @@ main(int argc, char *argv[])
 
 	putchar('\n');
 
-	rmdir("/tmp/mailz");
 	free(line);
 	close(fd);
 	maildir_free(&maildir);
