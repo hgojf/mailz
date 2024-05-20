@@ -65,7 +65,7 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if ((cfg = config_location()) != NULL && unveil(cfg, "r") == -1)
 		err(1, "unveil");
-	if (unveil("/usr/bin/less", "x") == -1)
+	if (unveil("/usr/local/libexec/lesswrapper", "x") == -1)
 		err(1, "unveil");
 	if (pledge("stdio rpath cpath proc exec", NULL) == -1)
 		err(1, "pledge");

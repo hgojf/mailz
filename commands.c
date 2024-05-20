@@ -142,7 +142,7 @@ more(struct maildir *maildir, struct options *options, char *args)
 			if (dup2(p[0], STDIN_FILENO) == -1)
 				err(1, "dup2");
 			close(p[0]);
-			execl("/usr/bin/less", "less", "--", "-", NULL);
+			execl("/usr/local/libexec/lesswrapper", "lesswrapper", "-", NULL);
 			err(1, "execl");
 			/* NOTREACHED */
 		default:
