@@ -43,7 +43,7 @@ main(int argc, char *argv[])
 	options.ignore = NULL;
 	options.nunignore = 0;
 	options.unignore = NULL;
-	options.msg = 0;
+	options.msg = 1;
 
 	while ((ch = getopt(argc, argv, "s")) != -1) {
 		switch (ch) {
@@ -121,7 +121,7 @@ main(int argc, char *argv[])
 				fputs("> ", stdout);
 				continue;
 			}
-			maildir_letter_print_read(&maildir, &maildir.letters[options.msg++],
+			maildir_letter_print_read(&maildir, &maildir.letters[options.msg++ - 1],
 				&options, stdout);
 		}
 		else if (isdigit(*line)) {
@@ -131,8 +131,7 @@ main(int argc, char *argv[])
 			if (errstr != NULL)
 				warnx("Message number was %s", errstr);
 			else {
-				options.msg -= 1;
-				maildir_letter_print_read(&maildir, &maildir.letters[options.msg],
+				maildir_letter_print_read(&maildir, &maildir.letters[options.msg - 1],
 					&options, stdout);
 			}
 		}

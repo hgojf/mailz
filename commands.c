@@ -116,7 +116,7 @@ more(struct maildir *maildir, struct options *options, char *args)
 	int tfd;
 	pid_t pid;
 	FILE *fp;
-	struct maildir_letter *letter = &maildir->letters[options->msg];
+	struct maildir_letter *letter = &maildir->letters[options->msg - 1];
 	char template[] = "/tmp/mailz/letter.XXXXXX";
 
 	if (args != NULL) {
@@ -155,7 +155,7 @@ more(struct maildir *maildir, struct options *options, char *args)
 static int
 unsee(struct maildir *maildir, struct options *options, char *args)
 {
-	struct maildir_letter *letter = &maildir->letters[options->msg];
+	struct maildir_letter *letter = &maildir->letters[options->msg - 1];
 
 	if (args != NULL) {
 		warnx("This command takes no arguments.");
