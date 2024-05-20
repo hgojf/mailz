@@ -420,3 +420,31 @@ maildir_free(struct maildir *maildir)
 	}
 	free(maildir->letters);
 }
+
+static int
+letter_print(size_t nth, struct maildir_letter *letter)
+{
+	char date[30];
+	struct tm *tm;
+
+	if ((tm = localtime(&letter->date)) == NULL) {
+		strlcpy(date, "Unknown date", sizeof(date));
+	}
+	else {
+		if (strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
+			strlcpy(date, "Unknown date", sizeof(date));
+	}
+
+	return printf("%zu    %s %s %s\n", nth, date, letter->from, 
+		letter->subject);
+}
+
+int
+maildir_print(struct maildir *mail, size_t b, size_t e)
+{
+	for (; b < e; b++) {
+		if (letter_print(b + 1, &mail->letters[b]) == -1)
+			return -1;
+	}
+	return 0;
+}

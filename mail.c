@@ -21,8 +21,6 @@
 static int configure(struct maildir *, struct options *);
 static const char *config_location(void);
 static void usage(void);
-static int letter_print(size_t, struct maildir_letter *);
-static int mail_print(struct maildir *, size_t, size_t);
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
@@ -105,7 +103,7 @@ main(int argc, char *argv[])
 
 	configure(&maildir, &options);
 
-	mail_print(&maildir, 0, maildir.nletters);
+	maildir_print(&maildir, 0, maildir.nletters);
 
 	fputs("> ", stdout);
 	while ((len = getline(&line, &n, stdin)) != -1) {
@@ -206,34 +204,6 @@ configure(struct maildir *maildir, struct options *options)
 	free(line);
 	fclose(fp);
 	return rv;
-}
-
-static int
-mail_print(struct maildir *mail, size_t b, size_t e)
-{
-	for (size_t i = 0; b < e; i++, b++) {
-		if (letter_print(i + 1, &mail->letters[b]) == -1)
-			return -1;
-	}
-	return 0;
-}
-
-static int
-letter_print(size_t nth, struct maildir_letter *letter)
-{
-	char date[30];
-	struct tm *tm;
-
-	if ((tm = localtime(&letter->date)) == NULL) {
-		strlcpy(date, "Unknown date", sizeof(date));
-	}
-	else {
-		if (strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
-			strlcpy(date, "Unknown date", sizeof(date));
-	}
-
-	return printf("%zu    %s %s %s\n", nth, date, letter->from, 
-		letter->subject);
 }
 
 static void
