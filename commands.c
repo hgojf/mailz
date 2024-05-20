@@ -124,7 +124,7 @@ more(struct maildir *maildir, struct options *options, char *args)
 		return 0;
 	}
 
-	if (pipe(p) == -1)
+	if (pipe2(p, O_CLOEXEC) == -1)
 		return -1;
 	if ((fp = fdopen(p[1], "w")) == NULL) {
 		close(p[0]);

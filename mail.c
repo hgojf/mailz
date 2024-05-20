@@ -70,7 +70,7 @@ main(int argc, char *argv[])
 	if (pledge("stdio rpath cpath proc exec", NULL) == -1)
 		err(1, "pledge");
 
-	if ((fd = open(argv[0], O_RDONLY)) == -1)
+	if ((fd = open(argv[0], O_RDONLY | O_CLOEXEC)) == -1)
 		err(1, "open %s", argv[0]);
 	if (fstat(fd, &sb) == -1) {
 		warn("fstat");
@@ -191,7 +191,7 @@ configure(struct maildir *maildir, struct options *options)
 
 	if ((mailrc = config_location()) == NULL)
 		return 0;
-	if ((fp = fopen(mailrc, "r")) == NULL) {
+	if ((fp = fopen(mailrc, "re")) == NULL) {
 		warn("fopen %s", mailrc);
 		return -1;
 	}

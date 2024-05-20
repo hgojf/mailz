@@ -27,7 +27,7 @@ opendirat(int at, const char *path)
 	int fd;
 	DIR *ret;
 
-	if ((fd = openat(at, path, O_DIRECTORY | O_RDONLY)) == -1)
+	if ((fd = openat(at, path, O_DIRECTORY | O_RDONLY | O_CLOEXEC)) == -1)
 		return NULL;
 	if ((ret = fdopendir(fd)) == NULL) {
 		close(fd);
@@ -41,7 +41,7 @@ fopenat(int at, const char *path)
 	FILE *ret;
 	int fd;
 
-	if ((fd = openat(at, path, O_RDONLY)) == -1)
+	if ((fd = openat(at, path, O_RDONLY | O_CLOEXEC)) == -1)
 		return NULL;
 	if ((ret = fdopen(fd, "r")) == NULL) {
 		close(fd);
