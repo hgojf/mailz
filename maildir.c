@@ -100,7 +100,6 @@ maildir_read(struct maildir *maildir, const struct options *options)
 		int n, rv;
 		struct maildir_letter letter;
 		FILE *fp;
-		void *t;
 
 		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
 			continue;
@@ -169,7 +168,6 @@ read_letter(const char *name, FILE *fp, struct maildir_letter *letter)
 	char *line = NULL;
 	size_t n = 0;
 	ssize_t len;
-	int np;
 
 	letter->subject = NULL;
 	letter->from = NULL;
@@ -224,7 +222,6 @@ header_push(struct header *header, struct maildir_letter *letter)
 		return 0;
 	}
 	else if (!strcmp(header->key, "Date")) {
-		char date[30];
 		struct tm tm;
 
 		if (letter->date != -1)
@@ -322,7 +319,7 @@ const struct options *options)
 int
 maildir_letter_set_flag(struct maildir *maildir, struct maildir_letter *letter, char f)
 {
-	char name[NAME_MAX], *flags, flag, *t;
+	char name[NAME_MAX], *flags, *t;
 	int n, dfd;
 	size_t len;
 

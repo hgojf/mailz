@@ -59,7 +59,7 @@ command_run(char *args, struct maildir *maildir, struct options *options)
 }
 
 static int
-ignore(struct maildir *maildir, struct options *options, char *args)
+ignore(__unused struct maildir *maildir, struct options *options, char *args)
 {
 	char *arg;
 
@@ -85,7 +85,7 @@ ignore(struct maildir *maildir, struct options *options, char *args)
 }
 
 static int
-unignore(struct maildir *maildir, struct options *options, char *args)
+unignore(__unused struct maildir *maildir, struct options *options, char *args)
 {
 	char *arg;
 
@@ -119,6 +119,11 @@ more(struct maildir *maildir, struct options *options, char *args)
 	struct maildir_letter *letter = &maildir->letters[options->msg];
 	char template[] = "/tmp/mailz/letter.XXXXXX";
 
+	if (args != NULL) {
+		warnx("This command takes no arguments.");
+		return 0;
+	}
+
 	if ((tfd = mkstemp(template)) == -1)
 		return -1;
 	if ((fp = fdopen(tfd, "w")) == NULL) {
@@ -151,6 +156,11 @@ static int
 unsee(struct maildir *maildir, struct options *options, char *args)
 {
 	struct maildir_letter *letter = &maildir->letters[options->msg];
+
+	if (args != NULL) {
+		warnx("This command takes no arguments.");
+		return 0;
+	}
 
 	if (maildir_letter_set_flag(maildir, letter, '\0') == -1)
 		return -1;
