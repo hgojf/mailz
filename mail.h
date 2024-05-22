@@ -6,16 +6,7 @@ struct header {
 	RB_ENTRY(header) entries;
 };
 
-struct letter {
-	RB_HEAD(headers, header) headers;
-	char *text;
-	time_t sent;
-};
-
-struct mail {
-	struct letter *letters;
-	size_t nletters;
-};
+RB_HEAD(headers, header);
 
 struct options {
 	size_t msg;
