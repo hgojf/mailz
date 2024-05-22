@@ -22,6 +22,7 @@ static int ignore(struct maildir *, struct options *, char *);
 static int unignore(struct maildir *, struct options *, char *);
 static int more(struct maildir *, struct options *, char *);
 static int print(struct maildir *, struct options *, char *);
+static int thread(struct maildir *, struct options *, char *);
 static int unsee(struct maildir *, struct options *, char *);
 
 static struct command commands[] =
@@ -29,6 +30,7 @@ static struct command commands[] =
 	{ "ignore", ignore },
 	{ "more", more },
 	{ "p", print },
+	{ "t", thread },
 	{ "unignore", unignore },
 	{ "x", unsee },
 };
@@ -207,4 +209,59 @@ print(struct maildir *maildir, __unused struct options *options, char *args)
 	}
 
 	return maildir_print(maildir, b, e);
+}
+
+static int
+thread(struct maildir *maildir, __unused struct options *options, char *args)
+{
+	struct maildir_letter *letter;
+	const char *subject;
+	int re;
+	size_t start;
+
+	if (args != NULL) {
+		const char *errstr;
+		size_t idx;
+
+		idx = strtonum(args, 1, maildir->nletters, &errstr);
+		if (errstr != NULL) {
+			warnx("Message number was %s", errstr);
+			return -1;
+		}
+		options->msg = idx;
+	}
+
+	letter = &maildir->letters[options->msg - 1];
+	subject = letter->subject;
+	re = 0;
+	if (!strncmp(letter->subject, "Re: ", strlen("Re: "))) {
+		subject += strlen("Re: ");
+		re = 1;
+	}
+
+	/* if this is the first message in a chain,
+	 * dont search mails before it 
+	 */
+	if (!re) {
+		start = options->msg - 1;
+		/* wont be printed in loop */
+		if (maildir_letter_print(options->msg, letter) == -1)
+			return -1;
+	}
+	else
+		start = 0;
+
+	for (size_t i = start; i < maildir->nletters; i++) {
+		struct maildir_letter *l = &maildir->letters[i];
+
+		if ((!strncmp(l->subject, "Re: ", strlen("Re: ")) && 
+			!strcmp(l->subject + strlen("Re: "), subject)) ||
+			(re && !strcmp(l->subject, subject))) 
+		{
+			if (maildir_letter_print(i + 1, l) == -1)
+				return -1;
+		}
+	}
+
+	return 0;
 }
