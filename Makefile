@@ -4,6 +4,9 @@ SRCS = commands.c mail.c mail-util.c maildir.c
 NOMAN = noman
 TIDYFLAGS = -checks=-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
+realinstall:
+	install -m 0755 mail /usr/local/bin/mailz
+
 .include <bsd.prog.mk>
 
 .PHONY: tidy
