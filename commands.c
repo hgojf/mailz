@@ -119,14 +119,23 @@ static int
 more(struct maildir *maildir, struct options *options, char *args)
 {
 	pid_t pid;
-	struct maildir_letter *letter = &maildir->letters[options->msg - 1];
+	struct maildir_letter *letter;
 	int p[2];
 	FILE *fp;
 
 	if (args != NULL) {
-		warnx("This command takes no arguments.");
-		return 0;
+		const char *errstr;
+		size_t idx;
+
+		idx = strtonum(args, 1, maildir->nletters, &errstr);
+		if (errstr != NULL) {
+			warnx("Message number was %s", errstr);
+			return -1;
+		}
+		options->msg = idx;
 	}
+
+	letter = &maildir->letters[options->msg - 1];
 
 	if (pipe2(p, O_CLOEXEC) == -1)
 		return -1;
