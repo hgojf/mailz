@@ -1,5 +1,6 @@
 #include <sys/tree.h>
 
+#include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -348,6 +349,84 @@ maildir_letter_set_flag(struct maildir *maildir, struct maildir_letter *letter, 
 	return 0;
 }
 
+#define LOCALE_NONE 0
+#define LOCALE_UTF8 1
+
+#define SOFT_BREAK 256
+static int
+equal_escape(FILE *fp, int locale)
+{
+	char s[3], rv;
+
+	switch (locale) {
+		case LOCALE_NONE:
+			if ((s[0] = fgetc(fp)) == EOF)
+				return '=';
+			if (s[0] == '\n')
+				return SOFT_BREAK;
+			return s[0];
+		case LOCALE_UTF8:
+			if ((s[0] = fgetc(fp)) == EOF)
+				return '=';
+			if (s[0] == '\n')
+				return SOFT_BREAK;
+			if (!isxdigit(s[0])) {
+				if (ungetc(s[0], fp) == EOF)
+					return EOF;
+				return '=';
+			}
+			if ((s[1] = fgetc(fp)) == EOF)
+				return '=';
+			if (!isxdigit(s[1])) {
+				if (ungetc(s[0], fp) == EOF)
+					return EOF;
+				if (ungetc(s[1], fp) == EOF)
+					return EOF;
+				return '=';
+			}
+			s[2] = '\0';
+
+			rv = strtol(s, NULL, 16);
+			if (rv > 127 || rv == '\0')
+				return EOF;
+			return rv;
+		default:
+			abort();
+	}
+}
+
+static int
+locale_find(struct headers *headers)
+{
+	struct header w, *f;
+	char *cs, *val;
+
+	w.key = "Content-Type";
+	if ((f = RB_FIND(headers, headers, &w)) == NULL)
+		return 0;
+
+	val = f->val;
+
+	while ((cs = strsep(&val, ";")) != NULL) {
+		char *v, *q;
+
+		cs += strspn(cs, " \t");
+		if ((v = strchr(cs, '=')) == NULL)
+			continue;
+		*v++ = '\0';
+		if (strcmp(cs, "charset") != 0)
+			continue;
+		if (v[0] == '\"')
+			v++;
+		if ((q = strchr(v, '\"')) != NULL)
+			*q = '\0';
+		if (!strcasecmp("utf-8", v))
+			return LOCALE_UTF8;
+	}
+
+	return LOCALE_NONE;
+}
+
 int
 maildir_letter_print_read(struct maildir *maildir,
 struct maildir_letter *letter, const struct options *options,
@@ -359,7 +438,7 @@ FILE *out)
 	ssize_t len;
 	struct headers headers;
 	struct header *h, *h2;
-	char buf[4096];
+	int c, locale;
 	int rv = -1;
 
 	if ((fp = fopenat(dirfd(maildir->cur), letter->path)) == NULL)
@@ -387,8 +466,20 @@ FILE *out)
 			goto headers;
 	}
 
-	while (fgets(buf, sizeof(buf), fp) != NULL) {
-		if (fputs(buf, out) == -1)
+	locale = locale_find(&headers);
+
+	while ((c = fgetc(fp)) != EOF) {
+		if (c == '=') {
+			switch (c = equal_escape(fp, locale)) {
+				case EOF:
+					goto headers;
+				case SOFT_BREAK:
+					continue;
+				default:
+					break;
+			}
+		}
+		if (fputc(c, out) == EOF)
 			goto headers;
 	}
 
