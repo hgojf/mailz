@@ -280,12 +280,7 @@ const struct options *options)
 {
 	struct header *fh, *hp;
 
-	if (header_ignore(header, options)) {
-		free(header->key);
-		free(header->val);
-		return 0;
-	}
-	else if ((fh = RB_FIND(headers, headers, header)) != NULL) {
+	if ((fh = RB_FIND(headers, headers, header)) != NULL) {
 		void *t;
 		size_t len, len1;
 
@@ -462,7 +457,7 @@ FILE *out)
 	}
 
 	RB_FOREACH(h, headers, &headers) {
-		if (fprintf(out, "%s: %s\n", h->key, h->val) < 0)
+		if (!header_ignore(h, options) && fprintf(out, "%s: %s\n", h->key, h->val) < 0)
 			goto headers;
 	}
 
