@@ -520,7 +520,7 @@ maildir_letter_print(size_t nth, struct maildir_letter *letter)
 			strlcpy(date, "Unknown date", sizeof(date));
 	}
 
-	return printf("%zu    %s %s %s\n", nth, date, letter->from, 
+	return printf("%-5zu%s %s %s\n", nth, date, letter->from, 
 		letter->subject);
 }
 
