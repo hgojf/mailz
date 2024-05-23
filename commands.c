@@ -22,6 +22,7 @@ static int ignore(struct maildir *, struct options *, char *);
 static int unignore(struct maildir *, struct options *, char *);
 static int more(struct maildir *, struct options *, char *);
 static int print(struct maildir *, struct options *, char *);
+static int see(struct maildir *, struct options *, char *);
 static int thread(struct maildir *, struct options *, char *);
 static int unsee(struct maildir *, struct options *, char *);
 
@@ -30,6 +31,7 @@ static struct command commands[] =
 	{ "ignore", ignore },
 	{ "more", more },
 	{ "p", print },
+	{ "r", see },
 	{ "t", thread },
 	{ "unignore", unignore },
 	{ "x", unsee },
@@ -172,6 +174,27 @@ more(struct maildir *maildir, struct options *options, char *args)
 	return 0;
 }
 
+static int
+see(struct maildir *maildir, struct options *options, char *args)
+{
+	struct maildir_letter *letter = &maildir->letters[options->msg - 1];
+
+	if (args != NULL) {
+		const char *errstr;
+		size_t idx;
+
+		idx = strtonum(args, 1, maildir->nletters, &errstr);
+		if (errstr != NULL) {
+			warnx("Message number was %s", errstr);
+			return -1;
+		}
+		letter = &maildir->letters[idx - 1];
+	}
+
+	if (maildir_letter_set_flag(maildir, letter, 'S') == -1)
+		return -1;
+	return 0;
+}
 
 static int
 unsee(struct maildir *maildir, struct options *options, char *args)
