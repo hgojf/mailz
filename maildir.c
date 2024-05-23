@@ -275,8 +275,7 @@ header_ignore(struct header *header, const struct options *options)
 }
 
 static int
-header_push2(struct header *header, struct headers *headers,
-const struct options *options)
+header_push2(struct header *header, struct headers *headers)
 {
 	struct header *fh, *hp;
 
@@ -452,7 +451,7 @@ FILE *out)
 			break;
 		if (header_read(fp, &line, &n, &header) == -1)
 			goto headers;
-		if (header_push2(&header, &headers, options) == -1)
+		if (header_push2(&header, &headers) == -1)
 			goto headers;
 	}
 
