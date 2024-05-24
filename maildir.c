@@ -352,39 +352,37 @@ equal_escape(FILE *fp, int locale)
 {
 	char s[3], rv;
 
+	if ((s[0] = fgetc(fp)) == EOF)
+		return '=';
+	if (s[0] == '\n')
+		return SOFT_BREAK;
+	if (!isxdigit(s[0])) {
+		if (ungetc(s[0], fp) == EOF)
+			return EOF;
+		return '=';
+	}
+	if ((s[1] = fgetc(fp)) == EOF)
+		return '=';
+	if (!isxdigit(s[1])) {
+		if (ungetc(s[0], fp) == EOF)
+				return EOF;
+		if (ungetc(s[1], fp) == EOF)
+			return EOF;
+		return '=';
+	}
+	s[2] = '\0';
+
+	rv = strtol(s, NULL, 16);
+
 	switch (locale) {
 		case LOCALE_NONE:
-			if ((s[0] = fgetc(fp)) == EOF)
-				return '=';
-			if (s[0] == '\n')
-				return SOFT_BREAK;
-			return s[0];
 		case LOCALE_UTF8:
-			if ((s[0] = fgetc(fp)) == EOF)
-				return '=';
-			if (s[0] == '\n')
-				return SOFT_BREAK;
-			if (!isxdigit(s[0])) {
-				if (ungetc(s[0], fp) == EOF)
-					return EOF;
-				return '=';
-			}
-			if ((s[1] = fgetc(fp)) == EOF)
-				return '=';
-			if (!isxdigit(s[1])) {
-				if (ungetc(s[0], fp) == EOF)
-					return EOF;
-				if (ungetc(s[1], fp) == EOF)
-					return EOF;
-				return '=';
-			}
-			s[2] = '\0';
-
-			rv = strtol(s, NULL, 16);
-			if (rv > 127 || rv == '\0')
+		/* utf-8 should do mbrtowc */
+			if (!isprint(rv))
 				return EOF;
 			return rv;
 		default:
+			/* NOTREACHED */
 			abort();
 	}
 }
