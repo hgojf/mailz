@@ -14,7 +14,6 @@
 #include <unistd.h>
 
 #include "mail.h"
-#include "mail-util.h"
 #include "maildir.h"
 #include "commands.h"
 
