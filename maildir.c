@@ -261,7 +261,15 @@ static int
 letter_cmp(const void *one, const void *two)
 {
 	const struct maildir_letter *n1 = one, *n2 = two;
-	return n1->date - n2->date;
+	time_t rv;
+
+	rv = n1->date - n2->date;
+	if (rv < 0)
+		return -1;
+	else if (rv > 0)
+		return 1;
+	else
+		return 0;
 }
 
 static int
