@@ -375,15 +375,15 @@ equal_escape(FILE *fp, int locale)
 	rv = strtol(s, NULL, 16);
 
 	switch (locale) {
-		case LOCALE_NONE:
-		case LOCALE_UTF8:
-		/* utf-8 should do mbrtowc */
-			if (!isprint(rv))
-				return EOF;
-			return rv;
-		default:
-			/* NOTREACHED */
-			abort();
+	case LOCALE_NONE:
+	case LOCALE_UTF8:
+	/* utf-8 should do mbrtowc */
+		if (!isprint(rv))
+			return EOF;
+		return rv;
+	default:
+		/* NOTREACHED */
+		abort();
 	}
 }
 
@@ -478,12 +478,12 @@ FILE *out)
 	while ((c = fgetc(fp)) != EOF) {
 		if (c == '=') {
 			switch (c = equal_escape(fp, locale)) {
-				case EOF:
-					goto headers;
-				case SOFT_BREAK:
-					continue;
-				default:
-					break;
+			case EOF:
+				goto headers;
+			case SOFT_BREAK:
+				continue;
+			default:
+				break;
 			}
 		}
 		if (fputc(c, out) == EOF)

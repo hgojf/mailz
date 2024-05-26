@@ -78,23 +78,23 @@ main(int argc, char *argv[])
 	}
 
 	switch (sb.st_mode & S_IFMT) {
-		case S_IFDIR: /* assume maildir */
-			if (maildir_setup(fd, &maildir) == -1)
-				err(1, "maildir_setup1");
-			/* mailread_read takes owner of 'cur' */
-			if (maildir_read(&maildir, &options) == -1)
-				err(1, "maildir_read");
-			break;
-		case S_IFREG: /* assume mbox */
-			warnx("mbox support not yet implemented");
-			close(fd);
-			return 1;
-			/* NOTREACHED */
-		default:
-			warnx("mailbox is not a regular file or directory");
-			close(fd);
-			return 1;
-			/* NOTREACHED */
+	case S_IFDIR: /* assume maildir */
+		if (maildir_setup(fd, &maildir) == -1)
+			err(1, "maildir_setup1");
+		/* mailread_read takes owner of 'cur' */
+		if (maildir_read(&maildir, &options) == -1)
+			err(1, "maildir_read");
+		break;
+	case S_IFREG: /* assume mbox */
+		warnx("mbox support not yet implemented");
+		close(fd);
+		return 1;
+		/* NOTREACHED */
+	default:
+		warnx("mailbox is not a regular file or directory");
+		close(fd);
+		return 1;
+		/* NOTREACHED */
 	}
 
 	if (maildir.nletters == 0) {

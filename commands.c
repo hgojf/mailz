@@ -113,19 +113,19 @@ more(struct maildir *maildir, struct options *options, char *args)
 
 
 	switch (pid = fork()) {
-		case -1:
-			fclose(fp);
-			return -1;
-		case 0:
-			close(p[1]);
-			if (dup2(p[0], STDIN_FILENO) == -1)
-				err(1, "dup2");
-			close(p[0]);
-			execl("/usr/local/libexec/lesswrapper", "lesswrapper", "-", NULL);
-			err(1, "execl");
-			/* NOTREACHED */
-		default:
-			break;
+	case -1:
+		fclose(fp);
+		return -1;
+	case 0:
+		close(p[1]);
+		if (dup2(p[0], STDIN_FILENO) == -1)
+			err(1, "dup2");
+		close(p[0]);
+		execl("/usr/local/libexec/lesswrapper", "lesswrapper", "-", NULL);
+		err(1, "execl");
+		/* NOTREACHED */
+	default:
+		break;
 	}
 
 	signal(SIGPIPE, SIG_IGN);
