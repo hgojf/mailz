@@ -371,9 +371,11 @@ static int
 equal_escape(FILE *fp, int locale)
 {
 	char s[3], rv;
+	int t;
 
-	if ((s[0] = fgetc(fp)) == EOF)
+	if ((t = fgetc(fp)) == EOF)
 		return '=';
+	s[0] = (char) t;
 	if (s[0] == '\n')
 		return SOFT_BREAK;
 	if (!isxdigit(s[0])) {
@@ -381,8 +383,9 @@ equal_escape(FILE *fp, int locale)
 			return EOF;
 		return '=';
 	}
-	if ((s[1] = fgetc(fp)) == EOF)
+	if ((t = fgetc(fp)) == EOF)
 		return '=';
+	s[1] = (char) t;
 	if (!isxdigit(s[1])) {
 		if (ungetc(s[0], fp) == EOF)
 				return EOF;
@@ -606,7 +609,8 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 		goto key;
 
 	for (;;) {
-		char c, *line;
+		char *line;
+		int c;
 		void *t;
 		ssize_t len, ws;
 
