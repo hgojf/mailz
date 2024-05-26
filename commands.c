@@ -12,6 +12,7 @@
 
 #include "mail.h"
 #include "maildir.h"
+#include "util.h"
 
 struct command {
 	const char *ident;
@@ -93,7 +94,7 @@ more(struct maildir *maildir, struct options *options, char *args)
 		const char *errstr;
 		size_t idx;
 
-		idx = strtonum(args, 1, maildir->nletters, &errstr);
+		idx = strtosize(args, 1, maildir->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
 			return -1;
@@ -153,7 +154,7 @@ see(struct maildir *maildir, struct options *options, char *args)
 		const char *errstr;
 		size_t idx;
 
-		idx = strtonum(args, 1, maildir->nletters, &errstr);
+		idx = strtosize(args, 1, maildir->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
 			return -1;
@@ -189,13 +190,13 @@ print(struct maildir *maildir, __unused struct options *options, char *args)
 	size_t b, e;
 
 	if ((start = strsep(&args, "-")) != NULL) {
-		b = strtonum(start, 1, maildir->nletters, &errstr);
+		b = strtosize(start, 1, maildir->nletters, &errstr);
 		if (errstr != NULL) {
 			printf("range was %s\n", errstr);
 			return -1;
 		}
 		if ((end = strsep(&args, "-")) != NULL) {
-			e = strtonum(end, b, maildir->nletters, &errstr);
+			e = strtosize(end, b, maildir->nletters, &errstr);
 			if (errstr != NULL) {
 				printf("range was %s\n", errstr);
 				return -1;
@@ -225,7 +226,7 @@ thread(struct maildir *maildir, __unused struct options *options, char *args)
 		const char *errstr;
 		size_t idx;
 
-		idx = strtonum(args, 1, maildir->nletters, &errstr);
+		idx = strtosize(args, 1, maildir->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
 			return -1;

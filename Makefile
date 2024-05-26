@@ -1,6 +1,6 @@
 PROG = mail
 CFLAGS = -g -Wall -Wextra
-SRCS = commands.c mail.c maildir.c
+SRCS = commands.c mail.c maildir.c util.c
 NOMAN = noman
 TIDYFLAGS = -checks=-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 

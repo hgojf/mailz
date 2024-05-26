@@ -16,6 +16,7 @@
 #include "mail.h"
 #include "maildir.h"
 #include "commands.h"
+#include "util.h"
 
 static int configure(struct maildir *, struct options *);
 static const char *config_location(void);
@@ -122,7 +123,7 @@ main(int argc, char *argv[])
 		else if (isdigit(*line)) {
 			const char *errstr;
 
-			options.msg = strtonum(line, 1, maildir.nletters, &errstr);
+			options.msg = strtosize(line, 1, maildir.nletters, &errstr);
 			if (errstr != NULL)
 				warnx("Message number was %s", errstr);
 			else {
