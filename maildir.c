@@ -368,9 +368,9 @@ maildir_letter_set_flag(struct maildir *maildir, struct maildir_letter *letter, 
 
 #define SOFT_BREAK 256
 static int
-equal_escape(FILE *fp, int locale)
+equal_escape(FILE *fp)
 {
-	char s[3], rv;
+	char s[3];
 	int t;
 
 	if ((t = fgetc(fp)) == EOF)
@@ -395,19 +395,7 @@ equal_escape(FILE *fp, int locale)
 	}
 	s[2] = '\0';
 
-	rv = strtol(s, NULL, 16);
-
-	switch (locale) {
-	case LOCALE_NONE:
-	case LOCALE_UTF8:
-	/* utf-8 should do mbrtowc */
-		if (!isprint(rv))
-			return EOF;
-		return rv;
-	default:
-		/* NOTREACHED */
-		abort();
-	}
+	return (char) strtol(s, NULL, 16);
 }
 
 static int
@@ -496,11 +484,14 @@ FILE *out)
 			goto headers;
 	}
 
+	if (fputc('\n', out) == EOF)
+		goto headers;
+
 	locale = locale_find(&headers);
 
 	while ((c = fgetc(fp)) != EOF) {
 		if (c == '=') {
-			switch (c = equal_escape(fp, locale)) {
+			switch (c = equal_escape(fp)) {
 			case EOF:
 				goto headers;
 			case SOFT_BREAK:
@@ -509,8 +500,17 @@ FILE *out)
 				break;
 			}
 		}
-		if (fputc(c, out) == EOF)
-			goto headers;
+		switch (locale) {
+		case LOCALE_UTF8:
+		case LOCALE_NONE:
+			if (!isprint(c) && !isspace(c)) {
+				if (fputs("__[invalid]__", out) == EOF)
+					goto headers;
+			}
+			else if (fputc(c, out) == EOF)
+				goto headers;
+			break;
+		}
 	}
 
 	if (maildir_letter_set_flag(maildir, letter, 'S') == -1)
