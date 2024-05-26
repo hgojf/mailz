@@ -17,6 +17,9 @@ struct options {
 
 	size_t nunignore;
 	char **unignore;
+
+	size_t nreorder;
+	char **reorder;
 };
 
 RB_PROTOTYPE(headers, header, entry, header_cmp);

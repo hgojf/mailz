@@ -18,10 +18,13 @@ struct command {
 	int (*fn) (struct maildir *, struct options *, char *);
 };
 
+static int argv_ify(char *, size_t *, char ***);
+
 static int ignore(struct maildir *, struct options *, char *);
 static int unignore(struct maildir *, struct options *, char *);
 static int more(struct maildir *, struct options *, char *);
 static int print(struct maildir *, struct options *, char *);
+static int reorder(struct maildir *, struct options *, char *);
 static int see(struct maildir *, struct options *, char *);
 static int thread(struct maildir *, struct options *, char *);
 static int unsee(struct maildir *, struct options *, char *);
@@ -32,6 +35,7 @@ static struct command commands[] =
 	{ "more", more },
 	{ "p", print },
 	{ "r", see },
+	{ "reorder", reorder },
 	{ "t", thread },
 	{ "unignore", unignore },
 	{ "x", unsee },
@@ -68,53 +72,13 @@ command_run(char *args, struct maildir *maildir, struct options *options)
 static int
 ignore(__unused struct maildir *maildir, struct options *options, char *args)
 {
-	char *arg;
-
-	while ((arg = strsep(&args, " \t")) != NULL) {
-		void *t;
-		char *s;
-
-		if ((s = strdup(arg)) == NULL)
-			return -1;
-
-		t = reallocarray(options->ignore, options->nignore + 1, 
-			sizeof(*options->ignore));
-		if (t == NULL) {
-			free(s);
-			return -1;
-		}
-
-		options->ignore = t;
-		options->ignore[options->nignore] = s;
-		options->nignore++;
-	}
-	return 0;
+	return argv_ify(args, &options->nignore, &options->ignore);
 }
 
 static int
 unignore(__unused struct maildir *maildir, struct options *options, char *args)
 {
-	char *arg;
-
-	while ((arg = strsep(&args, " \t")) != NULL) {
-		void *t;
-		char *s;
-
-		if ((s = strdup(arg)) == NULL)
-			return -1;
-
-		t = reallocarray(options->unignore, options->nunignore + 1, 
-			sizeof(*options->unignore));
-		if (t == NULL) {
-			free(s);
-			return -1;
-		}
-
-		options->unignore = t;
-		options->unignore[options->nunignore] = s;
-		options->nunignore++;
-	}
-	return 0;
+	return argv_ify(args, &options->nunignore, &options->unignore);
 }
 
 static int
@@ -172,6 +136,12 @@ more(struct maildir *maildir, struct options *options, char *args)
 	waitpid(pid, NULL, 0);
 	signal(SIGPIPE, SIG_DFL);
 	return 0;
+}
+
+static int
+reorder(__unused struct maildir *maildir, struct options *options, char *args)
+{
+	return argv_ify(args, &options->nreorder, &options->reorder);
 }
 
 static int
@@ -296,4 +266,36 @@ thread(struct maildir *maildir, __unused struct options *options, char *args)
 	}
 
 	return 0;
+}
+
+static int
+argv_ify(char *args, size_t *out_argc, char ***out_argv)
+{
+	char **argv, *s, *p;
+	size_t argc;
+	void *t;
+	int rv = -1;
+
+	argv = *out_argv;
+	argc = *out_argc;
+
+	while ((s = strsep(&args, " \t")) != NULL) {
+		if ((p = strdup(s)) == NULL)
+			goto fail;
+		t = reallocarray(argv, argc + 1, sizeof(*argv));
+		if (t == NULL) {
+			free(s);
+			goto fail;
+		}
+
+		argv = t;
+		argv[argc] = p;
+		argc++;
+	}
+
+	rv = 0;
+	fail:
+	*out_argc = argc;
+	*out_argv = argv;
+	return rv;
 }

@@ -41,6 +41,8 @@ main(int argc, char *argv[])
 	options.ignore = NULL;
 	options.nunignore = 0;
 	options.unignore = NULL;
+	options.nreorder = 0;
+	options.reorder = NULL;
 	options.msg = 1;
 
 	while ((ch = getopt(argc, argv, "s")) != -1) {
@@ -140,6 +142,10 @@ main(int argc, char *argv[])
 	free(line);
 	close(fd);
 	maildir_free(&maildir);
+	for (size_t i = 0; i < options.nreorder; i++) {
+		free(options.reorder[i]);
+	}
+	free(options.reorder);
 	for (size_t i = 0; i < options.nignore; i++) {
 		free(options.ignore[i]);
 	}
