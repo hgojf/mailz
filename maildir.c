@@ -19,8 +19,10 @@ struct header {
 	RB_ENTRY(header) entries;
 };
 
+static int header_cmp(struct header *, struct header *);
 RB_HEAD(headers, header);
-RB_PROTOTYPE(headers, header, entry, header_cmp);
+RB_PROTOTYPE(headers, header, entry, header_cmp)
+RB_GENERATE(headers, header, entries, header_cmp)
 
 static DIR *opendirat(int, const char *);
 static FILE *fopenat(int, const char *);
@@ -575,8 +577,6 @@ header_cmp(struct header *one, struct header *two)
 {
 	return strcmp(one->key, two->key);
 }
-
-RB_GENERATE(headers, header, entries, header_cmp);
 
 static int
 header_read(FILE *fp, char **lp, size_t *np, struct header *out)
