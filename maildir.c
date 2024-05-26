@@ -325,18 +325,21 @@ maildir_letter_set_flag(struct maildir *maildir, struct maildir_letter *letter, 
 {
 	char name[NAME_MAX], *flags, *t;
 	int n, dfd;
-	size_t len;
 
 	/* remove existing flags, if they exist */
 	if ((flags = strchr(letter->path, ':')) == NULL)
 		return -1;
-	len = flags - letter->path;
-	if (len > INT_MAX)
-		return -1;
+	*flags = '\0';
 
-	n = snprintf(name, NAME_MAX, "%.*s:2,%c", (int) len, letter->path, f);
+	/* hide flags for this call */
+	n = snprintf(name, NAME_MAX, "%s:2,%c", letter->path, f);
+
+	/* now unhide */
+	*flags = ':';
+
 	if (n < 0 || n >= NAME_MAX)
 		return -1;
+
 
 	dfd = dirfd(maildir->cur);
 
