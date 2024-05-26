@@ -1,13 +1,5 @@
 #ifndef MAILZ_MAIL_H
 #define MAILZ_MAIL_H
-struct header {
-	char *key;
-	char *val;
-	RB_ENTRY(header) entries;
-};
-
-RB_HEAD(headers, header);
-
 struct options {
 	size_t msg;
 	int view_seen;
@@ -21,6 +13,4 @@ struct options {
 	size_t nreorder;
 	char **reorder;
 };
-
-RB_PROTOTYPE(headers, header, entry, header_cmp);
 #endif /* MAILZ_MAIL_H */

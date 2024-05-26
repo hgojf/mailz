@@ -13,6 +13,15 @@
 #include "mail.h"
 #include "maildir.h"
 
+struct header {
+	char *key;
+	char *val;
+	RB_ENTRY(header) entries;
+};
+
+RB_HEAD(headers, header);
+RB_PROTOTYPE(headers, header, entry, header_cmp);
+
 static DIR *opendirat(int, const char *);
 static FILE *fopenat(int, const char *);
 
