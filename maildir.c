@@ -594,12 +594,12 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 	out->key[strcspn(out->key, " \t")] = '\0';
 
 	for (size_t i = 0; out->key[i] != '\0'; i++) {
-		if (out->key[i] < 33 || out->key[i] > 126)
+		if (!isprint(out->key[i]))
 			return -1;
 	}
 
 	for (vlen = 0; out->val[vlen] != '\0'; vlen++) {
-		if (out->val[vlen] > 127)
+		if (!isascii(out->val[vlen]))
 			return -1;
 	}
 
@@ -634,7 +634,7 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 		line = (*lp) + ws;
 
 		for (size_t i = 0; line[i] != '\0'; i++) {
-			if (line[i] > 127)
+			if (!isascii(line[i]))
 				goto val;
 		}
 
