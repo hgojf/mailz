@@ -219,21 +219,21 @@ read_letter(const char *name, FILE *fp, struct maildir_letter *letter)
 static int
 header_push(struct header *header, struct maildir_letter *letter)
 {
-	if (!strcmp(header->key, "Subject")) {
+	if (!strcasecmp(header->key, "Subject")) {
 		if (letter->subject != NULL)
 			goto header;
 		letter->subject = header->val;
 		free(header->key);
 		return 0;
 	}
-	else if (!strcmp(header->key, "From")) {
+	else if (!strcasecmp(header->key, "From")) {
 		if (letter->from != NULL)
 			goto header;
 		letter->from = header->val;
 		free(header->key);
 		return 0;
 	}
-	else if (!strcmp(header->key, "Date")) {
+	else if (!strcasecmp(header->key, "Date")) {
 		struct tm tm;
 
 		if (letter->date != -1)
@@ -279,14 +279,14 @@ header_ignore(struct header *header, const struct options *options)
 {
 	if (options->nunignore != 0) {
 		for (size_t i = 0; i < options->nunignore; i++) {
-			if (!strcmp(header->key, options->unignore[i]))
+			if (!strcasecmp(header->key, options->unignore[i]))
 				return 0;
 		}
 		return 1;
 	}
 	else {
 		for (size_t i = 0; i < options->nignore; i++) {
-			if (!strcmp(header->key, options->ignore[i]))
+			if (!strcasecmp(header->key, options->ignore[i]))
 				return 1;
 		}
 		return 0;
@@ -575,7 +575,7 @@ maildir_print(struct maildir *mail, size_t b, size_t e)
 static int
 header_cmp(struct header *one, struct header *two)
 {
-	return strcmp(one->key, two->key);
+	return strcasecmp(one->key, two->key);
 }
 
 static int
