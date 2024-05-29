@@ -260,7 +260,6 @@ header_push(struct header *header, struct maildir_letter *letter)
 			goto header;
 		if (letter->date < off)
 			goto header;
-		assert(off == tm.tm_gmtoff);
 		letter->date -= off;
 		free(header->key);
 		free(header->val);
