@@ -1,5 +1,6 @@
 #include <sys/tree.h>
 
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -10,6 +11,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "date.h"
 #include "mail.h"
 #include "maildir.h"
 
@@ -235,14 +237,31 @@ header_push(struct header *header, struct maildir_letter *letter)
 	}
 	else if (!strcasecmp(header->key, "Date")) {
 		struct tm tm;
+		char *tz, *b;
+		time_t off;
 
 		if (letter->date != -1)
 			goto header;
 
-		if (strptime(header->val, "%a, %d %b %Y %H:%M:%S %z", &tm) == NULL)
+		/* Some clients put their timezone abbreviation in brackets.
+		 * Not sure why this is done or if it is standardized,
+		 * but we ignore it.
+		 */
+		if ((b = strrchr(header->val, '(')) != NULL)
+			*b = '\0';
+		if ((tz = strrchr(header->val, ' ')) == NULL)
+			goto header;
+		*tz++ = '\0';
+		if ((off = tz_tosec(tz)) == TZ_INVALIDSEC)
+			goto header;
+		if (strptime(header->val, "%a, %d %b %Y %H:%M:%S", &tm) == NULL)
 			goto header;
 		if ((letter->date = mktime(&tm)) == -1)
 			goto header;
+		if (letter->date < off)
+			goto header;
+		assert(off == tm.tm_gmtoff);
+		letter->date -= off;
 		free(header->key);
 		free(header->val);
 		return 0;
