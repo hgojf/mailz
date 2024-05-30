@@ -359,7 +359,13 @@ header_push2(struct header *header, struct headers *headers)
 		if ((hp = malloc(sizeof(*hp))) == NULL)
 			goto header;
 		*hp = *header;
-		(void) RB_INSERT(headers, headers, hp);
+		/* clang-tidy thinks that this can leak hp because RB_INSERT 
+		 * will discard the inserted value if there already exists
+		 * a value with that key. This cannot happen because RB_FIND 
+		 * above has failed, meaning no value with this key exists.
+		 * XXX: clean this up
+		 */
+		(void) RB_INSERT(headers, headers, hp); //NOLINT
 	}
 
 	return 0;
