@@ -415,7 +415,6 @@ maildir_letter_set_flag(struct maildir *maildir, struct maildir_letter *letter, 
 #define LOCALE_NONE 0
 #define LOCALE_UTF8 1
 
-#define SOFT_BREAK 256
 static int
 equal_escape(FILE *fp)
 {
@@ -426,7 +425,7 @@ equal_escape(FILE *fp)
 		return '=';
 	s[0] = (char) t;
 	if (s[0] == '\n')
-		return SOFT_BREAK;
+		return '\n';
 	if (!isxdigit(s[0])) {
 		if (ungetc(s[0], fp) == EOF)
 			return EOF;
@@ -539,16 +538,8 @@ FILE *out)
 	locale = locale_find(&headers);
 
 	while ((c = fgetc(fp)) != EOF) {
-		if (c == '=') {
-			switch (c = equal_escape(fp)) {
-			case EOF:
-				goto headers;
-			case SOFT_BREAK:
-				continue;
-			default:
-				break;
-			}
-		}
+		if (c == '=' && (c = equal_escape(fp)) == EOF)
+			goto headers;
 		switch (locale) {
 		case LOCALE_UTF8:
 		case LOCALE_NONE:
