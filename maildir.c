@@ -254,7 +254,8 @@ header_push(struct header *header, struct maildir_letter *letter)
 			goto header;
 		/* takes ownership of header->val on success */
 		if ((letter->from = from_extract(header->val)) == NULL)
-			abort();
+			goto header;
+		free(header->key);
 		return 0;
 	}
 	else if (!strcasecmp(header->key, "Date")) {
