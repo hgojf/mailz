@@ -285,7 +285,7 @@ argv_ify(char *args, size_t *out_argc, char ***out_argv)
 			goto fail;
 		t = reallocarray(argv, argc + 1, sizeof(*argv));
 		if (t == NULL) {
-			free(s);
+			free(p);
 			goto fail;
 		}
 
