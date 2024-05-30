@@ -366,7 +366,7 @@ header_push2(struct header *header, struct headers *headers)
 		 * above has failed, meaning no value with this key exists.
 		 * XXX: clean this up
 		 */
-		(void) RB_INSERT(headers, headers, hp); //NOLINT
+		(void) RB_INSERT(headers, headers, hp); //NOLINT(clang-analyzer-unix.Malloc)
 	}
 
 	return 0;
