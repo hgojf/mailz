@@ -218,6 +218,27 @@ read_letter(const char *name, FILE *fp, struct maildir_letter *letter)
 	return -1;
 }
 
+static char *
+from_extract(char *from)
+{
+	char *m;
+	if ((m = strchr(from, '<')) != NULL) {
+		char *rv;
+		size_t len;
+
+		len = strlen(m);
+		if (m[len - 1] != '>')
+			return NULL;
+
+		if ((rv = strndup(&m[1], len - 2)) == NULL)
+			return NULL;
+		free(from);
+		return rv;
+	}
+
+	return from;
+}
+
 static int
 header_push(struct header *header, struct maildir_letter *letter)
 {
@@ -231,8 +252,9 @@ header_push(struct header *header, struct maildir_letter *letter)
 	else if (!strcasecmp(header->key, "From")) {
 		if (letter->from != NULL)
 			goto header;
-		letter->from = header->val;
-		free(header->key);
+		/* takes ownership of header->val on success */
+		if ((letter->from = from_extract(header->val)) == NULL)
+			abort();
 		return 0;
 	}
 	else if (!strcasecmp(header->key, "Date")) {
