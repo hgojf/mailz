@@ -235,6 +235,12 @@ thread(struct maildir *maildir, __unused struct options *options, char *args)
 	}
 
 	letter = &maildir->letters[options->msg - 1];
+
+	if (letter->subject == NULL) {
+		/* cant really find a thread without a subject */
+		return maildir_letter_print(1, letter);
+	}
+
 	subject = letter->subject;
 	re = 0;
 	if (!strncmp(letter->subject, "Re: ", strlen("Re: "))) {
@@ -256,6 +262,9 @@ thread(struct maildir *maildir, __unused struct options *options, char *args)
 
 	for (size_t i = start; i < maildir->nletters; i++) {
 		struct maildir_letter *l = &maildir->letters[i];
+
+		if (l->subject == NULL)
+			continue;
 
 		if ((!strncmp(l->subject, "Re: ", strlen("Re: ")) && 
 			!strcmp(l->subject + strlen("Re: "), subject)) ||

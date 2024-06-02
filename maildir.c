@@ -201,7 +201,7 @@ read_letter(const char *name, FILE *fp, struct maildir_letter *letter)
 			goto letter;
 	}
 
-	if (letter->subject == NULL || letter->from == NULL || letter->date == -1)
+	if (letter->from == NULL || letter->date == -1)
 		goto letter;
 
 	if ((letter->path = strdup(name)) == NULL)
@@ -596,8 +596,8 @@ maildir_letter_print(size_t nth, struct maildir_letter *letter)
 			strlcpy(date, "Unknown date", sizeof(date));
 	}
 
-	return printf("%-5zu%s %s %s\n", nth, date, letter->from, 
-		letter->subject);
+	return printf("%4zu %-20s %-32s %-30s\n", nth, date, letter->from, 
+		letter->subject == NULL ? "No Subject" : letter->subject);
 }
 
 int
