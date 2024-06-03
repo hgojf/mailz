@@ -10,7 +10,7 @@ struct maildir_letter {
 struct maildir {
 	DIR *cur;
 
-	size_t nletters;
+	long long nletters;
 	struct maildir_letter *letters;
 };
 

@@ -123,7 +123,7 @@ main(int argc, char *argv[])
 		else if (isdigit(*line)) {
 			const char *errstr;
 
-			options.msg = strtosize(line, 1, maildir.nletters, &errstr);
+			options.msg = strtonum(line, 1, maildir.nletters, &errstr);
 			if (errstr != NULL)
 				warnx("Message number was %s", errstr);
 			else {

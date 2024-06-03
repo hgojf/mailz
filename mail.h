@@ -1,7 +1,7 @@
 #ifndef MAILZ_MAIL_H
 #define MAILZ_MAIL_H
 struct options {
-	size_t msg;
+	long long msg;
 	int view_seen;
 
 	size_t nignore;

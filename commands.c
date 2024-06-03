@@ -92,9 +92,9 @@ more(struct maildir *maildir, struct options *options, char *args)
 
 	if (args != NULL) {
 		const char *errstr;
-		size_t idx;
+		long long idx;
 
-		idx = strtosize(args, 1, maildir->nletters, &errstr);
+		idx = strtonum(args, 1, maildir->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
 			return -1;
@@ -152,9 +152,9 @@ see(struct maildir *maildir, struct options *options, char *args)
 
 	if (args != NULL) {
 		const char *errstr;
-		size_t idx;
+		long long idx;
 
-		idx = strtosize(args, 1, maildir->nletters, &errstr);
+		idx = strtonum(args, 1, maildir->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
 			return -1;
@@ -187,16 +187,16 @@ print(struct maildir *maildir, __unused struct options *options, char *args)
 {
 	char *start, *end;
 	const char *errstr;
-	size_t b, e;
+	long long b, e;
 
 	if ((start = strsep(&args, "-")) != NULL) {
-		b = strtosize(start, 1, maildir->nletters, &errstr);
+		b = strtonum(start, 1, maildir->nletters, &errstr);
 		if (errstr != NULL) {
 			printf("range was %s\n", errstr);
 			return -1;
 		}
 		if ((end = strsep(&args, "-")) != NULL) {
-			e = strtosize(end, b, maildir->nletters, &errstr);
+			e = strtonum(end, b, maildir->nletters, &errstr);
 			if (errstr != NULL) {
 				printf("range was %s\n", errstr);
 				return -1;
@@ -224,9 +224,9 @@ thread(struct maildir *maildir, __unused struct options *options, char *args)
 
 	if (args != NULL) {
 		const char *errstr;
-		size_t idx;
+		long long idx;
 
-		idx = strtosize(args, 1, maildir->nletters, &errstr);
+		idx = strtonum(args, 1, maildir->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
 			return -1;
@@ -260,7 +260,7 @@ thread(struct maildir *maildir, __unused struct options *options, char *args)
 	else
 		start = 0;
 
-	for (size_t i = start; i < maildir->nletters; i++) {
+	for (long long i = start; i < maildir->nletters; i++) {
 		struct maildir_letter *l = &maildir->letters[i];
 
 		if (l->subject == NULL)

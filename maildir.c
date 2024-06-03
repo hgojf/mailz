@@ -145,7 +145,7 @@ maildir_read(struct maildir *maildir, const struct options *options)
 	return 0;
 
 	letters:
-	for (size_t i = 0; i < maildir->nletters; i++) {
+	for (long long i = 0; i < maildir->nletters; i++) {
 		free(maildir->letters[i].path);
 		free(maildir->letters[i].subject);
 		free(maildir->letters[i].from);
@@ -574,7 +574,7 @@ void
 maildir_free(struct maildir *maildir)
 {
 	closedir(maildir->cur);
-	for (size_t i = 0; i < maildir->nletters; i++) {
+	for (long long i = 0; i < maildir->nletters; i++) {
 		free(maildir->letters[i].path);
 		free(maildir->letters[i].subject);
 		free(maildir->letters[i].from);
