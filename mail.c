@@ -16,7 +16,6 @@
 #include "mail.h"
 #include "maildir.h"
 #include "commands.h"
-#include "util.h"
 
 static int configure(struct maildir *, struct options *);
 static const char *config_location(void);
