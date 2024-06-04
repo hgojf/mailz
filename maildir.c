@@ -277,6 +277,7 @@ header_push(struct header *header, struct maildir_letter *letter)
 		*tz++ = '\0';
 		if ((off = tz_tosec(tz)) == TZ_INVALIDSEC)
 			goto header;
+		memset(&tm, 0, sizeof(tm));
 		if (strptime(header->val, "%a, %d %b %Y %H:%M:%S", &tm) == NULL)
 			goto header;
 		if ((letter->date = mktime(&tm)) == -1)
