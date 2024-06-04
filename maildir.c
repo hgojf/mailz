@@ -513,18 +513,18 @@ FILE *out)
 	}
 
 	for (size_t i = 0; i < options->nreorder; i++) {
-		struct header *h, f;
+		struct header *v, f;
 
 		f.key = options->reorder[i];
-		if ((h = RB_FIND(headers, &headers, &f)) == NULL)
+		if ((v = RB_FIND(headers, &headers, &f)) == NULL)
 			continue;
-		if (!header_ignore(h, options) 
-				&& fprintf(out, "%s: %s\n", h->key, h->val) < 0)
+		if (!header_ignore(v, options) 
+				&& fprintf(out, "%s: %s\n", v->key, v->val) < 0)
 			goto headers;
-		RB_REMOVE(headers, &headers, h);
-		free(h->key);
-		free(h->val);
-		free(h);
+		RB_REMOVE(headers, &headers, v);
+		free(v->key);
+		free(v->val);
+		free(v);
 	}
 
 	RB_FOREACH(h, headers, &headers) {
