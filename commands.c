@@ -12,7 +12,6 @@
 
 #include "mail.h"
 #include "maildir.h"
-#include "util.h"
 
 struct command {
 	const char *ident;
