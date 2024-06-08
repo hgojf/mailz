@@ -159,6 +159,10 @@ push_letter(struct maildir_letter *letter, struct maildir *maildir)
 {
 	void *t;
 
+	/* should be impossible */
+	if (maildir->nletters == LLONG_MAX)
+		goto letter;
+
 	t = reallocarray(maildir->letters, maildir->nletters + 1,
 		sizeof(*maildir->letters));
 	if (t == NULL)
