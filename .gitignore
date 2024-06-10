@@ -1,5 +1,8 @@
 *.[od]
+obj/*.[od]
+obj/mail
 mail
 ktrace.out
 lesswrapper/*.[od]
 lesswrapper/lesswrapper
+tags
