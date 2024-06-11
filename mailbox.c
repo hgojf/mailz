@@ -700,7 +700,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 			if ((c = fgetc(fp)) == EOF)
 				break;
 			if (c != '\n') {
-				if (fputc(c, out) == EOF)
+				if (ungetc(c, fp) == EOF)
 					goto headers;
 				continue;
 			}
@@ -709,7 +709,8 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 				break;
 			if (n == 4 && memcmp(from, "From", 4) == 0)
 				break;
-			if (fwrite(from, n, 1, out) != 1)
+			/* allow these characters to be dealth with as normal */
+			if (fseek(fp, -n, SEEK_CUR) == -1)
 				goto headers;
 		}
 	}
