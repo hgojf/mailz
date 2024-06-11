@@ -44,6 +44,11 @@ static int see(struct mailbox *, struct options *, char *);
 static int thread(struct mailbox *, struct options *, char *);
 static int unsee(struct mailbox *, struct options *, char *);
 
+#ifndef __OpenBSD__
+#define pledge(a, b) 0
+#define unveil(a, b) 0
+#endif /* !__OpenBSD__ */
+
 static struct command commands[] =
 {
 	{ "ignore", ignore },
