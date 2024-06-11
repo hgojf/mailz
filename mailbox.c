@@ -449,10 +449,7 @@ header_push(struct header *header, struct letter *letter)
 		if (letter->date != -1)
 			goto header;
 
-		/* Some clients put their timezone abbreviation in brackets.
-		 * Not sure why this is done or if it is standardized,
-		 * but we ignore it.
-		 */
+		/* dont yet support ignoring comments except in this common case */
 		if ((b = strrchr(header->val, '(')) != NULL)
 			*b = '\0';
 		if ((tz = strrchr(header->val, ' ')) == NULL)
