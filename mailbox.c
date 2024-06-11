@@ -1,5 +1,9 @@
 #include <sys/stat.h>
+#ifdef __GLIBC__
+#include "tree.h"
+#else
 #include <sys/tree.h>
+#endif /* __GLIBC__ */
 
 #include <assert.h>
 #include <ctype.h>
@@ -16,6 +20,10 @@
 #include "date.h"
 #include "mail.h"
 #include "mailbox.h"
+
+#ifdef __GLIBC__
+char *strptime(const char *, const char *, struct tm *);
+#endif /* __GLIBC__ */
 
 struct header {
 	char *key;

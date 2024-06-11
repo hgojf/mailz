@@ -51,6 +51,10 @@ static long long strtonum(const char *, long long, long long, const char **);
 #define unveil(a, b) 0
 #endif /* !__OpenBSD__ */
 
+#ifdef __GLIBC__
+int pipe2(int [2], int);
+#endif /* __GLIBC__ */
+
 static struct command commands[] =
 {
 	{ "ignore", ignore },
