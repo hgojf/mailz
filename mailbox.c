@@ -283,7 +283,7 @@ mailbox_letter_print(size_t nth, struct letter *letter)
 			|| strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
 		strlcpy(date, "Unknown date", sizeof(date));
 
-	return printf("%4zu %-20s %-32s %-30s\n", nth, date, letter->from,
+	return printf("%4zu %-20s %-32.32s %-30s\n", nth, date, letter->from,
 		letter->subject == NULL ? "No Subject" : letter->subject);
 }
 
