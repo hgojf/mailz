@@ -15,6 +15,14 @@
 #include "mail.h"
 #include "mailbox.h"
 
+#ifndef __unused
+#if defined(__GNUC__) || defined(__clang__)
+#define __unused __attribute__((unused))
+#else
+#define __unused /* delete */
+#endif /* __GNUC__ || __clang__ */
+#endif /* __unused */
+
 struct command {
 	const char *ident;
 	int (*fn) (struct mailbox *, struct options *, char *);
