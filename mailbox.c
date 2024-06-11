@@ -109,6 +109,7 @@ mailbox_read(struct mailbox *out, const struct options *options)
 	else if (type == MAILBOX_MAILDIR) {
 		mdir = out->val.maildir_cur;
 		dfd = dirfd(mdir);
+		fp = NULL;
 	}
 
 	out->letters = NULL;
@@ -166,6 +167,7 @@ mailbox_read(struct mailbox *out, const struct options *options)
 				goto fail;
 			}
 			fclose(fp);
+			fp = NULL;
 		}
 
 		if (type == MAILBOX_MBOX)
@@ -178,12 +180,15 @@ mailbox_read(struct mailbox *out, const struct options *options)
 
 	rv = 0;
 	fail:
+	if (type == MAILBOX_MAILDIR && fp != NULL)
+		fclose(fp);
 	if (rv == -1) {
 		for (long long i = 0; i < out->nletters; i++)
 			letter_free(type, &out->letters[i]);
 		free(out->letters);
-		if (type == MAILBOX_MAILDIR)
+		if (type == MAILBOX_MAILDIR) {
 			closedir(mdir);
+		}
 		else if (type == MAILBOX_MBOX)
 			fclose(mbox);
 	}
