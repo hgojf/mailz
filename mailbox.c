@@ -186,9 +186,8 @@ mailbox_read(struct mailbox *out, const struct options *options)
 		for (long long i = 0; i < out->nletters; i++)
 			letter_free(type, &out->letters[i]);
 		free(out->letters);
-		if (type == MAILBOX_MAILDIR) {
+		if (type == MAILBOX_MAILDIR)
 			closedir(mdir);
-		}
 		else if (type == MAILBOX_MBOX)
 			fclose(mbox);
 	}
