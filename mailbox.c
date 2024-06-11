@@ -552,7 +552,7 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 		if ((c = fgetc(fp)) == EOF)
 			goto val;
 		if (!isspace(c) || c == '\n') {
-			if (ungetc(c, fp) == EOF)
+			if (fseek(fp, -1, SEEK_CUR) == -1)
 				goto val;
 			break;
 		}
@@ -713,7 +713,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 			if ((c = fgetc(fp)) == EOF)
 				break;
 			if (c != '\n') {
-				if (ungetc(c, fp) == EOF)
+				if (fseek(fp, -1, SEEK_CUR) == -1)
 					goto headers;
 				continue;
 			}
@@ -827,7 +827,7 @@ equal_escape(FILE *fp)
 	if (s[0] == '\n')
 		return '\n';
 	if (!isxdigit(s[0])) {
-		if (ungetc(s[0], fp) == EOF)
+		if (fseek(fp, -1, SEEK_CUR) == -1)
 			return EOF;
 		return '=';
 	}
@@ -835,9 +835,7 @@ equal_escape(FILE *fp)
 		return '=';
 	s[1] = (char) t;
 	if (!isxdigit(s[1])) {
-		if (ungetc(s[0], fp) == EOF)
-				return EOF;
-		if (ungetc(s[1], fp) == EOF)
+		if (fseek(fp, -2, SEEK_CUR) == -1)
 			return EOF;
 		return '=';
 	}
