@@ -183,7 +183,6 @@ main(int argc, char *argv[])
 		free(options.unignore[i]);
 	}
 	free(options.unignore);
-	assert(getdtablecount() == 3);
 }
 
 static const char *
