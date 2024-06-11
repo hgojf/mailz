@@ -444,6 +444,7 @@ header_push(struct header *header, struct letter *letter)
 		struct tm tm;
 		char *tz, *b;
 		time_t off;
+		const char *fmt;
 
 		if (letter->date != -1)
 			goto header;
@@ -460,7 +461,11 @@ header_push(struct header *header, struct letter *letter)
 		if ((off = tz_tosec(tz)) == TZ_INVALIDSEC)
 			goto header;
 		memset(&tm, 0, sizeof(tm));
-		if (strptime(header->val, "%a, %d %b %Y %H:%M:%S", &tm) == NULL)
+		if (strchr(header->val, ',') != NULL)
+			fmt = "%a, %d %b %Y %H:%M:%S";
+		else
+			fmt = "%d %b %Y %H:%M:%S";
+		if (strptime(header->val, fmt, &tm) == NULL)
 			goto header;
 		if ((letter->date = mktime(&tm)) == -1)
 			goto header;
