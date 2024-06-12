@@ -12,5 +12,8 @@ struct options {
 
 	size_t nreorder;
 	char **reorder;
+
+	char *address;
+	char *name;
 };
 #endif /* MAILZ_MAIL_H */

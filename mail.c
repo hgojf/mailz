@@ -16,6 +16,7 @@
 
 #include "mail.h"
 #include "mailbox.h"
+#include "sendmail.h"
 #include "strtonum.h"
 
 #ifndef __unused
@@ -43,8 +44,11 @@ static int unignore(struct mailbox *, struct options *, char *);
 static int more(struct mailbox *, struct options *, char *);
 static int print(struct mailbox *, struct options *, char *);
 static int reorder(struct mailbox *, struct options *, char *);
+static int reply(struct mailbox *, struct options *, char *);
 static int save(struct mailbox *, struct options *, char *);
 static int see(struct mailbox *, struct options *, char *);
+static int set(struct mailbox *, struct options *, char *);
+static int send(struct mailbox *, struct options *, char *);
 static int thread(struct mailbox *, struct options *, char *);
 static int unsee(struct mailbox *, struct options *, char *);
 
@@ -64,7 +68,10 @@ static struct command commands[] =
 	{ "p", print },
 	{ "r", see },
 	{ "reorder", reorder },
+	{ "reply", reply },
 	{ "s", save },
+	{ "send", send },
+	{ "set", set },
 	{ "t", thread },
 	{ "unignore", unignore },
 	{ "x", unsee },
@@ -84,6 +91,8 @@ main(int argc, char *argv[])
 	const char *cfg;
 	struct mailbox mailbox;
 
+	options.address = NULL;
+	options.name = NULL;
 	options.view_seen = 0;
 	options.nignore = 0;
 	options.ignore = NULL;
@@ -117,7 +126,7 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if ((cfg = config_location()) != NULL && unveil(cfg, "r") == -1)
 		err(1, "unveil");
-	if (unveil("/usr/local/libexec/lesswrapper", "x") == -1)
+	if (unveil("/usr/local/libexec/mailzwrapper", "x") == -1)
 		err(1, "unveil");
 	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
 		err(1, "pledge");
@@ -327,7 +336,7 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 		if (dup2(p[0], STDIN_FILENO) == -1)
 			err(1, "dup2");
 		close(p[0]);
-		execl("/usr/local/libexec/lesswrapper", "lesswrapper", "-", NULL);
+		execl("/usr/local/libexec/mailzwrapper", "less", "-", NULL);
 		err(1, "execl");
 		/* NOTREACHED */
 	default:
@@ -351,6 +360,42 @@ reorder(__unused struct mailbox *mailbox, struct options *options, char *args)
 }
 
 static int
+reply(struct mailbox *mailbox, struct options *options, char *args)
+{
+	struct letter *letter = &mailbox->letters[options->msg - 1];
+	struct sendmail send;
+
+	if (options->address == NULL || options->name == NULL) {
+		warnx("Must set an email address and real name");
+		return -1;
+	}
+
+	if (args != NULL) {
+		const char *errstr;
+		long long idx;
+
+		idx = strtonum(args, 1, mailbox->nletters, &errstr);
+		if (errstr != NULL) {
+			warnx("Message number was %s", errstr);
+			return -1;
+		}
+		letter = &mailbox->letters[idx - 1];
+	}
+
+	send.from.addr = options->address;
+	send.from.name = options->name;
+	send.to = letter->from;
+
+	send.subject = letter->subject;
+	send.re = 1;
+	if (letter->subject != NULL && strncmp(letter->subject, "Re: ", 4) == 0) {
+		send.subject += 4;
+	}
+
+	return sendmail(&send);
+}
+
+static int
 see(struct mailbox *mailbox, struct options *options, char *args)
 {
 	struct letter *letter = &mailbox->letters[options->msg - 1];
@@ -370,6 +415,67 @@ see(struct mailbox *mailbox, struct options *options, char *args)
 	if (mailbox_letter_mark_read(mailbox, letter) == -1)
 		return -1;
 	return 0;
+}
+
+static int
+set(__unused struct mailbox *mailbox, struct options *options, char *args)
+{
+	const char *var, *val;
+
+	if ((var = strsep(&args, " \t")) == NULL) {
+		warnx("need an argument");
+		return -1;
+	}
+	val = args;
+
+	if (strcmp(var, "address") == 0) {
+		if (val == NULL) {
+			warnx("need a value");
+			return -1;
+		}
+		if ((options->address = strdup(val)) == NULL) {
+			warn("strdup");
+			return -1;
+		}
+	}
+	else if (strcmp(var, "name") == 0) {
+		if (val == NULL) {
+			warnx("need a value");
+			return -1;
+		}
+		if ((options->name = strdup(val)) == NULL) {
+			warn("strdup");
+			return -1;
+		}
+	}
+	else {
+		warnx("unknown variable");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+send(struct mailbox *mailbox, struct options *options, char *args)
+{
+	struct sendmail letter;
+
+	if (options->address == NULL || options->name == NULL) {
+		warnx("Must set an email address and real name");
+		return -1;
+	}
+
+	if ((letter.to = strsep(&args, " \t")) == NULL) {
+		warnx("enter a mail address");
+		return -1;
+	}
+	letter.from.addr = options->address;
+	letter.from.name = options->name;
+	letter.subject = args;
+	letter.re = 0;
+
+	return sendmail(&letter);
 }
 
 static int
