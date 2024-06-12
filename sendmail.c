@@ -8,6 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "pathnames.h"
 #include "sendmail.h"
 
 int
@@ -82,7 +83,7 @@ sendmail(struct sendmail *letter)
 		warn("fork");
 		return -1;
 	case 0:
-		execl("/usr/local/libexec/mailzwrapper", "vi", path, NULL);
+		execl(PATH_MAILZWRAPPER, "vi", path, NULL);
 		err(1, "execl");
 		/* NOTREACHED */
 	default:
@@ -101,7 +102,7 @@ sendmail(struct sendmail *letter)
 			err(1, "dup2");
 		if (close(fd) == -1)
 			err(1, "close");
-		execl("/usr/local/libexec/mailzwrapper", "sendmail", letter->to, NULL);
+		execl(PATH_MAILZWRAPPER, "sendmail", letter->to, NULL);
 		err(1, "execl");
 		/* NOTREACHED */
 	default:

@@ -16,6 +16,7 @@
 
 #include "mail.h"
 #include "mailbox.h"
+#include "pathnames.h"
 #include "sendmail.h"
 #include "strtonum.h"
 
@@ -126,7 +127,7 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if ((cfg = config_location()) != NULL && unveil(cfg, "r") == -1)
 		err(1, "unveil");
-	if (unveil("/usr/local/libexec/mailzwrapper", "x") == -1)
+	if (unveil(PATH_MAILZWRAPPER, "x") == -1)
 		err(1, "unveil");
 	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
 		err(1, "pledge");
@@ -338,7 +339,7 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 		if (dup2(p[0], STDIN_FILENO) == -1)
 			err(1, "dup2");
 		close(p[0]);
-		execl("/usr/local/libexec/mailzwrapper", "less", "-", NULL);
+		execl(PATH_MAILZWRAPPER, "less", "-", NULL);
 		err(1, "execl");
 		/* NOTREACHED */
 	default:
