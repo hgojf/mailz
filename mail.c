@@ -1,3 +1,4 @@
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -42,6 +43,7 @@ static int unignore(struct mailbox *, struct options *, char *);
 static int more(struct mailbox *, struct options *, char *);
 static int print(struct mailbox *, struct options *, char *);
 static int reorder(struct mailbox *, struct options *, char *);
+static int save(struct mailbox *, struct options *, char *);
 static int see(struct mailbox *, struct options *, char *);
 static int thread(struct mailbox *, struct options *, char *);
 static int unsee(struct mailbox *, struct options *, char *);
@@ -62,6 +64,7 @@ static struct command commands[] =
 	{ "p", print },
 	{ "r", see },
 	{ "reorder", reorder },
+	{ "s", save },
 	{ "t", thread },
 	{ "unignore", unignore },
 	{ "x", unsee },
@@ -106,23 +109,23 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		usage();
 
+	if (mkdir("/tmp/mail/", 0700) == -1 && errno != EEXIST)
+		err(1, "mkdir");
+	if (unveil("/tmp/mail/", "crw") == -1)
+		err(1, "unveil");
 	if (unveil(argv[0], "rc") == -1)
 		err(1, "unveil");
 	if ((cfg = config_location()) != NULL && unveil(cfg, "r") == -1)
 		err(1, "unveil");
 	if (unveil("/usr/local/libexec/lesswrapper", "x") == -1)
 		err(1, "unveil");
-	if (pledge("stdio rpath cpath proc exec", NULL) == -1)
+	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
 		err(1, "pledge");
 
 	if ((fd = open(argv[0], O_RDONLY | O_CLOEXEC)) == -1)
 		err(1, "open %s", argv[0]);
 	if (mailbox_setup(fd, &mailbox) == -1)
 		err(1, "mailbox_setup");
-	if (mailbox.type == MAILBOX_MBOX) {
-		if (pledge("stdio rpath proc exec", NULL) == -1)
-			err(1, "pledge");
-	}
 	if (mailbox_read(&mailbox, &options) == -1)
 		err(1, "mailbox_read");
 
@@ -132,11 +135,6 @@ main(int argc, char *argv[])
 	}
 
 	configure(&mailbox, &options);
-
-	if (mailbox.type == MAILBOX_MBOX) {
-		if (pledge("stdio proc exec", NULL) == -1)
-			err(1, "pledge");
-	}
 
 	mailbox_print(&mailbox, 0, mailbox.nletters);
 
@@ -371,6 +369,44 @@ see(struct mailbox *mailbox, struct options *options, char *args)
 
 	if (mailbox_letter_mark_read(mailbox, letter) == -1)
 		return -1;
+	return 0;
+}
+
+static int
+save(struct mailbox *mailbox, struct options *options, char *args)
+{
+	struct letter *letter = &mailbox->letters[options->msg - 1];
+	char path[] = "/tmp/mail/letter.XXXXXX";
+	int fd;
+	FILE *fp;
+
+	if (args != NULL) {
+		const char *errstr;
+		long long idx;
+
+		idx = strtonum(args, 1, mailbox->nletters, &errstr);
+		if (errstr != NULL) {
+			warnx("Message number was %s", errstr);
+			return -1;
+		}
+		letter = &mailbox->letters[idx - 1];
+	}
+
+	if ((fd = mkstemp(path)) == -1) {
+		warn("mktemp");
+		return -1;
+	}
+	if ((fp = fdopen(fd, "w")) == NULL) {
+		warn("fdopen");
+		close(fd);
+		return -1;
+	}
+
+	if (mailbox_letter_print_read(mailbox, letter, options, fp) == -1)
+		warnx("failed to save letter");
+	else
+		printf("saved letter to %s\n", path);
+	fclose(fp);
 	return 0;
 }
 
