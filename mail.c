@@ -182,6 +182,8 @@ main(int argc, char *argv[])
 	free(line);
 	close(fd);
 	mailbox_free(&mailbox);
+	free(options.address);
+	free(options.name);
 	for (size_t i = 0; i < options.nreorder; i++) {
 		free(options.reorder[i]);
 	}
