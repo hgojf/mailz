@@ -58,10 +58,6 @@ static int unsee(struct mailbox *, struct options *, char *);
 #define unveil(a, b) 0
 #endif /* !__OpenBSD__ */
 
-#ifdef __GLIBC__
-int pipe2(int [2], int);
-#endif /* __GLIBC__ */
-
 static struct command commands[] =
 {
 	{ "ignore", ignore },
@@ -321,7 +317,7 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 
 	letter = &mailbox->letters[options->msg - 1];
 
-	if (pipe2(p, O_CLOEXEC) == -1)
+	if (pipe(p) == -1)
 		return -1;
 	if ((fp = fdopen(p[1], "w")) == NULL) {
 		close(p[0]);
