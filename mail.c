@@ -423,6 +423,7 @@ static int
 set(__unused struct mailbox *mailbox, struct options *options, char *args)
 {
 	const char *var, *val;
+	char *orig;
 
 	if ((var = strsep(&args, " \t")) == NULL) {
 		warnx("need an argument");
@@ -435,20 +436,24 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 			warnx("need a value");
 			return -1;
 		}
+		orig = options->address;
 		if ((options->address = strdup(val)) == NULL) {
 			warn("strdup");
 			return -1;
 		}
+		free(orig);
 	}
 	else if (strcmp(var, "name") == 0) {
 		if (val == NULL) {
 			warnx("need a value");
 			return -1;
 		}
+		orig = options->name;
 		if ((options->name = strdup(val)) == NULL) {
 			warn("strdup");
 			return -1;
 		}
+		free(orig);
 	}
 	else {
 		warnx("unknown variable");
