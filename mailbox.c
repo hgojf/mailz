@@ -93,7 +93,7 @@ mailbox_setup(int fd, struct mailbox *out)
 }
 
 int
-mailbox_read(struct mailbox *out, const struct options *options)
+mailbox_read(struct mailbox *out, int view_seen)
 {
 	FILE *fp, *mbox;
 	DIR *mdir;
@@ -124,7 +124,7 @@ mailbox_read(struct mailbox *out, const struct options *options)
 				break;
 			if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
 				continue;
-			if (!options->view_seen && maildir_letter_seen(de->d_name))
+			if (!view_seen && maildir_letter_seen(de->d_name))
 				continue;
 			if ((fp = fopenat(dfd, de->d_name)) == NULL)
 				goto fail;

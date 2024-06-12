@@ -126,7 +126,7 @@ main(int argc, char *argv[])
 		err(1, "open %s", argv[0]);
 	if (mailbox_setup(fd, &mailbox) == -1)
 		err(1, "mailbox_setup");
-	if (mailbox_read(&mailbox, &options) == -1)
+	if (mailbox_read(&mailbox, options.view_seen) == -1)
 		err(1, "mailbox_read");
 
 	if (mailbox.nletters == 0) {

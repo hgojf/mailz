@@ -26,7 +26,7 @@ struct mailbox {
 
 void mailbox_free(struct mailbox *);
 int mailbox_setup(int, struct mailbox *);
-int mailbox_read(struct mailbox *, const struct options *);
+int mailbox_read(struct mailbox *, int);
 int mailbox_print(struct mailbox *, size_t, size_t);
 int mailbox_letter_print(size_t, struct letter *);
 int mailbox_letter_print_read(struct mailbox *, struct letter *,
