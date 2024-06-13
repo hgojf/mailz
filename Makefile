@@ -9,6 +9,7 @@ TIDYCHECKS = \
 SRCS = date.c mail.c mailbox.c sendmail.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
+INSTALL ?= install
 
 include config.mk
 
