@@ -34,7 +34,7 @@ have_function() {
 # header, variable
 have_header() {
 	cat < /dev/null > test.c
-	echo "#include $1" >> test.c
+	echo "#include <$1>" >> test.c
 	echo "int main(void) { }" >> test.c
 	printf -- "Checking for header $1... "
 	cc test.c 2>/dev/null
