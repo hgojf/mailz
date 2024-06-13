@@ -3,6 +3,7 @@
 struct options {
 	long long msg;
 	int view_seen;
+	int linewrap;
 
 	size_t nignore;
 	char **ignore;

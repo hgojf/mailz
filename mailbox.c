@@ -633,13 +633,14 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	struct headers headers;
 	FILE *fp;
 	char *line;
-	size_t n;
+	size_t lastnl, n;
 	ssize_t len;
 	struct header *h, *h2;
 	int c, rv;
 
 	rv = -1;
 	assert(mailbox->type == MAILBOX_MBOX || mailbox->type == MAILBOX_MAILDIR);
+	assert(options->linewrap >= 0);
 
 	if (mailbox->type == MAILBOX_MBOX) {
 		fp = mailbox->val.mbox_file;
@@ -695,6 +696,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	if (fputc('\n', out) == EOF)
 		goto headers;
 
+	lastnl = 0;
 	while ((c = fgetc(fp)) != EOF) {
 		if (c == '=' && (c = equal_escape(fp)) == EOF)
 			goto headers;
@@ -704,6 +706,16 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 		}
 		else if (fputc(c, out) == EOF)
 				goto headers;
+
+		if (c == '\n')
+			lastnl = 0;
+		else if (options->linewrap != 0 && lastnl == options->linewrap) {
+			if (fputc('\n', out) == EOF)
+				goto headers;
+			lastnl = 0;
+		}
+		else
+			lastnl++;
 
 		if (c == '\n' && mailbox->type == MAILBOX_MBOX) {
 			/* Find next 'From' line */

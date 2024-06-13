@@ -97,6 +97,7 @@ main(int argc, char *argv[])
 	options.nunignore = 0;
 	options.unignore = NULL;
 	options.nreorder = 0;
+	options.linewrap = 0;
 	options.reorder = NULL;
 	options.msg = 1;
 
@@ -440,6 +441,21 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 			return -1;
 		}
 		free(orig);
+	}
+	else if (strcmp(var, "linewrap") == 0) {
+		int lr;
+		const char *errstr;
+
+		if (val != NULL) {
+			lr = strtonum(val, 0, INT_MAX, &errstr);
+			if (errstr != NULL) {
+				warnx("linewrap was %s", errstr);
+				return -1;
+			}
+		}
+		else
+			lr = 72;
+		options->linewrap = lr;
 	}
 	else if (strcmp(var, "name") == 0) {
 		if (val == NULL) {
