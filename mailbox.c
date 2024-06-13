@@ -579,6 +579,7 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 		out->val = t;
 		memcpy(&out->val[vlen], line, len);
 		out->val[vlen + len] = '\0';
+		vlen += len;
 	}
 
 	return 0;
