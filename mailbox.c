@@ -1,8 +1,8 @@
 #include <sys/stat.h>
-#ifdef __GLIBC__
-#include "tree.h"
-#else
+#ifdef HAVE_SYS_TREE_H
 #include <sys/tree.h>
+#else
+#include "tree.h"
 #endif /* __GLIBC__ */
 
 #include <assert.h>

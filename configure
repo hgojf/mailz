@@ -31,6 +31,22 @@ have_function() {
 	rm test.c
 }
 
+# header, variable
+have_header() {
+	cat < /dev/null > test.c
+	echo "#include $1" >> test.c
+	echo "int main(void) { }" >> test.c
+	cc test.c 2>/dev/null
+	printf -- "Checking for header $1... "
+	if [ $? -eq 0 ]; then
+		echo CFLAGS += -D$2 >> config.mk
+		printf 'Found\n'
+	else
+		printf 'Not Found\n'
+	fi
+	rm test.c
+}
+
 # optional, flag name
 have_compiler_flag() {
 	optional=$1
@@ -139,6 +155,8 @@ echo "#endif /* MAILZ_CONFIG_H */" >> config.h
 have_compiler_flag optional -MD -MP
 have_compiler_flag optional -pipe
 have_compiler_flag required -include config.h
+
+have_header sys/tree.h HAVE_SYS_TREE_H
 
 echo "PREFIX = ${PREFIX}" >> config.mk
 if [ -n "${CC}" ]; then
