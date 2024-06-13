@@ -1,0 +1,42 @@
+#!/bin/sh
+
+system="$(uname -s)"
+
+if [ "${system}" = "FreeBSD" ]; then
+	PREFIX=/usr/local/
+	HAVE_STRTONUM=1
+elif [ "${system}" = "NetBSD" ]; then
+	PREFIX=/usr/pkg/
+	HAVE_MDMP=1
+	HAVE_STRTONUM=1
+elif [ "${system}" = "OpenBSD" ]; then
+	PREFIX=/usr/local/
+	HAVE_MDMP=1
+	HAVE_STRTONUM=1
+	HAVE_PLEDGE=1
+	HAVE_UNVEIL=1
+elif [ "${system}" = "Linux" ]; then
+	HAVE_MDMP=1
+	PREFIX=/usr/local/
+fi
+
+cat < /dev/null > config.mk
+cat < /dev/null > config.h
+echo "#ifndef MAILZ_CONFIG_H" >> config.h
+echo "#define MAILZ_CONFIG_H" >> config.h
+if [ -n "${HAVE_MDMP}" ]; then
+	echo CFLAGS += -MD -MP >> config.mk
+fi
+if [ -z "${HAVE_STRTONUM}" ]; then
+	echo SRCS += strtonum.c >> config.mk
+fi
+if [ -z "${HAVE_PLEDGE}" ]; then
+	echo "#define pledge(a, b) 0" >> config.h
+fi
+if [ -z "${HAVE_UNVEIL}" ]; then
+	echo "#define unveil(a, b) 0" >> config.h
+fi
+echo "#define PREFIX \"${PREFIX}\"" >> config.h
+echo "PREFIX = ${PREFIX}" >> config.mk
+echo "#endif /* MAILZ_CONFIG_H */" >> config.h
+echo CFLAGS += -include config.h >> config.mk

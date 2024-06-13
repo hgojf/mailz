@@ -3,12 +3,14 @@
 .PHONY: all clean install tidy
 
 PREFIX ?= /usr/local
-CFLAGS = -MD -MP -O2 -pipe -g -DPREFIX=\"${PREFIX}\"
+CFLAGS = -O2 -pipe -g
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
-SRCS = date.c mail.c mailbox.c sendmail.c strtonum.c
+SRCS = date.c mail.c mailbox.c sendmail.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
+
+include config.mk
 
 all: mail mailwrapper
 
