@@ -1,6 +1,6 @@
 .POSIX:
 
-.PHONY: clean install tidy
+.PHONY: all clean install tidy
 
 PREFIX ?= /usr/local
 CFLAGS = -MD -MP -O2 -pipe -g -DPREFIX=\"${PREFIX}\"
@@ -9,6 +9,8 @@ TIDYCHECKS = \
 SRCS = date.c mail.c mailbox.c sendmail.c strtonum.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
+
+all: mail mailwrapper
 
 mail: ${OBJS}
 	$(CC) -o $@ ${LDFLAGS} ${OBJS}
