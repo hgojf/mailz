@@ -2,7 +2,6 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#ifndef __OpenBSD__
 long long
 strtonum(const char *nptr, long long minval, long long maxval,
 	const char **errstr)
@@ -25,4 +24,3 @@ strtonum(const char *nptr, long long minval, long long maxval,
 		*errstr = NULL;
 	return rv;
 }
-#endif /* __OpenBSD__ */
