@@ -45,6 +45,7 @@ have_header() {
 		printf 'Not Found\n'
 	fi
 	rm test.c
+	rm a.out
 }
 
 # optional, flag name
