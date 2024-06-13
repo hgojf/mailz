@@ -17,6 +17,7 @@
 #include "mail.h"
 #include "mailbox.h"
 #include "pathnames.h"
+#include "reallocarray.h"
 #include "sendmail.h"
 #include "strtonum.h"
 

@@ -20,6 +20,7 @@
 #include "date.h"
 #include "mail.h"
 #include "mailbox.h"
+#include "reallocarray.h"
 
 #ifdef __GLIBC__
 char *strptime(const char *, const char *, struct tm *);
