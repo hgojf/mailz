@@ -36,8 +36,8 @@ have_header() {
 	cat < /dev/null > test.c
 	echo "#include $1" >> test.c
 	echo "int main(void) { }" >> test.c
-	cc test.c 2>/dev/null
 	printf -- "Checking for header $1... "
+	cc test.c 2>/dev/null
 	if [ $? -eq 0 ]; then
 		echo CFLAGS += -D$2 >> config.mk
 		printf 'Found\n'
