@@ -11,7 +11,7 @@ have_function() {
 	echo "}" >> test.c
 
 	printf -- "Checking for function $1... "
-	cc test.c 2>/dev/null
+	cc -Werror=implicit-function-declaration test.c 2>/dev/null
 	ex=$?
 	if [ $ex -eq 0 ]; then
 		./a.out
@@ -66,7 +66,9 @@ have_compiler_flag() {
 		EOF
 	cc $@ test.c
 	if [ $? -eq 0 ]; then
-		echo CFLAGS += $@ >> config.mk
+		if [ "${optional}" != "testonly" ]; then
+			echo CFLAGS += $@ >> config.mk
+		fi
 		printf 'Found\n'
 	else
 		printf 'Not Found\n'
@@ -94,6 +96,8 @@ cat < /dev/null > config.mk
 cat < /dev/null > config.h
 echo "#ifndef MAILZ_CONFIG_H" >> config.h
 echo "#define MAILZ_CONFIG_H" >> config.h
+
+have_compiler_flag testonly -Werror=implicit-function-declaration
 
 have_function unveil "fcntl.h unistd.h" NULL "unveil(a, b)" 0 <<-EOF
 	char buf[] = "/tmp/unveiltest.XXXXXXXXXX";
