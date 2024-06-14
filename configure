@@ -153,6 +153,18 @@ have_function reallocarray stdlib.h reallocarray.c <<-EOF
 		return 1;
 	return 0;
 	EOF
+have_function strsep string.h strsep.c <<-EOF
+	char string[] = "/usr/bin/vi vi -- file";
+	char *one, *s;
+	s = string;
+	if ((one = strsep(&s, " \t")) == NULL)
+		return 1;
+	if (strcmp(one, "/usr/bin/vi") != 0)
+		return 1;
+	if (strcmp(s, "vi -- file") != 0)
+		return 1;
+	return 0;
+	EOF
 
 echo "#define PREFIX \"${PREFIX}\"" >> config.h
 echo "#endif /* MAILZ_CONFIG_H */" >> config.h

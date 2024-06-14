@@ -35,6 +35,7 @@
 #include "pathnames.h"
 #include "reallocarray.h"
 #include "sendmail.h"
+#include "strsep.h"
 #include "strtonum.h"
 
 #ifndef __unused
