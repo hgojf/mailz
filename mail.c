@@ -248,7 +248,8 @@ configure(struct mailbox *mailbox, struct options *options)
 	if ((mailrc = config_location()) == NULL)
 		return 0;
 	if ((fp = fopen(mailrc, "re")) == NULL) {
-		warn("fopen %s", mailrc);
+		if (errno != ENOENT)
+			warn("fopen %s", mailrc);
 		return -1;
 	}
 
