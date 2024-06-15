@@ -10,7 +10,7 @@ have_function() {
 	cat - >> test.c
 	echo "}" >> test.c
 
-	printf -- "Checking for function $1... "
+	printf -- "Checking for function %s... " "$1"
 	cc -Werror=implicit-function-declaration test.c 2>/dev/null
 	ex=$?
 	if [ $ex -eq 0 ]; then
@@ -22,7 +22,7 @@ have_function() {
 		if [ "$3" = "NULL" ]; then
 			echo "#define $4 $5" >> config.h
 		else
-			echo SRCS += $3 >> config.mk
+			echo SRCS += "$3" >> config.mk
 		fi
 		printf 'Not Found\n'
 	else
@@ -36,10 +36,10 @@ have_header() {
 	cat < /dev/null > test.c
 	echo "#include <$1>" >> test.c
 	echo "int main(void) { }" >> test.c
-	printf -- "Checking for header $1... "
+	printf -- "Checking for header %s... " "$1"
 	cc test.c 2>/dev/null
-	if [ $? -eq 0 ]; then
-		echo CFLAGS += -D$2 >> config.mk
+	if cc test.c 2>/dev/null ; then
+		echo CFLAGS += -D"$2" >> config.mk
 		printf 'Found\n'
 	else
 		printf 'Not Found\n'
@@ -52,22 +52,22 @@ have_header() {
 have_compiler_flag() {
 	optional=$1
 	shift 1
-	printf -- "Checking for ${optional} compiler flag"
+	printf -- "Checking for %s compiler flag" "${optional}"
 	if [ $# -ne 1 ]; then
 		printf 's'
 	fi
 	printf ' '
-	for flag in $@; do
-		printf -- "${flag} "
+	for flag in "$@"; do
+		printf -- "%s " "${flag}"
 	done
 	printf '... '
 	cat <<- EOF > test.c
 		int main(void) {  }
 		EOF
-	cc $@ test.c
-	if [ $? -eq 0 ]; then
+	cc "$@" test.c
+	if cc "$@" test.c; then
 		if [ "${optional}" != "testonly" ]; then
-			echo CFLAGS += $@ >> config.mk
+			echo CFLAGS += "$@" >> config.mk
 		fi
 		printf 'Found\n'
 	else
