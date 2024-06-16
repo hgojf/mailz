@@ -732,20 +732,20 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 
 		if (c == '\n' && mailbox->type == MAILBOX_MBOX) {
 			/* Find next 'From' line */
-			char from[4];
+			char rom[3];
 			int n;
 
 			if ((c = fgetc(fp)) == EOF)
 				break;
-			if (c != '\n') {
+			if (c != 'F') {
 				if (fseek(fp, -1, SEEK_CUR) == -1)
 					goto headers;
 				continue;
 			}
 
-			if ((n = fread(from, 1, 4, fp)) == EOF)
+			if ((n = fread(rom, 1, 3, fp)) == EOF)
 				break;
-			if (n == 4 && memcmp(from, "From", 4) == 0)
+			if (n == 3 && memcmp(rom, "rom", 3) == 0)
 				break;
 			/* allow these characters to be dealth with as normal */
 			if (fseek(fp, -n, SEEK_CUR) == -1)
