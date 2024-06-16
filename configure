@@ -84,12 +84,16 @@ system="$(uname -s)"
 if [ "${system}" = "FreeBSD" ]; then
 	CC=cc
 	PREFIX=/usr/local/
+	CFLAGS="-D_BSD_SOURCE"
 elif [ "${system}" = "NetBSD" ]; then
 	PREFIX=/usr/pkg/
+	CFLAGS="-D_BSD_SOURCE"
 elif [ "${system}" = "OpenBSD" ]; then
 	PREFIX=/usr/local/
+	CFLAGS="-D_BSD_SOURCE"
 elif [ "${system}" = "Linux" ]; then
 	PREFIX=/usr/local/
+	CFLAGS="-D_DEFAULT_SOURCE"
 fi
 
 cat < /dev/null > config.mk
@@ -178,4 +182,8 @@ have_header sys/tree.h HAVE_SYS_TREE_H
 echo "PREFIX = ${PREFIX}" >> config.mk
 if [ -n "${CC}" ]; then
 	echo "CC = ${CC}" >> config.mk
+fi
+echo "CFLAGS += -D_XOPEN_SOURCE=700" >> config.mk
+if [ -n "${CFLAGS}" ]; then
+	echo "CFLAGS += ${CFLAGS}" >> config.mk
 fi

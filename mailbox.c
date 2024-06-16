@@ -19,7 +19,7 @@
 #include <sys/tree.h>
 #else
 #include "tree.h"
-#endif /* __GLIBC__ */
+#endif /* HAVE_SYS_TREE_H */
 
 #include <assert.h>
 #include <ctype.h>
@@ -37,10 +37,6 @@
 #include "mail.h"
 #include "mailbox.h"
 #include "reallocarray.h"
-
-#ifdef __GLIBC__
-char *strptime(const char *, const char *, struct tm *);
-#endif /* __GLIBC__ */
 
 struct header {
 	char *key;
