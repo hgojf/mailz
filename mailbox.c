@@ -843,29 +843,14 @@ header_push2(struct header *header, struct headers *headers)
 static int
 equal_escape(FILE *fp)
 {
-	char s[3];
 	int t;
 
 	if ((t = fgetc(fp)) == EOF)
 		return '=';
-	s[0] = (char) t;
-	if (s[0] == '\n')
+	if (t == '\n')
 		return '\n';
-	if (!isxdigit(s[0])) {
-		if (fseek(fp, -1, SEEK_CUR) == -1)
-			return EOF;
-		return '=';
-	}
-	if ((t = fgetc(fp)) == EOF)
-		return '=';
-	s[1] = (char) t;
-	if (!isxdigit(s[1])) {
-		if (fseek(fp, -2, SEEK_CUR) == -1)
-			return EOF;
-		return '=';
-	}
-	s[2] = '\0';
-
-	return strtol(s, NULL, 16);
+	if (fseek(fp, -1, SEEK_CUR) == -1)
+		return EOF;
+	return '=';
 }
 
