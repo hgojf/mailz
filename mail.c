@@ -316,6 +316,8 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 	pid_t pid;
 	struct letter *letter;
 	int p[2];
+	char path[] = "/tmp/mail/more.XXXXXXXXXX";
+	int fd;
 	FILE *fp;
 
 	if (args != NULL) {
@@ -332,38 +334,29 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 
 	letter = &mailbox->letters[options->msg - 1];
 
-	if (pipe(p) == -1)
+	if ((fd = mkstemp(path)) == -1)
 		return -1;
-	if ((fp = fdopen(p[1], "w")) == NULL) {
-		close(p[0]);
-		close(p[1]);
+	if ((fp = fdopen(fd, "w")) == NULL) {
+		close(fd);
 		return -1;
 	}
-
 
 	switch (pid = fork()) {
 	case -1:
 		fclose(fp);
 		return -1;
 	case 0:
-		close(p[1]);
-		if (dup2(p[0], STDIN_FILENO) == -1)
-			err(1, "dup2");
-		close(p[0]);
-		execl(PATH_MAILZWRAPPER, "less", "-", NULL);
+		execl(PATH_MAILZWRAPPER, "less", path, NULL);
 		err(1, "execl");
 		/* NOTREACHED */
 	default:
 		break;
 	}
 
-	signal(SIGPIPE, SIG_IGN);
-	close(p[0]);
 	mailbox_letter_print_read(mailbox, letter, options, fp);
-	fflush(fp);
 	fclose(fp);
 	waitpid(pid, NULL, 0);
-	signal(SIGPIPE, SIG_DFL);
+	unlink(path);
 	return 0;
 }
 

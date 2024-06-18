@@ -38,7 +38,9 @@ main(int argc, char *argv[])
 		err(1, "execl");
 	}
 	else if (strcmp(argv[0], "less") == 0) {
-		execl("/usr/bin/less", "less", "--", "-", NULL);
+		if (argc != 2)
+			errx(1, "invalid usage");
+		execl("/usr/bin/less", "less", "--", argv[1], NULL);
 		err(1, "execl");
 	}
 }
