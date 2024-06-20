@@ -3,7 +3,7 @@
 .PHONY: all clean install tidy
 
 PREFIX ?= /usr/local
-CFLAGS = -O2 -pipe -g
+CFLAGS = -O2 -g
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 SRCS = date.c mail.c mailbox.c sendmail.c
