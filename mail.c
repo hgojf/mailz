@@ -191,7 +191,6 @@ main(int argc, char *argv[])
 	putchar('\n');
 
 	free(line);
-	close(fd);
 	mailbox_free(&mailbox);
 	free(options.address);
 	free(options.name);

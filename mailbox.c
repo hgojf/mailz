@@ -68,14 +68,16 @@ static DIR *maildir_setup(int);
 static int maildir_letter_set_flag(DIR *, struct letter *, char);
 static int maildir_letter_seen(const char *);
 
+/* function takes ownership of 'fd', closing on failure */
 int
 mailbox_setup(int fd, struct mailbox *out)
 {
-	int type;
+	int type, rv;
 	struct stat sb;
 
+	rv = -1;
 	if (fstat(fd, &sb) == -1)
-		return -1;
+		goto fail;
 	switch (sb.st_mode & S_IFMT) {
 	case S_IFDIR:
 		type = MAILBOX_MAILDIR;
@@ -84,25 +86,31 @@ mailbox_setup(int fd, struct mailbox *out)
 		type = MAILBOX_MBOX;
 		break;
 	default:
-		return -1;
+		goto fail;
 	}
 
 	if (type == MAILBOX_MAILDIR) {
 		DIR *dp;
 
 		if ((dp = maildir_setup(fd)) == NULL)
-			return -1;
+			goto fail;
 		out->val.maildir_cur = dp;
+		close(fd);
 	}
 	else {
 		FILE *fp;
 
 		if ((fp = fdopen(fd, "r")) == NULL)
-			return -1;
+			goto fail;
 		out->val.mbox_file = fp;
 	}
+
 	out->type = type;
-	return 0;
+	rv = 0;
+	fail:
+	if (rv == -1)
+		close(fd);
+	return rv;
 }
 
 int
