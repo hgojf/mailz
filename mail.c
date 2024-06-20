@@ -139,13 +139,36 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if (unveil(PATH_MAILZWRAPPER, "x") == -1)
 		err(1, "unveil");
-	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
+	if (pledge("stdio rpath cpath wpath proc exec unveil", NULL) == -1)
 		err(1, "pledge");
 
 	if ((fd = open(argv[0], O_RDONLY | O_CLOEXEC)) == -1)
 		err(1, "open %s", argv[0]);
 	if (mailbox_setup(fd, &mailbox) == -1)
 		err(1, "mailbox_setup");
+
+	/* dont need to reopen this ever */
+	if (mailbox.type == MAILBOX_MBOX && unveil(argv[0], "") == -1)
+		err(1, "unveil");
+	/* only need 'cur' directory for maildir */
+	if (mailbox.type == MAILBOX_MAILDIR) {
+		char path[PATH_MAX];
+		int n;
+
+		n = snprintf(path, sizeof(path), "%s/cur", argv[0]);
+		if (n < 0)
+			err(1, "snprintf");
+		/* we shouldnt get here if this is possible... probably */
+		if (n >= sizeof(path))
+			errx(1, "snprintf truncation");
+		if (unveil(path, "crw") == -1)
+			err(1, "unveil");
+		if (unveil(argv[0], "") == -1)
+			err(1, "unveil");
+	}
+	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
+		err(1, "pledge");
+
 	if (mailbox_read(&mailbox, options.view_seen) == -1)
 		err(1, "mailbox_read");
 
