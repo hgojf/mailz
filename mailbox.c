@@ -524,15 +524,16 @@ static int
 letter_cmp(const void *one, const void *two)
 {
 	const struct letter *n1 = one, *n2 = two;
-	time_t rv;
+	time_t u, d;
 
-	rv = n1->date - n2->date;
-	if (rv < 0)
-		return -1;
-	else if (rv > 0)
+	u = n1->date;
+	d = n2->date;
+	if (u > d)
 		return 1;
-	else
+	else if (u == d)
 		return 0;
+	else
+		return -1;
 }
 
 static int
