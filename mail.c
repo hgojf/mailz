@@ -196,11 +196,13 @@ main(int argc, char *argv[])
 		}
 		else if (isdigit(*line)) {
 			const char *errstr;
+			long long msg;
 
-			options.msg = strtonum(line, 1, mailbox.nletters, &errstr);
+			msg = strtonum(line, 1, mailbox.nletters, &errstr);
 			if (errstr != NULL)
 				warnx("Message number was %s", errstr);
 			else {
+				options.msg = msg;
 				mailbox_letter_print_read(&mailbox, &mailbox.letters[options.msg - 1],
 					&options, stdout);
 			}
