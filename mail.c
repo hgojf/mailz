@@ -585,33 +585,11 @@ unsee(struct mailbox *mailbox, struct options *options, char *args)
 static int
 print(struct mailbox *mailbox, __unused struct options *options, char *args)
 {
-	char *start, *end;
-	const char *errstr;
-	long long b, e;
-
-	if ((start = strsep(&args, "-")) != NULL) {
-		b = strtonum(start, 1, mailbox->nletters, &errstr);
-		if (errstr != NULL) {
-			printf("range was %s\n", errstr);
-			return -1;
-		}
-		if ((end = strsep(&args, "-")) != NULL) {
-			e = strtonum(end, b, mailbox->nletters, &errstr);
-			if (errstr != NULL) {
-				printf("range was %s\n", errstr);
-				return -1;
-			}
-		}
-		else
-			e = mailbox->nletters;
-		b -= 1;
+	if (args != NULL) {
+		warnx("This command takes no arguments");
+		return 0;
 	}
-	else {
-		b = 0;
-		e = mailbox->nletters;
-	}
-
-	return mailbox_print(mailbox, b, e);
+	return mailbox_print(mailbox, 0, mailbox->nletters);
 }
 
 static int
