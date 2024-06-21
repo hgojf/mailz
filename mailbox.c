@@ -68,6 +68,8 @@ static DIR *maildir_setup(int);
 static int maildir_letter_set_flag(DIR *, struct letter *, char);
 static int maildir_letter_seen(const char *);
 
+static char *dupstr(const char *, size_t);
+
 /* function takes ownership of 'fd', closing on failure */
 int
 mailbox_setup(int fd, struct mailbox *out)
@@ -445,7 +447,7 @@ from_extract(char *from)
 		if (m[len - 1] != '>')
 			return NULL;
 
-		if ((rv = strndup(&m[1], len - 2)) == NULL)
+		if ((rv = dupstr(&m[1], len - 2)) == NULL)
 			return NULL;
 		free(from);
 		return rv;
@@ -560,7 +562,7 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 
 	if ((out->key = strdup(out->key)) == NULL)
 		return -1;
-	if ((out->val = strndup(out->val, vlen)) == NULL)
+	if ((out->val = dupstr(out->val, vlen)) == NULL)
 		goto key;
 
 	for (;;) {
@@ -862,3 +864,16 @@ equal_escape(FILE *fp)
 	return '=';
 }
 
+
+static char *
+dupstr(const char *str, size_t n)
+{
+	char *rv;
+
+	rv = malloc(n + 1);
+	if (rv != NULL) {
+		memcpy(rv, str, n);
+		rv[n] = '\0';
+	}
+	return rv;
+}
