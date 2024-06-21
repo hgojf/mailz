@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define MAILBOX_INTERNALS
+
 #include <sys/stat.h>
 #ifdef HAVE_SYS_TREE_H
 #include <sys/tree.h>
@@ -59,9 +61,7 @@ static int header_push2(struct header *, struct headers *);
 static int header_read(FILE *, char **, size_t *, struct header *);
 static int header_ignore(struct header *, const struct options *);
 static int push_letter(int, struct letter *, struct mailbox *);
-static int read_letter(FILE *, struct letter *);
 
-static void letter_free(int, struct letter *);
 static int letter_cmp(const void *, const void *);
 
 static DIR *maildir_setup(int);
@@ -358,7 +358,7 @@ fopenat(int at, const char *path)
 	return ret;
 }
 
-static void
+void
 letter_free(int type, struct letter *letter)
 {
 	free(letter->subject);
@@ -394,7 +394,7 @@ push_letter(int type, struct letter *letter, struct mailbox *mailbox)
 	return -1;
 }
 
-static int
+int
 read_letter(FILE *fp, struct letter *letter)
 {
 	char *line = NULL;

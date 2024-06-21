@@ -49,4 +49,9 @@ int mailbox_letter_print_read(struct mailbox *, struct letter *,
 	const struct options *, FILE *);
 int mailbox_letter_mark_read(struct mailbox *, struct letter *);
 int mailbox_letter_mark_unread(struct mailbox *, struct letter *);
+
+#ifdef MAILBOX_INTERNALS
+void letter_free(int, struct letter *);
+int read_letter(FILE *, struct letter *);
+#endif /* MAILBOX_INTERNALS */
 #endif /* MAILZ_MAILBOX_H */

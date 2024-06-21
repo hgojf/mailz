@@ -10,3 +10,4 @@ ktrace.out
 lesswrapper/*.[od]
 lesswrapper/lesswrapper
 tags
+regress

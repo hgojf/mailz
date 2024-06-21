@@ -28,10 +28,13 @@ install:
 	$(INSTALL) -m 0755 mail ${PREFIX}/bin/mailz
 	$(INSTALL) -m 0755 mailwrapper ${PREFIX}/libexec/mailzwrapper
 
+regress: date.o mailbox.o sendmail.o regress.o
+	$(CC) -o $@ ${LDFLAGS} date.o mailbox.o sendmail.o regress.o
+
 tags: ${SRCS}
 	$(CTAGS) ${SRCS}
 
 tidy:
 	clang-tidy -checks=${TIDYCHECKS} ${SRCS}
 
--include ${DEPS}
+-include ${DEPS} regress.d
