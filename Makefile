@@ -18,11 +18,11 @@ all: mail mailwrapper
 mail: ${OBJS}
 	$(CC) -o $@ ${LDFLAGS} ${OBJS}
 
-mailwrapper: mailwrapper.c
-	$(CC) -o $@ ${CFLAGS} ${LDFLAGS} mailwrapper.c
+mailwrapper: mailwrapper.o
+	$(CC) -o $@ ${CFLAGS} ${LDFLAGS} mailwrapper.o
 
 clean:
-	rm -f ${DEPS} ${OBJS} mail
+	rm -f ${DEPS} ${OBJS} mail mailwrapper mailwrapper.o mailwrapper.d regress.o regress
 
 install:
 	$(INSTALL) -m 0755 mail ${PREFIX}/bin/mailz

@@ -20,6 +20,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "config.h"
 #include "date.h"
 
 struct timezone_offset {

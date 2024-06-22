@@ -180,7 +180,6 @@ echo "#endif /* MAILZ_CONFIG_H */" >> config.h
 
 have_compiler_flag optional -MD -MP
 have_compiler_flag optional -pipe
-have_compiler_flag required -include config.h
 
 have_header sys/tree.h HAVE_SYS_TREE_H
 

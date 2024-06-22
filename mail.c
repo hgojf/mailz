@@ -30,6 +30,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "mail.h"
 #include "mailbox.h"
 #include "pathnames.h"

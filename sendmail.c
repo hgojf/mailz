@@ -24,6 +24,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "pathnames.h"
 #include "sendmail.h"
 
