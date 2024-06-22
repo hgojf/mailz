@@ -137,6 +137,35 @@ mailbox_read(struct mailbox *out, int view_seen)
 
 	out->letters = NULL;
 	out->nletters = 0;
+
+	/* first message has 'From' on the first line */
+	if (type == MAILBOX_MBOX) {
+		char from[4];
+		int c, n;
+		struct letter letter;
+		long off;
+
+		if ((n = fread(from, 1, 4, fp)) == EOF || n != 4)
+			goto fail;
+		if (memcmp(from, "From", 4) != 0)
+			goto fail;
+		for (;;) {
+			if ((c = fgetc(fp)) == EOF)
+				goto fail;
+			if (c == '\n')
+				break;
+		}
+
+		if ((off = ftell(fp)) == -1)
+			goto fail;
+		if (read_letter(fp, &letter) == -1)
+			goto fail;
+		letter.ident.mbox_offset = off;
+
+		if (push_letter(type, &letter, out) == -1)
+			goto fail;
+	}
+
 	for (;;) {
 		struct dirent *de;
 		long off;
@@ -154,22 +183,23 @@ mailbox_read(struct mailbox *out, int view_seen)
 		}
 
 		if (type == MAILBOX_MBOX) {
-			char rom[3];
-			int c, n;
+			int c;
 
 			/* find next 'From' line */
 			for (;;) {
-				for (;;) {
-					if ((c = fgetc(fp)) == EOF)
-						goto done;
-					if (c == 'F')
-						break;
-				}
+				char from[4];
+				int n;
 
-				if ((n = fread(rom, 1, 3, fp)) == EOF || n != 3)
+				if ((c = fgetc(fp)) == EOF)
 					goto done;
-				if (memcmp(rom, "rom", 3) == 0)
+				if (c != '\n')
+					continue;
+				if ((n = fread(from, 1, 4, fp)) == EOF)
+					goto done;
+				if (n == 4 && memcmp(from, "From", 4) == 0)
 					break;
+				if (fseek(fp, -n, SEEK_CUR) == -1)
+					goto fail;
 			}
 			for (;;) {
 				if ((c = fgetc(fp)) == EOF)
@@ -743,20 +773,12 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 
 		if (c == '\n' && mailbox->type == MAILBOX_MBOX) {
 			/* Find next 'From' line */
-			char rom[3];
+			char from[4];
 			int n;
 
-			if ((c = fgetc(fp)) == EOF)
+			if ((n = fread(from, 1, 4, fp)) == EOF)
 				break;
-			if (c != 'F') {
-				if (fseek(fp, -1, SEEK_CUR) == -1)
-					goto headers;
-				continue;
-			}
-
-			if ((n = fread(rom, 1, 3, fp)) == EOF)
-				break;
-			if (n == 3 && memcmp(rom, "rom", 3) == 0)
+			if (n == 4 && memcmp(from, "From", 4) == 0)
 				break;
 			/* allow these characters to be dealth with as normal */
 			if (fseek(fp, -n, SEEK_CUR) == -1)
