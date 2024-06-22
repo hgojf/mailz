@@ -141,11 +141,12 @@ mailbox_read(struct mailbox *out, int view_seen)
 	/* first message has 'From' on the first line */
 	if (type == MAILBOX_MBOX) {
 		char from[4];
-		int c, n;
+		int c;
+		size_t n;
 		struct letter letter;
 		long off;
 
-		if ((n = fread(from, 1, 4, fp)) == EOF || n != 4)
+		if ((n = fread(from, 1, 4, fp)) == 0 || n != 4)
 			goto fail;
 		if (memcmp(from, "From", 4) != 0)
 			goto fail;
@@ -188,17 +189,17 @@ mailbox_read(struct mailbox *out, int view_seen)
 			/* find next 'From' line */
 			for (;;) {
 				char from[4];
-				int n;
+				size_t n;
 
 				if ((c = fgetc(fp)) == EOF)
 					goto done;
 				if (c != '\n')
 					continue;
-				if ((n = fread(from, 1, 4, fp)) == EOF)
+				if ((n = fread(from, 1, 4, fp)) == 0)
 					goto done;
 				if (n == 4 && memcmp(from, "From", 4) == 0)
 					break;
-				if (fseek(fp, -n, SEEK_CUR) == -1)
+				if (fseek(fp, - (long) n, SEEK_CUR) == -1)
 					goto fail;
 			}
 			for (;;) {
@@ -774,14 +775,14 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 		if (c == '\n' && mailbox->type == MAILBOX_MBOX) {
 			/* Find next 'From' line */
 			char from[4];
-			int n;
+			size_t n;
 
-			if ((n = fread(from, 1, 4, fp)) == EOF)
+			if ((n = fread(from, 1, 4, fp)) == 0)
 				break;
 			if (n == 4 && memcmp(from, "From", 4) == 0)
 				break;
 			/* allow these characters to be dealth with as normal */
-			if (fseek(fp, -n, SEEK_CUR) == -1)
+			if (fseek(fp, - (long) n, SEEK_CUR) == -1)
 				goto headers;
 		}
 	}
