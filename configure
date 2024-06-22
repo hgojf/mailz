@@ -1,5 +1,18 @@
 #!/bin/sh
 
+print_plural() {
+	printf ' '
+	nth=0
+	for flag in "$@"; do
+		nth=$(($nth + 1))
+		printf -- "%s" "${flag}"
+		if [ $nth -ne $# ]; then
+			printf ' '
+		fi
+	done
+	printf '... '
+}
+
 # function name, header name, replacement to source. Stdin is test program
 have_function() {
 	cat < /dev/null > test.c
@@ -56,11 +69,7 @@ have_compiler_flag() {
 	if [ $# -ne 1 ]; then
 		printf 's'
 	fi
-	printf ' '
-	for flag in "$@"; do
-		printf -- "%s " "${flag}"
-	done
-	printf '... '
+	print_plural $@
 	cat <<- EOF > test.c
 		int main(void) {  }
 		EOF
