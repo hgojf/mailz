@@ -159,8 +159,11 @@ main(int argc, char *argv[])
 		n = snprintf(path, sizeof(path), "%s/cur", argv[0]);
 		if (n < 0)
 			err(1, "snprintf");
-		/* we shouldnt get here if this is possible... probably */
-		if (n >= sizeof(path))
+		/* 
+		 * could happen because earlier accesses use *at functions 
+		 * instead of the entire path
+		 */
+		if ( (size_t) n >= sizeof(path))
 			errx(1, "snprintf truncation");
 		if (unveil(path, "crw") == -1)
 			err(1, "unveil");
@@ -340,7 +343,6 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 {
 	pid_t pid;
 	struct letter *letter;
-	int p[2];
 	char path[] = "/tmp/mail/more.XXXXXXXXXX";
 	int fd;
 	FILE *fp;
@@ -474,11 +476,11 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 		free(orig);
 	}
 	else if (strcmp(var, "linewrap") == 0) {
-		int lr;
+		unsigned int lr;
 		const char *errstr;
 
 		if (val != NULL) {
-			lr = strtonum(val, 0, INT_MAX, &errstr);
+			lr = strtonum(val, 0, UINT_MAX, &errstr);
 			if (errstr != NULL) {
 				warnx("linewrap was %s", errstr);
 				return -1;
@@ -509,7 +511,7 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 }
 
 static int
-send(struct mailbox *mailbox, struct options *options, char *args)
+send(__unused struct mailbox *mailbox, struct options *options, char *args)
 {
 	struct sendmail letter;
 
