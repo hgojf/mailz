@@ -115,28 +115,22 @@ tzparse(const char *tz, struct timezone_offset *out)
 		break;
 	}
 	case 5: {
-		char *ep, h[3], m[3];
 		/* official ([+-])DDDD utc offset */
 		if (tz[0] != '+' && tz[0] != '-')
 			return -1;
 		ng = tz[0] == '-';
-		/* strtol accepts leading whitespace, we do not. */
 		for (int i = 1; i < 5; i++)
 			if (!isdigit(tz[i]))
 				return -1;
+		hr = 0;
+		hr += (tz[1] - '0') * 10;
+		hr += (tz[2] - '0');
 
-		memcpy(h, &tz[1], 2);
-		h[2] = '\0';
-		errno = 0;
-		hr = strtol(h, &ep, 10);
-		if (*ep != '\0' || errno == ERANGE || hr > 23)
-			return -1;
+		mn = 0;
+		mn += (tz[3] - '0') * 10;
+		mn += (tz[4] - '0');
 
-		memcpy(m, &tz[3], 2);
-		m[2] = '\0';
-		errno = 0;
-		mn = strtol(m, &ep, 10);
-		if (*ep != '\0' || errno == ERANGE || mn > 59)
+		if (hr > 23 || mn > 59)
 			return -1;
 		break;
 	}
