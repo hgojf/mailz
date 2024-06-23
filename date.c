@@ -31,7 +31,7 @@ struct timezone_offset {
 
 /* rfc 5322 date parsing */
 
-static int tzparse(const char *, size_t, struct timezone_offset *);
+static int tzparse(const char *, struct timezone_offset *);
 
 time_t
 tz_tosec(const char *s)
@@ -39,7 +39,7 @@ tz_tosec(const char *s)
 	time_t rv;
 	struct timezone_offset off;
 
-	if (tzparse(s, strlen(s), &off) == -1)
+	if (tzparse(s, &off) == -1)
 		return TZ_INVALIDSEC;
 
 	rv = (off.hour * 60 * 60) + (off.minute * 60);
@@ -49,9 +49,12 @@ tz_tosec(const char *s)
 }
 
 static int
-tzparse(const char *tz, size_t len, struct timezone_offset *out)
+tzparse(const char *tz, struct timezone_offset *out)
 {
 	int hr, mn, ng;
+	size_t len;
+
+	len = strlen(tz);
 
 	/* defaults */
 	mn = 0;

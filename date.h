@@ -16,6 +16,6 @@
 
 #ifndef MAILZ_DATE_H
 #define MAILZ_DATE_H
-#define TZ_INVALIDSEC 90000 /* (+25h) */
+#define TZ_INVALIDSEC 1 /* 1 minute offset from utc not defined in rfc 5822 */
 time_t tz_tosec(const char *);
 #endif /* MAILZ_DATE_H */
