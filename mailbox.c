@@ -270,11 +270,12 @@ maildir_letter_seen(const char *name)
 	char *flags, flag;
 	int n;
 
+	/* shouldnt have made it this far */
 	if ((flags = strchr(name, ':')) == NULL)
 		return -1;
 	flags++;
 	n = sscanf(flags, "2,%c", &flag);
-	return n != EOF && flag == 'S';
+	return n == 1 && flag == 'S';
 }
 
 int
