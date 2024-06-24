@@ -349,12 +349,17 @@ mailbox_letter_print(size_t nth, struct letter *letter)
 {
 	struct tm *tm;
 	char date[30];
+	struct from from;
+
+	if (from_extract(letter->from, &from) == -1)
+		return -1;
 
 	if ((tm = localtime(&letter->date)) == NULL
 			|| strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
 		return -1;
 
-	return printf("%4zu %-20s %-32.32s %-30s\n", nth, date, letter->from,
+	return printf("%4zu %-20s %-32.*s %-30s\n", nth, date, 
+		from.al, from.addr,
 		letter->subject == NULL ? "No Subject" : letter->subject);
 }
 
@@ -471,25 +476,36 @@ read_letter(FILE *fp, struct letter *letter)
 	return -1;
 }
 
-static char *
-from_extract(char *from)
+int
+from_extract(char *from, struct from *out)
 {
 	char *m;
+	size_t al, nl;
+
 	if ((m = strchr(from, '<')) != NULL) {
-		char *rv;
-		size_t len;
+		al = strlen(m) - 2;
+		if (al > INT_MAX)
+			return -1;
+		nl = (m - from);
+		if (m != from)
+			nl -= 1;
+		if (nl > INT_MAX)
+			return -1;
 
-		len = strlen(m);
-		if (m[len - 1] != '>')
-			return NULL;
-
-		if ((rv = dupstr(&m[1], len - 2)) == NULL)
-			return NULL;
-		free(from);
-		return rv;
+		out->addr = m + 1;
+		out->al = al;
 	}
+	else {
+		al = strlen(from);
+		if (al > INT_MAX)
+			return -1;
+	}
+	out->al = al;
+	out->addr = from;
+	out->nl = 0;
+	out->name = NULL;
 
-	return from;
+	return 0;
 }
 
 static int
@@ -506,8 +522,7 @@ header_push(struct header *header, struct letter *letter)
 		if (letter->from != NULL)
 			goto header;
 		/* takes ownership of header->val on success */
-		if ((letter->from = from_extract(header->val)) == NULL)
-			goto header;
+		letter->from = header->val;
 		free(header->key);
 		return 0;
 	}
@@ -903,6 +918,95 @@ dupstr(const char *str, size_t n)
 	if (rv != NULL) {
 		memcpy(rv, str, n);
 		rv[n] = '\0';
+	}
+	return rv;
+}
+
+int
+mailbox_letter_print_content(struct mailbox *mailbox, 
+	struct letter *letter, FILE *out)
+{
+	FILE *fp;
+	int c, type, rv;
+	struct letter tl;
+	struct tm *tm;
+	char date[30];
+	struct from from;
+	int lastnl;
+
+	rv = -1;
+
+	type = mailbox->type;
+	assert(type == MAILBOX_MBOX || type == MAILBOX_MAILDIR);
+
+	if ((tm = localtime(&letter->date)) == NULL)
+		return -1;
+	if (strftime(date, sizeof(date), "%a, %b %e, %Y at %H:%M", tm) == 0)
+		return -1;
+	if (from_extract(letter->from, &from) == -1)
+		return -1;
+
+	if (type == MAILBOX_MBOX) {
+		fp = mailbox->val.mbox_file;
+		if (fseek(fp, letter->ident.mbox_offset, SEEK_SET) == -1)
+			return -1;
+	}
+	if (type == MAILBOX_MAILDIR) {
+		int dfd;
+
+		dfd = dirfd(mailbox->val.maildir_cur);
+		if ((fp = fopenat(dfd, letter->ident.maildir_path)) == NULL)
+			return -1;
+	}
+
+	/* advances file pointer to just past the letter content */
+	if (read_letter(fp, &tl) == -1)
+		goto fail;
+	free(tl.subject);
+	free(tl.from);
+
+	if (fprintf(out, "On %s, %.*s wrote:\n", date, from.nl, from.name) < 0)
+		goto fail;
+
+	if (fputs("> ", out) == EOF)
+		goto fail;
+	lastnl = 0;
+	while ((c = fgetc(fp)) != EOF) {
+		/* find next 'From' line */
+
+		if (lastnl) {
+			if (fputs("> ", out) == EOF)
+				goto fail;
+			lastnl = 0;
+		}
+
+		if (type == MAILBOX_MBOX && c == '\n') {
+			char from[4];
+			size_t n;
+
+			if ((n = fread(from, 1, 4, fp)) == 0)
+				goto done;
+			if (memcmp(from, "From", 4) == 0)
+				break;
+			if (fseek(fp, - (long) n, SEEK_CUR) == -1)
+				goto fail;
+		}
+
+		if (fputc(c, out) == EOF)
+			goto fail;
+		if (c == '\n')
+			lastnl = 1;
+	}
+	done:
+
+	if (ferror(fp))
+		goto fail;
+
+	rv = 0;
+	fail:
+	if (type == MAILBOX_MAILDIR) {
+		if (fclose(fp) == EOF)
+			rv = -1;
 	}
 	return rv;
 }

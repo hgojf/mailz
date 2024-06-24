@@ -22,8 +22,10 @@ struct sendmail {
 		const char *name;
 	} from;
 	const char *subject; /* maybe NULL */
-	const char *to;
+	int tl;
+	char *to;
 	int re;
+	FILE *seed;
 };
 
 int sendmail(int, struct sendmail *);

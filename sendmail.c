@@ -73,6 +73,7 @@ sendmail(int sin, struct sendmail *letter)
 		if (close(fd) == -1)
 			err(1, "close");
 
+		letter->to[letter->tl] = '\0';
 		execl(PATH_MAILZWRAPPER, "sendmail", letter->to, NULL);
 		err(1, "execl");
 	default:
@@ -152,7 +153,7 @@ setup_mail(const struct sendmail *letter, char *path)
 		warn("fprintf");
 		goto fp;
 	}
-	if (fprintf(fp, "To: %s\n", letter->to) < 0) {
+	if (fprintf(fp, "To: %.*s\n", letter->tl, letter->to) < 0) {
 		warn("fprintf");
 		goto fp;
 	}
@@ -168,6 +169,16 @@ setup_mail(const struct sendmail *letter, char *path)
 	if (fputc('\n', fp) == EOF) {
 		warn("fputc");
 		goto fp;
+	}
+
+	if (letter->seed != NULL) {
+		int c;
+
+		while ((c = fgetc(letter->seed)) != EOF)
+			if (fputc(c, fp) == EOF)
+				goto fp;
+		if (ferror(letter->seed))
+			goto fp;
 	}
 
 	rv = 0;

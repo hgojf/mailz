@@ -171,7 +171,9 @@ main(int argc, char *argv[])
 
 		letter.subject = subject;
 		letter.to = argv[0];
+		letter.tl = strlen(argv[0]);
 		letter.re = 0;
+		letter.seed = NULL;
 
 		return sendmail(1, &letter) == -1 ? 1 : 0;
 	}
@@ -435,6 +437,13 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 {
 	struct letter *letter = &mailbox->letters[options->msg - 1];
 	struct sendmail send;
+	int fd;
+	FILE *fp;
+	int rv;
+	char path[] = "/tmp/mail/reply.XXXXXX";
+	struct from from;
+
+	rv = -1;
 
 	if (options->address == NULL || options->name == NULL) {
 		warnx("Must set an email address and real name");
@@ -453,9 +462,27 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 		letter = &mailbox->letters[idx - 1];
 	}
 
+	if (from_extract(letter->from, &from) == -1)
+		return -1;
+
+	if ((fd = mkstemp(path)) == -1)
+		return -1;
+	if ((fp = fdopen(fd, "a+")) == NULL) {
+		close(fd);
+		unlink(path);
+		return -1;
+	}
+	if (mailbox_letter_print_content(mailbox, letter, fp) == -1)
+		goto fail;
+	if (fseek(fp, 0, SEEK_SET) == -1)
+		goto fail;
+
+	send.seed = fp;
+
 	send.from.addr = options->address;
 	send.from.name = options->name;
-	send.to = letter->from;
+	send.tl = strlen(from.addr) - 1;
+	send.to = from.addr;
 
 	send.subject = letter->subject;
 	send.re = 1;
@@ -463,7 +490,16 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 		send.subject += 4;
 	}
 
-	return sendmail(0, &send);
+	if (sendmail(0, &send) == -1)
+		goto fail;
+
+	rv = 0;
+	fail:
+	if (fclose(fp) == EOF)
+		rv = -1;
+	if (unlink(path) == -1)
+		rv = -1;
+	return rv;
 }
 
 static int
@@ -561,10 +597,12 @@ send(__unused struct mailbox *mailbox, struct options *options, char *args)
 		warnx("enter a mail address");
 		return -1;
 	}
+	letter.tl = strlen(letter.to);
 	letter.from.addr = options->address;
 	letter.from.name = options->name;
 	letter.subject = args;
 	letter.re = 0;
+	letter.seed = NULL;
 
 	return sendmail(0, &letter);
 }

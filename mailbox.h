@@ -40,15 +40,26 @@ struct mailbox {
 	} val;
 };
 
+struct from {
+	int al;
+	char *addr;
+	int nl;
+	char *name;
+};
+
 void mailbox_free(struct mailbox *);
 int mailbox_setup(int, struct mailbox *);
 int mailbox_read(struct mailbox *, int);
 int mailbox_print(struct mailbox *, size_t, size_t);
 int mailbox_letter_print(size_t, struct letter *);
+int mailbox_letter_print_content(struct mailbox *, struct letter *,
+	FILE *);
 int mailbox_letter_print_read(struct mailbox *, struct letter *,
 	const struct options *, FILE *);
 int mailbox_letter_mark_read(struct mailbox *, struct letter *);
 int mailbox_letter_mark_unread(struct mailbox *, struct letter *);
+
+int from_extract(char *, struct from *);
 
 #ifdef MAILBOX_INTERNALS
 void letter_free(int, struct letter *);
