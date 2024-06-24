@@ -96,6 +96,7 @@ main(int argc, char *argv[])
 {
 	int ch, fd;
 	char *line = NULL;
+	const char *subject;
 	size_t n = 0;
 	ssize_t len;
 	struct options options;
@@ -114,9 +115,14 @@ main(int argc, char *argv[])
 	options.reorder = NULL;
 	options.msg = 1;
 
-	while ((ch = getopt(argc, argv, "s")) != -1) {
+	subject = NULL;
+
+	while ((ch = getopt(argc, argv, "as:")) != -1) {
 		switch (ch) {
 		case 's':
+			subject = optarg;
+			break;
+		case 'a': /* 'all' */
 			options.view_seen = 1;
 			break;
 		default:
@@ -134,14 +140,45 @@ main(int argc, char *argv[])
 		err(1, "mkdir");
 	if (unveil("/tmp/mail/", "crw") == -1)
 		err(1, "unveil");
-	if (unveil(argv[0], "rc") == -1)
-		err(1, "unveil");
 	if ((cfg = config_location()) != NULL && unveil(cfg, "r") == -1)
 		err(1, "unveil");
 	if (unveil(PATH_MAILZWRAPPER, "x") == -1)
 		err(1, "unveil");
 	if (pledge("stdio rpath cpath wpath proc exec unveil", NULL) == -1)
 		err(1, "pledge");
+
+	if (subject != NULL) {
+		struct sendmail letter;
+
+		if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
+			err(1, "pledge");
+
+		mailbox.nletters = 0;
+		mailbox.letters = NULL;
+		mailbox.type = MAILBOX_MAILDIR;
+		mailbox.val.mbox_file = NULL;
+		/* only mailbox.nletters = 0 should be necessary */
+
+		configure(&mailbox, &options);
+
+		if (options.address == NULL || options.name == NULL) {
+			warnx("Must set an email address and real name");
+			return 1;
+		}
+
+		letter.from.addr = options.address;
+		letter.from.name = options.name;
+
+		letter.subject = subject;
+		letter.to = argv[0];
+		letter.re = 0;
+
+		return sendmail(1, &letter) == -1 ? 1 : 0;
+	}
+	/* else */
+
+	if (unveil(argv[0], "rc") == -1)
+		err(1, "unveil");
 
 	if ((fd = open(argv[0], O_RDONLY | O_CLOEXEC)) == -1)
 		err(1, "open %s", argv[0]);
@@ -426,7 +463,7 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 		send.subject += 4;
 	}
 
-	return sendmail(&send);
+	return sendmail(0, &send);
 }
 
 static int
@@ -529,7 +566,7 @@ send(__unused struct mailbox *mailbox, struct options *options, char *args)
 	letter.subject = args;
 	letter.re = 0;
 
-	return sendmail(&letter);
+	return sendmail(0, &letter);
 }
 
 static int

@@ -28,15 +28,93 @@
 #include "pathnames.h"
 #include "sendmail.h"
 
+static int cat(const char *);
+static int setup_mail(const struct sendmail *, char *);
+
 int
-sendmail(struct sendmail *letter)
+sendmail(int sin, struct sendmail *letter)
+{
+	char path[] = "/tmp/mail/send.XXXXXXXXXX";
+	pid_t pid;
+	int fd, rv, status;
+
+	rv = -1;
+
+	if (setup_mail(letter, path) == -1)
+		return -1;
+
+	if (sin) {
+		if (cat(path) == -1)
+			goto fail;
+	}
+	else {
+		switch (pid = fork()) {
+		case -1:
+			warn("fork");
+			goto fail;
+		case 0:
+			execl(PATH_MAILZWRAPPER, "vi", path, NULL);
+			err(1, "execl");
+		default:
+			if (waitpid(pid, &status, 0) == -1 || status != 0)
+				goto fail;
+		}
+	}
+
+	switch (pid = fork()) {
+	case -1:
+		warn("fork");
+		goto fail;
+	case 0:
+		if ((fd = open(path, O_RDONLY)) == -1)
+			err(1, "fopen");
+		if (dup2(fd, STDIN_FILENO) == -1)
+			err(1, "dup2");
+		if (close(fd) == -1)
+			err(1, "close");
+
+		execl(PATH_MAILZWRAPPER, "sendmail", letter->to, NULL);
+		err(1, "execl");
+	default:
+		if (waitpid(pid, &status, 0) == -1 || status != 0)
+			goto fail;
+	}
+
+	rv = 0;
+	fail:
+	if (unlink(path) == -1)
+		rv = -1;
+	return rv;
+}
+
+static int
+cat(const char *path)
 {
 	FILE *fp;
-	pid_t pid;
-	char date[32], path[] = "/tmp/mail/send.XXXXXXXXXX";
-	struct tm *tm;
+	int c;
+
+	if ((fp = fopen(path, "a")) == NULL)
+		return -1;
+	while ((c = fgetc(stdin)) != EOF)
+		if (fputc(c, fp) == EOF)
+			return -1;
+	if (ferror(stdin))
+		return -1;
+	if (fclose(fp) == EOF)
+		return -1;
+	return 0;
+}
+
+static int
+setup_mail(const struct sendmail *letter, char *path)
+{
+	int fd, rv;
+	FILE *fp;
 	time_t cur;
-	int fd;
+	struct tm *tm;
+	char date[32];
+
+	rv = -1;
 
 	assert(letter->from.addr != NULL);
 	assert(letter->from.name != NULL);
@@ -90,45 +168,14 @@ sendmail(struct sendmail *letter)
 		warn("fputc");
 		goto fp;
 	}
+
+	rv = 0;
+	fp:
 	if (fclose(fp) == EOF) {
 		warn("fclose");
 		return -1;
 	}
-
-	switch (pid = fork()) {
-	case -1:
-		warn("fork");
-		return -1;
-	case 0:
-		execl(PATH_MAILZWRAPPER, "vi", path, NULL);
-		err(1, "execl");
-		/* NOTREACHED */
-	default:
-		waitpid(pid, NULL, 0);
-		break;
-	}
-
-	switch (pid = fork()) {
-	case -1:
-		warn("fork");
-		return -1;
-	case 0:
-		if ((fd = open(path, O_RDONLY)) == -1)
-			err(1, "fopen");
-		if (dup2(fd, STDIN_FILENO) == -1)
-			err(1, "dup2");
-		if (close(fd) == -1)
-			err(1, "close");
-		execl(PATH_MAILZWRAPPER, "sendmail", letter->to, NULL);
-		err(1, "execl");
-		/* NOTREACHED */
-	default:
-		waitpid(pid, NULL, 0);
-	}
-
-	return 0;
-
-	fp:
-	fclose(fp);
-	return -1;
+	if (rv == -1)
+		unlink(path);
+	return rv;
 }

@@ -26,5 +26,5 @@ struct sendmail {
 	int re;
 };
 
-int sendmail(struct sendmail *);
+int sendmail(int, struct sendmail *);
 #endif /* MAILZ_SENDMAIL_H */
