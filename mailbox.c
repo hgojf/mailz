@@ -238,8 +238,10 @@ mailbox_read(struct mailbox *out, int view_seen)
 
 	rv = 0;
 	fail:
-	if (type == MAILBOX_MAILDIR && fp != NULL)
-		fclose(fp);
+	if (type == MAILBOX_MAILDIR && fp != NULL) {
+		if (fclose(fp) == EOF)
+			rv = -1;
+	}
 	if (rv == -1) {
 		for (long long i = 0; i < out->nletters; i++)
 			letter_free(type, &out->letters[i]);
@@ -826,8 +828,8 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	}
 
 	free(line);
-	if (mailbox->type == MAILBOX_MAILDIR)
-		fclose(fp);
+	if (mailbox->type == MAILBOX_MAILDIR && fclose(fp) == EOF)
+		rv = -1;
 	return rv;
 }
 

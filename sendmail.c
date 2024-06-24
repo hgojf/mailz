@@ -92,18 +92,22 @@ static int
 cat(const char *path)
 {
 	FILE *fp;
-	int c;
+	int c, rv;
+
+	rv = -1;
 
 	if ((fp = fopen(path, "a")) == NULL)
 		return -1;
 	while ((c = fgetc(stdin)) != EOF)
 		if (fputc(c, fp) == EOF)
-			return -1;
+			goto fail;
 	if (ferror(stdin))
-		return -1;
-	if (fclose(fp) == EOF)
-		return -1;
-	return 0;
+		goto fail;
+
+	rv = 0;
+	fail:
+	fclose(fp);
+	return rv;
 }
 
 static int
@@ -185,7 +189,7 @@ setup_mail(const struct sendmail *letter, char *path)
 	fp:
 	if (fclose(fp) == EOF) {
 		warn("fclose");
-		return -1;
+		rv = -1;
 	}
 	if (rv == -1)
 		unlink(path);

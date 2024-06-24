@@ -401,6 +401,7 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 		return -1;
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		close(fd);
+		unlink(path);
 		return -1;
 	}
 
@@ -631,6 +632,7 @@ save(struct mailbox *mailbox, struct options *options, char *args)
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		warn("fdopen");
 		close(fd);
+		unlink(path);
 		return -1;
 	}
 
