@@ -173,11 +173,15 @@ mailbox_read(struct mailbox *out, int view_seen)
 		struct letter letter;
 
 		if (type == MAILBOX_MAILDIR) {
+			int seen;
+
 			if ((de = readdir(mdir)) == NULL)
 				break;
 			if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
 				continue;
-			if (!view_seen && maildir_letter_seen(de->d_name))
+			if ((seen = maildir_letter_seen(de->d_name)) == -1)
+				goto fail;
+			if (!view_seen && seen)
 				continue;
 			if ((fp = fopenat(dfd, de->d_name)) == NULL)
 				goto fail;
