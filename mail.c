@@ -103,16 +103,7 @@ main(int argc, char *argv[])
 	const char *cfg;
 	struct mailbox mailbox;
 
-	options.address = NULL;
-	options.name = NULL;
-	options.view_seen = 0;
-	options.nignore = 0;
-	options.ignore = NULL;
-	options.nunignore = 0;
-	options.unignore = NULL;
-	options.nreorder = 0;
-	options.linewrap = 0;
-	options.reorder = NULL;
+	memset(&options, 0, sizeof(options));
 	options.msg = 1;
 
 	subject = NULL;
