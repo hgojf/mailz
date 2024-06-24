@@ -492,18 +492,24 @@ from_extract(char *from, struct from *out)
 		if (nl > INT_MAX)
 			return -1;
 
+		if (m[al + 1] != '>')
+			return -1;
+
 		out->addr = m + 1;
 		out->al = al;
+		out->name = from;
+		out->nl = nl;
 	}
 	else {
 		al = strlen(from);
 		if (al > INT_MAX)
 			return -1;
+
+		out->addr = from;
+		out->al = al;
+		out->nl = 0;
+		out->name = NULL;
 	}
-	out->al = al;
-	out->addr = from;
-	out->nl = 0;
-	out->name = NULL;
 
 	return 0;
 }
