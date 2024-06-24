@@ -144,6 +144,7 @@ setup_mail(const struct sendmail *letter, char *path)
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		warn("fdopen");
 		close(fd);
+		unlink(path);
 		return -1;
 	}
 
