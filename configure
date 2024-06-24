@@ -50,7 +50,6 @@ have_header() {
 	echo "#include <$1>" >> test.c
 	echo "int main(void) { }" >> test.c
 	printf -- "Checking for header %s... " "$1"
-	cc test.c 2>/dev/null
 	if cc test.c 2>/dev/null ; then
 		echo "#define $2" >> config.h
 		printf 'Found\n'
@@ -73,7 +72,6 @@ have_compiler_flag() {
 	cat <<- EOF > test.c
 		int main(void) {  }
 		EOF
-	cc "$@" test.c
 	if cc "$@" test.c; then
 		if [ "${optional}" != "testonly" ]; then
 			echo CFLAGS += "$@" >> config.mk
