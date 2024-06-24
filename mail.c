@@ -149,6 +149,7 @@ main(int argc, char *argv[])
 
 	if (subject != NULL) {
 		struct sendmail letter;
+		size_t tl;
 
 		if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
 			err(1, "pledge");
@@ -171,7 +172,12 @@ main(int argc, char *argv[])
 
 		letter.subject = subject;
 		letter.to = argv[0];
-		letter.tl = strlen(argv[0]);
+
+		tl = strlen(argv[0]);
+		if (tl > INT_MAX)
+			errx(1, "Email address is too long");
+		letter.tl = (int) tl;
+
 		letter.re = 0;
 		letter.seed = NULL;
 
