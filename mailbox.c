@@ -995,13 +995,6 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 	lastnl = 0;
 	while ((c = fgetc(fp)) != EOF) {
 		/* find next 'From' line */
-
-		if (lastnl) {
-			if (fputs("> ", out) == EOF)
-				goto fail;
-			lastnl = 0;
-		}
-
 		if (type == MAILBOX_MBOX && c == '\n') {
 			char from[4];
 			size_t n;
@@ -1012,6 +1005,12 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 				break;
 			if (fseek(fp, - (long) n, SEEK_CUR) == -1)
 				goto fail;
+		}
+
+		if (lastnl) {
+			if (fputs("> ", out) == EOF)
+				goto fail;
+			lastnl = 0;
 		}
 
 		if (fputc(c, out) == EOF)
