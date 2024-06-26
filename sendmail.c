@@ -106,7 +106,8 @@ cat(const char *path)
 
 	rv = 0;
 	fail:
-	fclose(fp);
+	if (fclose(fp) == EOF)
+		rv = -1;
 	return rv;
 }
 
@@ -148,8 +149,8 @@ setup_mail(const struct sendmail *letter, char *path)
 	}
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		warn("fdopen");
-		close(fd);
-		unlink(path);
+		(void) close(fd);
+		(void) unlink(path);
 		return -1;
 	}
 
@@ -187,11 +188,9 @@ setup_mail(const struct sendmail *letter, char *path)
 
 	rv = 0;
 	fp:
-	if (fclose(fp) == EOF) {
-		warn("fclose");
+	if (fclose(fp) == EOF)
 		rv = -1;
-	}
 	if (rv == -1)
-		unlink(path);
+		(void) unlink(path);
 	return rv;
 }
