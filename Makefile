@@ -1,6 +1,6 @@
 .POSIX:
 
-.PHONY: all clean install tidy
+.PHONY: all clean install test tidy
 
 PREFIX ?= /usr/local
 CFLAGS = -O2 -g
@@ -13,7 +13,7 @@ INSTALL ?= install
 
 include config.mk
 
-all: mail mailwrapper regress
+all: mail mailwrapper
 
 mail: ${OBJS}
 	$(CC) -o $@ ${LDFLAGS} ${OBJS}
@@ -33,6 +33,9 @@ regress: date.o mailbox.o sendmail.o regress.o
 
 tags: ${SRCS}
 	$(CTAGS) ${SRCS}
+
+test: regress
+	@./regress
 
 tidy:
 	clang-tidy -checks=${TIDYCHECKS} ${SRCS}
