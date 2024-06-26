@@ -111,7 +111,7 @@ mailbox_setup(int fd, struct mailbox *out)
 	rv = 0;
 	fail:
 	if (rv == -1)
-		close(fd);
+		(void) close(fd);
 	return rv;
 }
 
@@ -265,9 +265,9 @@ mailbox_free(struct mailbox *mailbox)
 		letter_free(mailbox->type, &mailbox->letters[i]);
 	free(mailbox->letters);
 	if (mailbox->type == MAILBOX_MAILDIR)
-		closedir(mailbox->val.maildir_cur);
+		(void) closedir(mailbox->val.maildir_cur);
 	else if (mailbox->type == MAILBOX_MBOX)
-		fclose(mailbox->val.mbox_file);
+		(void) fclose(mailbox->val.mbox_file);
 }
 
 static int
@@ -384,7 +384,7 @@ opendirat(int at, const char *path)
 	if ((fd = openat(at, path, O_DIRECTORY | O_RDONLY | O_CLOEXEC)) == -1)
 		return NULL;
 	if ((ret = fdopendir(fd)) == NULL) {
-		close(fd);
+		(void) close(fd);
 	}
 	return ret;
 }
@@ -398,7 +398,7 @@ fopenat(int at, const char *path)
 	if ((fd = openat(at, path, O_RDONLY | O_CLOEXEC)) == -1)
 		return NULL;
 	if ((ret = fdopen(fd, "r")) == NULL) {
-		close(fd);
+		(void) close(fd);
 	}
 	return ret;
 }
@@ -679,7 +679,9 @@ maildir_setup(int dfd)
 	DIR *cur, *new;
 	struct dirent *de;
 	char name[NAME_MAX];
-	int n, curfd, newfd;
+	int n, curfd, newfd, rv;
+
+	rv = -1;
 
 	if ((cur = opendirat(dfd, "cur")) == NULL)
 		return NULL;
@@ -699,14 +701,16 @@ maildir_setup(int dfd)
 			goto new;
 	}
 
-	closedir(new);
-	return cur;
-
+	rv = 0;
 	new:
-	closedir(new);
+	if (closedir(new) == -1)
+		rv = -1;
 	cur:
-	closedir(cur);
-	return NULL;
+	if (rv == -1) {
+		(void) closedir(cur);
+		cur = NULL;
+	}
+	return cur;
 }
 
 int
