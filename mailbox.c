@@ -146,6 +146,16 @@ mailbox_read(struct mailbox *out, int view_seen)
 		struct letter letter;
 		long off;
 
+		for (;;) {
+			if ((c = fgetc(fp)) == EOF)
+				goto fail;
+			if (c != '\n') {
+				if (fseek(fp, -1, SEEK_CUR) == -1)
+					goto fail;
+				break;
+			}
+		}
+
 		if ((n = fread(from, 1, 4, fp)) == 0 || n != 4)
 			goto fail;
 		if (memcmp(from, "From", 4) != 0)
