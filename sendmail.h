@@ -22,9 +22,9 @@ struct sendmail {
 		const char *name;
 	} from;
 	const char *subject; /* maybe NULL */
+	int re;
 	int tl;
 	char *to;
-	int re;
 	FILE *seed;
 };
 

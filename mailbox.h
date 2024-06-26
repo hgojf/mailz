@@ -41,9 +41,9 @@ struct mailbox {
 };
 
 struct from {
-	int al;
+	int al; /* length of addr */
+	int nl; /* length of name */
 	char *addr;
-	int nl;
 	char *name;
 };
 
