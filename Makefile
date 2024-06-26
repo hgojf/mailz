@@ -13,7 +13,7 @@ INSTALL ?= install
 
 include config.mk
 
-all: mail mailwrapper
+all: mail mailwrapper regress
 
 mail: ${OBJS}
 	$(CC) -o $@ ${LDFLAGS} ${OBJS}
