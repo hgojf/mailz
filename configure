@@ -84,6 +84,7 @@ have_compiler_flag() {
 		fi
 	fi
 	rm test.c
+	rm a.out
 }
 
 system="$(uname -s)"
