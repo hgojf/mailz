@@ -271,6 +271,7 @@ main(int argc, char *argv[])
 		free(options.unignore[i]);
 	}
 	free(options.unignore);
+	(void) rmdir("/tmp/mail");
 }
 
 static const char *
