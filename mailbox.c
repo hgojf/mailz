@@ -500,7 +500,7 @@ from_extract(char *from, struct from *out)
 		if (al > INT_MAX)
 			return -1;
 		nl = (m - from);
-		if (m != from)
+		if (m != from) /* addresses in the form '<addr>' */
 			nl -= 1;
 		if (nl > INT_MAX)
 			return -1;

@@ -143,6 +143,14 @@ from_test(void)
 		|| strncmp(from.addr, "guy@valid.com", 13) != 0
 		|| from.nl != 0)
 		return 1;
+
+	addr = "<odd@mail.com>";
+	if (from_extract(addr, &from) == -1)
+		return 1;
+	if (from.nl != 0
+		|| from.al != 12
+		|| strncmp(from.addr, "odd@mail.com", 12) != 0)
+		return 1;
 	return 0;
 }
 
