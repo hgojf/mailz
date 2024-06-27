@@ -98,7 +98,8 @@ mailbox_setup(int fd, struct mailbox *out)
 		if ((dp = maildir_setup(fd)) == NULL)
 			goto fail;
 		out->val.maildir_cur = dp;
-		close(fd);
+		if (close(fd) == -1)
+			return -1;
 	}
 	else {
 		FILE *fp;
@@ -235,7 +236,9 @@ mailbox_read(struct mailbox *out, int view_seen)
 				letter_free(type, &letter);
 				goto fail;
 			}
-			fclose(fp);
+			/* obviously this is weird, because it will 'try again' */
+			if (fclose(fp) == EOF)
+				goto fail;
 			fp = NULL;
 		}
 
@@ -258,9 +261,9 @@ mailbox_read(struct mailbox *out, int view_seen)
 			letter_free(type, &out->letters[i]);
 		free(out->letters);
 		if (type == MAILBOX_MAILDIR)
-			closedir(mdir);
+			(void) closedir(mdir);
 		else if (type == MAILBOX_MBOX)
-			fclose(mbox);
+			(void) fclose(mbox);
 	}
 	else {
 		qsort(out->letters, out->nletters, sizeof(*out->letters),
@@ -781,7 +784,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 		if (!header_ignore(v, options)
 				&& fprintf(out, "%s: %s\n", v->key, v->val) < 0)
 			goto headers;
-		RB_REMOVE(headers, &headers, v);
+		(void) RB_REMOVE(headers, &headers, v);
 		free(v->key);
 		free(v->val);
 		free(v);
@@ -838,7 +841,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	rv = 0;
 	headers:
 	RB_FOREACH_SAFE(h, headers, &headers, h2) {
-		RB_REMOVE(headers, &headers, h);
+		(void) RB_REMOVE(headers, &headers, h);
 		free(h->key);
 		free(h->val);
 		free(h);

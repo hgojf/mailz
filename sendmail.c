@@ -65,8 +65,9 @@ sendmail(int edit, struct sendmail *letter)
 			int c, ch, tm;
 
 			/* accept "q\n" or "\n", nothing else. */
-			fprintf(stderr, "message located at %s, press enter after editing"
-				" or q to cancel\n", path);
+			if (fprintf(stderr, "message located at %s, press enter after editing"
+					" or q to cancel\n", path) < 0)
+				goto fail;
 			if ((ch = fgetc(stdin)) == EOF)
 				goto fail;
 			tm = 0;
@@ -77,10 +78,12 @@ sendmail(int edit, struct sendmail *letter)
 					tm = 1;
 			}
 			if (tm || ch != '\n' || ch == 'q') {
-				if (tm || ch != 'q')
-					fprintf(stderr, "invalid response\n");
 				if (unlink(path) == -1)
 					return -1;
+				if (tm || ch != 'q') {
+					if (fprintf(stderr, "invalid response\n") < 0)
+						return -1;
+				}
 				return 0;
 			}
 			break;
@@ -102,7 +105,7 @@ sendmail(int edit, struct sendmail *letter)
 			err(1, "close");
 
 		letter->to[letter->tl] = '\0';
-		execl(PATH_MAILZWRAPPER, "sendmail", letter->to, NULL);
+		(void) execl(PATH_MAILZWRAPPER, "sendmail", letter->to, NULL);
 		err(1, "execl");
 	default:
 		if (waitpid(pid, &status, 0) == -1 || status != 0)
