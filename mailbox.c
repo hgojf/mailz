@@ -371,9 +371,11 @@ mailbox_letter_print(size_t nth, struct letter *letter)
 			|| strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
 		return -1;
 
-	return printf("%4zu %-20s %-32.*s %-30s\n", nth, date, 
+	if (printf("%4zu %-20s %-32.*s %-30s\n", nth, date, 
 		from.al, from.addr,
-		letter->subject == NULL ? "No Subject" : letter->subject);
+		letter->subject == NULL ? "No Subject" : letter->subject) < 0)
+		return -1;
+	return 0;
 }
 
 int
