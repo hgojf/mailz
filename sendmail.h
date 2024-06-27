@@ -28,5 +28,9 @@ struct sendmail {
 	FILE *seed;
 };
 
+#define EDIT_VI 0
+#define EDIT_CAT 1
+#define EDIT_MANUAL 2
+
 int sendmail(int, struct sendmail *);
 #endif /* MAILZ_SENDMAIL_H */

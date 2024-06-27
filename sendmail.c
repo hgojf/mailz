@@ -32,7 +32,7 @@ static int cat(const char *);
 static int setup_mail(const struct sendmail *, char *);
 
 int
-sendmail(int sin, struct sendmail *letter)
+sendmail(int edit, struct sendmail *letter)
 {
 	char path[] = "/tmp/mail/send.XXXXXXXXXX";
 	pid_t pid;
@@ -43,22 +43,42 @@ sendmail(int sin, struct sendmail *letter)
 	if (setup_mail(letter, path) == -1)
 		return -1;
 
-	if (sin) {
-		if (cat(path) == -1)
-			goto fail;
-	}
-	else {
-		switch (pid = fork()) {
-		case -1:
-			warn("fork");
-			goto fail;
-		case 0:
-			execl(PATH_MAILZWRAPPER, "vi", path, NULL);
-			err(1, "execl");
-		default:
-			if (waitpid(pid, &status, 0) == -1 || status != 0)
+	switch (edit) {
+		case EDIT_CAT:
+			if (cat(path) == -1)
 				goto fail;
-		}
+			break;
+		case EDIT_VI:
+			switch (pid = fork()) {
+			case -1:
+				warn("fork");
+				goto fail;
+			case 0:
+				execl(PATH_MAILZWRAPPER, "vi", path, NULL);
+				err(1, "execl");
+			default:
+				if (waitpid(pid, &status, 0) == -1 || status != 0)
+					goto fail;
+			}
+			break;
+		case EDIT_MANUAL: {
+			int ch;
+
+			fprintf(stderr, "message located at %s, press enter after editing"
+				" or q to cancel\n", path);
+			if ((ch = fgetc(stdin)) == EOF)
+				goto fail;
+			if (ch == 'q') {
+				if (unlink(path) == -1)
+					return -1;
+				return 0;
+			}
+			else if (ch != '\n')
+				goto fail;
+			break;
+			}
+		default:
+			assert(0);
 	}
 
 	switch (pid = fork()) {

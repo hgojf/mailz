@@ -172,7 +172,7 @@ main(int argc, char *argv[])
 		letter.re = 0;
 		letter.seed = NULL;
 
-		return sendmail(1, &letter) == -1 ? 1 : 0;
+		return sendmail(EDIT_CAT, &letter) == -1 ? 1 : 0;
 	}
 	/* else */
 
@@ -493,7 +493,7 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 		send.subject += 4;
 	}
 
-	if (sendmail(0, &send) == -1)
+	if (sendmail(options->edit_mode, &send) == -1)
 		goto fail;
 
 	rv = 0;
@@ -576,6 +576,14 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 		}
 		free(orig);
 	}
+	else if (strcmp(var, "edit") == 0) {
+		if (strcmp(val, "vi") == 0)
+			options->edit_mode = EDIT_VI;
+		else if (strcmp(val, "manual") == 0)
+			options->edit_mode = EDIT_MANUAL;
+		else
+			warnx("unknown edit mode");
+	}
 	else {
 		warnx("unknown variable");
 		return -1;
@@ -605,7 +613,7 @@ send(__unused struct mailbox *mailbox, struct options *options, char *args)
 	letter.re = 0;
 	letter.seed = NULL;
 
-	return sendmail(0, &letter);
+	return sendmail(options->edit_mode, &letter);
 }
 
 static int
