@@ -15,6 +15,7 @@
  */
 
 #define MAILBOX_INTERNALS
+#include "config.h"
 
 #include <sys/stat.h>
 #ifdef HAVE_SYS_TREE_H

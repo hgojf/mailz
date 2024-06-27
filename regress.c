@@ -11,6 +11,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "date.h"
 #include "mail.h"
 #include "mailbox.h"

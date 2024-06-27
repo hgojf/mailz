@@ -180,7 +180,9 @@ have_function strsep string.h strsep.c <<-EOF
 
 echo "#define _XOPEN_SOURCE 700" >> config.h
 if [ -n "${DEFINE}" ]; then
+	echo "#ifndef ${DEFINE}" >> config.h
 	echo "#define ${DEFINE}" >> config.h
+	echo "#endif /* ${DEFINE} */" >> config.h
 fi
 
 have_header sys/tree.h HAVE_SYS_TREE_H
