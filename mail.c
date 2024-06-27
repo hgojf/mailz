@@ -466,6 +466,10 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 
 	if ((fd = mkstemp(path)) == -1)
 		return -1;
+	if (unlink(path) == -1) {
+		close(fd);
+		return -1;
+	}
 	if ((fp = fdopen(fd, "a+")) == NULL) {
 		close(fd);
 		unlink(path);
@@ -495,8 +499,6 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 	rv = 0;
 	fail:
 	if (fclose(fp) == EOF)
-		rv = -1;
-	if (unlink(path) == -1)
 		rv = -1;
 	return rv;
 }
