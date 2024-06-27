@@ -953,7 +953,7 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 	int c, type, rv;
 	struct letter tl;
 	struct tm *tm;
-	char date[30];
+	char date[33];
 	struct from from;
 	int lastnl;
 
@@ -964,7 +964,7 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 
 	if ((tm = localtime(&letter->date)) == NULL)
 		return -1;
-	if (strftime(date, sizeof(date), "%a, %b %e, %Y at %H:%M", tm) == 0)
+	if (strftime(date, sizeof(date), "%a, %b %e, %Y at %H:%M %z", tm) == 0)
 		return -1;
 	if (from_extract(letter->from, &from) == -1)
 		return -1;
