@@ -62,21 +62,29 @@ sendmail(int edit, struct sendmail *letter)
 			}
 			break;
 		case EDIT_MANUAL: {
-			int ch;
+			int c, ch, tm;
 
+			/* accept "q\n" or "\n", nothing else. */
 			fprintf(stderr, "message located at %s, press enter after editing"
 				" or q to cancel\n", path);
 			if ((ch = fgetc(stdin)) == EOF)
 				goto fail;
-			if (ch == 'q') {
+			tm = 0;
+			while ((c = fgetc(stdin)) != EOF) {
+				if (c == '\n')
+					break;
+				else
+					tm = 1;
+			}
+			if (tm || ch != '\n' || ch == 'q') {
+				if (tm || ch != 'q')
+					fprintf(stderr, "invalid response\n");
 				if (unlink(path) == -1)
 					return -1;
 				return 0;
 			}
-			else if (ch != '\n')
-				goto fail;
 			break;
-			}
+		}
 		default:
 			assert(0);
 	}
