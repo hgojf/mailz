@@ -232,13 +232,13 @@ mailbox_read(struct mailbox *out, int view_seen)
 			goto fail;
 
 		if (type == MAILBOX_MAILDIR) {
+			/* obviously this is weird, because it will 'try again' */
+			if (fclose(fp) == EOF)
+				goto fail;
 			if ((letter.ident.maildir_path = strdup(de->d_name)) == NULL) {
 				letter_free(type, &letter);
 				goto fail;
 			}
-			/* obviously this is weird, because it will 'try again' */
-			if (fclose(fp) == EOF)
-				goto fail;
 			fp = NULL;
 		}
 
