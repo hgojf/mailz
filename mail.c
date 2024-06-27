@@ -49,6 +49,10 @@
 
 struct command {
 	const char *ident;
+	const char *usage;
+	#define COMMAND_USAGE -2
+	#define COMMAND_ERROR -1
+	#define COMMAND_OK 0
 	int (*fn) (struct mailbox *, struct options *, char *);
 };
 
@@ -57,6 +61,7 @@ static int command_run(char *, struct mailbox *, struct options *);
 static int command_cmp(const void *, const void *);
 static int configure(struct mailbox *, struct options *);
 static const char *config_location(void);
+static void options_free(struct options *);
 static void usage(void);
 
 static int ignore(struct mailbox *, struct options *, char *);
@@ -74,18 +79,18 @@ static int unsee(struct mailbox *, struct options *, char *);
 
 static struct command commands[] =
 {
-	{ "ignore", ignore },
-	{ "more", more },
-	{ "p", print },
-	{ "r", see },
-	{ "reorder", reorder },
-	{ "reply", reply },
-	{ "s", save },
-	{ "send", send },
-	{ "set", set },
-	{ "t", thread },
-	{ "unignore", unignore },
-	{ "x", unsee },
+	{ "ignore", "[headers...]", ignore },
+	{ "more", "[message number]", more },
+	{ "p", "", print },
+	{ "r", "[message number]", see },
+	{ "reorder", "[headers...]", reorder },
+	{ "reply", "[message number]", reply },
+	{ "s", "[message number]", save },
+	{ "send", "[message number]", send },
+	{ "set", "variable [value]", set },
+	{ "t", "[message number]", thread },
+	{ "unignore", "[headers...]", unignore },
+	{ "x", "", unsee },
 };
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -94,7 +99,7 @@ static struct command commands[] =
 int
 main(int argc, char *argv[])
 {
-	int ch, fd;
+	int ch, fd, rv;
 	char *line = NULL;
 	const char *subject;
 	size_t n = 0;
@@ -102,6 +107,8 @@ main(int argc, char *argv[])
 	struct options options;
 	const char *cfg;
 	struct mailbox mailbox;
+
+	rv = 1;
 
 	memset(&options, 0, sizeof(options));
 	options.msg = 1;
@@ -151,10 +158,14 @@ main(int argc, char *argv[])
 		mailbox.val.mbox_file = NULL;
 		/* only mailbox.nletters = 0 should be necessary */
 
-		configure(&mailbox, &options);
+		if (configure(&mailbox, &options) == -1) {
+			options_free(&options);
+			return 1;
+		}
 
 		if (options.address == NULL || options.name == NULL) {
 			warnx("Must set an email address and real name");
+			options_free(&options);
 			return 1;
 		}
 
@@ -172,7 +183,10 @@ main(int argc, char *argv[])
 		letter.re = 0;
 		letter.seed = NULL;
 
-		return sendmail(EDIT_CAT, &letter) == -1 ? 1 : 0;
+		rv = sendmail(EDIT_CAT, &letter) == -1 ? 1 : 0;
+		options_free(&options);
+
+		return rv;
 	}
 	/* else */
 
@@ -213,26 +227,33 @@ main(int argc, char *argv[])
 		err(1, "mailbox_read");
 
 	if (mailbox.nletters == 0) {
-		puts("No mail.");
-		return 0;
+		if (puts("No mail.") == EOF)
+			goto fail;
+		goto good;
 	}
 
-	configure(&mailbox, &options);
+	if (configure(&mailbox, &options) == -1)
+		goto fail;
 
-	mailbox_print(&mailbox, 0, mailbox.nletters);
+	if (mailbox_print(&mailbox, 0, mailbox.nletters) == -1)
+		goto fail;
 
-	fputs("> ", stdout);
+	if (fputs("> ", stdout) == EOF)
+		goto fail;
 	while ((len = getline(&line, &n, stdin)) != -1) {
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
 		if (*line == '\0') {
 			if (options.msg == mailbox.nletters) {
-				printf("No more messages\n");
-				fputs("> ", stdout);
+				if (printf("No more messages\n") < 0)
+					goto fail;
+				if (fputs("> ", stdout) == EOF)
+					goto fail;
 				continue;
 			}
-			mailbox_letter_print_read(&mailbox, &mailbox.letters[options.msg++ - 1],
-				&options, stdout);
+			if (mailbox_letter_print_read(&mailbox, &mailbox.letters[options.msg++ - 1],
+					&options, stdout) == -1)
+				goto fail;
 		}
 		else if (isdigit(*line)) {
 			const char *errstr;
@@ -243,35 +264,83 @@ main(int argc, char *argv[])
 				warnx("Message number was %s", errstr);
 			else {
 				options.msg = msg;
-				mailbox_letter_print_read(&mailbox, &mailbox.letters[options.msg - 1],
-					&options, stdout);
+				if (mailbox_letter_print_read(&mailbox, &mailbox.letters[options.msg - 1],
+						&options, stdout) == -1)
+					goto fail;
 			}
 		}
 		else {
-			command_run(line, &mailbox, &options);
+			struct command *cmd;
+			const char *command;
+			char *args;
+			int cv;
+
+			args = line;
+			if ((command = strsep(&args, " \t")) == NULL)
+				return -1;
+			cmd = bsearch(command, commands, nitems(commands), 
+			sizeof(*commands), command_cmp);
+			if (cmd == NULL) {
+				warnx("unknown command %s", command);
+				continue;
+			}
+			cv = cmd->fn(&mailbox, &options, args);
+
+			switch (cv) {
+			case COMMAND_USAGE:
+				if (fprintf(stderr, "usage: %s %s\n", cmd->ident,
+						cmd->usage) < 0)
+					goto fail;
+				break;
+			case COMMAND_ERROR:
+				if (fprintf(stderr, "command failed\n") < 0)
+					goto fail;
+				break;
+			case COMMAND_OK:
+				break;
+			}
 		}
-		fputs("> ", stdout);
+		if (fputs("> ", stdout) == EOF)
+			goto fail;
 	}
 
-	putchar('\n');
+	if (putchar('\n') == EOF)
+		goto fail;
 
+	good:
+	rv = 0;
+	fail:
+	if (pledge("stdio cpath", NULL) == -1)
+		err(1, "pledge");
+	if (rmdir("/tmp/mail") == -1 && errno != ENOTEMPTY) {
+		warn("rmdir");
+		rv = 1;
+	}
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
 	free(line);
 	mailbox_free(&mailbox);
-	free(options.address);
-	free(options.name);
-	for (size_t i = 0; i < options.nreorder; i++) {
-		free(options.reorder[i]);
+	options_free(&options);
+	return rv;
+}
+
+static void
+options_free(struct options *options)
+{
+	free(options->address);
+	free(options->name);
+	for (size_t i = 0; i < options->nreorder; i++) {
+		free(options->reorder[i]);
 	}
-	free(options.reorder);
-	for (size_t i = 0; i < options.nignore; i++) {
-		free(options.ignore[i]);
+	free(options->reorder);
+	for (size_t i = 0; i < options->nignore; i++) {
+		free(options->ignore[i]);
 	}
-	free(options.ignore);
-	for (size_t i = 0; i < options.nunignore; i++) {
-		free(options.unignore[i]);
+	free(options->ignore);
+	for (size_t i = 0; i < options->nunignore; i++) {
+		free(options->unignore[i]);
 	}
-	free(options.unignore);
-	(void) rmdir("/tmp/mail");
+	free(options->unignore);
 }
 
 static const char *
@@ -310,30 +379,38 @@ configure(struct mailbox *mailbox, struct options *options)
 	ssize_t len;
 	int rv;
 
+	rv = -1;
+
 	if ((mailrc = config_location()) == NULL)
 		return 0;
 	if ((fp = fopen(mailrc, "re")) == NULL) {
-		if (errno != ENOENT)
+		if (errno != ENOENT) {
 			warn("fopen %s", mailrc);
-		return -1;
+			return -1;
+		}
+		return 0;
 	}
 
 	while ((len = getline(&line, &n, fp)) != -1) {
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
-		command_run(line, mailbox, options);
+		if (command_run(line, mailbox, options) == -1)
+			goto fail;
 	}
 
 	rv = ferror(fp) ? -1 : 0;
+
+	fail:
 	free(line);
-	fclose(fp);
+	if (fclose(fp) == EOF)
+		rv = -1;
 	return rv;
 }
 
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: mailz [-s] <mailbox>\n");
+	(void) fprintf(stderr, "usage: mailz [-s] <mailbox>\n");
 	exit(1);
 }
 
@@ -381,7 +458,7 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 	pid_t pid;
 	struct letter *letter;
 	char path[] = "/tmp/mail/more.XXXXXXXXXX";
-	int fd;
+	int fd, rv;
 	FILE *fp;
 
 	if (args != NULL) {
@@ -391,7 +468,7 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 		idx = strtonum(args, 1, mailbox->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
-			return -1;
+			return COMMAND_USAGE;
 		}
 		options->msg = idx;
 	}
@@ -401,8 +478,8 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 	if ((fd = mkstemp(path)) == -1)
 		return -1;
 	if ((fp = fdopen(fd, "w")) == NULL) {
-		close(fd);
-		unlink(path);
+		(void) close(fd);
+		(void) unlink(path);
 		return -1;
 	}
 
@@ -418,11 +495,16 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 		break;
 	}
 
-	mailbox_letter_print_read(mailbox, letter, options, fp);
-	fclose(fp);
-	waitpid(pid, NULL, 0);
-	unlink(path);
-	return 0;
+	rv = 0;
+	if (mailbox_letter_print_read(mailbox, letter, options, fp) == -1)
+		rv = -1;
+	if (fclose(fp) == EOF)
+		rv = -1;
+	if (waitpid(pid, NULL, 0) == -1)
+		rv = -1;
+	if (unlink(path) == -1)
+		rv = -1;
+	return rv;
 }
 
 static int
@@ -456,7 +538,7 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 		idx = strtonum(args, 1, mailbox->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
-			return -1;
+			return COMMAND_USAGE;
 		}
 		letter = &mailbox->letters[idx - 1];
 	}
@@ -467,12 +549,11 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 	if ((fd = mkstemp(path)) == -1)
 		return -1;
 	if (unlink(path) == -1) {
-		close(fd);
+		(void) close(fd);
 		return -1;
 	}
 	if ((fp = fdopen(fd, "a+")) == NULL) {
-		close(fd);
-		unlink(path);
+		(void) close(fd);
 		return -1;
 	}
 	if (mailbox_letter_print_content(mailbox, letter, fp) == -1)
@@ -515,7 +596,7 @@ see(struct mailbox *mailbox, struct options *options, char *args)
 		idx = strtonum(args, 1, mailbox->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
-			return -1;
+			return COMMAND_USAGE;
 		}
 		letter = &mailbox->letters[idx - 1];
 	}
@@ -539,8 +620,7 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 
 	if (strcmp(var, "address") == 0) {
 		if (val == NULL) {
-			warnx("need a value");
-			return -1;
+			return COMMAND_USAGE;
 		}
 		orig = options->address;
 		if ((options->address = strdup(val)) == NULL) {
@@ -557,7 +637,7 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 			lr = strtonum(val, 0, UINT_MAX, &errstr);
 			if (errstr != NULL) {
 				warnx("linewrap was %s", errstr);
-				return -1;
+				return COMMAND_USAGE;
 			}
 		}
 		else
@@ -567,7 +647,7 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 	else if (strcmp(var, "name") == 0) {
 		if (val == NULL) {
 			warnx("need a value");
-			return -1;
+			return COMMAND_USAGE;
 		}
 		orig = options->name;
 		if ((options->name = strdup(val)) == NULL) {
@@ -581,12 +661,14 @@ set(__unused struct mailbox *mailbox, struct options *options, char *args)
 			options->edit_mode = EDIT_VI;
 		else if (strcmp(val, "manual") == 0)
 			options->edit_mode = EDIT_MANUAL;
-		else
+		else {
 			warnx("unknown edit mode");
+			return COMMAND_USAGE;
+		}
 	}
 	else {
 		warnx("unknown variable");
-		return -1;
+		return COMMAND_USAGE;
 	}
 
 	return 0;
@@ -603,8 +685,7 @@ send(__unused struct mailbox *mailbox, struct options *options, char *args)
 	}
 
 	if ((letter.to = strsep(&args, " \t")) == NULL) {
-		warnx("enter a mail address");
-		return -1;
+		return COMMAND_USAGE;
 	}
 	letter.tl = strlen(letter.to);
 	letter.from.addr = options->address;
@@ -621,7 +702,7 @@ save(struct mailbox *mailbox, struct options *options, char *args)
 {
 	struct letter *letter = &mailbox->letters[options->msg - 1];
 	char path[] = "/tmp/mail/letter.XXXXXX";
-	int fd;
+	int fd, rv;
 	FILE *fp;
 
 	if (args != NULL) {
@@ -631,7 +712,7 @@ save(struct mailbox *mailbox, struct options *options, char *args)
 		idx = strtonum(args, 1, mailbox->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
-			return -1;
+			return COMMAND_USAGE;
 		}
 		letter = &mailbox->letters[idx - 1];
 	}
@@ -642,17 +723,19 @@ save(struct mailbox *mailbox, struct options *options, char *args)
 	}
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		warn("fdopen");
-		close(fd);
-		unlink(path);
+		(void) close(fd);
+		(void) unlink(path);
 		return -1;
 	}
 
+	rv = 0;
 	if (mailbox_letter_print_read(mailbox, letter, options, fp) == -1)
-		warnx("failed to save letter");
-	else
-		printf("saved letter to %s\n", path);
-	fclose(fp);
-	return 0;
+		rv = -1;
+	else if (printf("saved letter to %s\n", path) < 0)
+		rv = -1;
+	if (fclose(fp) == EOF)
+		rv = -1;
+	return rv;
 }
 
 static int
@@ -662,7 +745,7 @@ unsee(struct mailbox *mailbox, struct options *options, char *args)
 
 	if (args != NULL) {
 		warnx("This command takes no arguments.");
-		return 0;
+		return COMMAND_USAGE;
 	}
 
 	if (mailbox_letter_mark_unread(mailbox, letter) == -1)
@@ -675,7 +758,7 @@ print(struct mailbox *mailbox, __unused struct options *options, char *args)
 {
 	if (args != NULL) {
 		warnx("This command takes no arguments");
-		return 0;
+		return COMMAND_USAGE;
 	}
 	return mailbox_print(mailbox, 0, mailbox->nletters);
 }
@@ -695,7 +778,7 @@ thread(struct mailbox *mailbox, __unused struct options *options, char *args)
 		idx = strtonum(args, 1, mailbox->nletters, &errstr);
 		if (errstr != NULL) {
 			warnx("Message number was %s", errstr);
-			return -1;
+			return COMMAND_USAGE;
 		}
 		options->msg = idx;
 	}
