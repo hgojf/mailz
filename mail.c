@@ -322,6 +322,9 @@ main(int argc, char *argv[])
 			goto fail;
 	}
 
+	if (ferror(stdin))
+		goto fail;
+
 	if (putchar('\n') == EOF)
 		goto fail;
 
