@@ -57,12 +57,16 @@ struct command {
 	int (*fn) (struct mailbox *, struct options *, char *);
 };
 
+#undef HAVE_FLOCK
+
 static int argv_ify(char *, size_t *, char ***);
 static int command_run(char *, struct mailbox *, struct options *);
 static int command_cmp(const void *, const void *);
 static int configure(struct mailbox *, struct options *);
 static const char *config_location(void);
+static int lock_interactive(int, int, const char *);
 static void options_free(struct options *);
+static int unlock(int);
 static void usage(void);
 
 static int ignore(struct mailbox *, struct options *, char *);
@@ -143,7 +147,7 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if (unveil(PATH_MAILZWRAPPER, "x") == -1)
 		err(1, "unveil");
-	if (pledge("stdio rpath cpath wpath proc exec unveil", NULL) == -1)
+	if (pledge("stdio rpath cpath wpath proc exec flock unveil", NULL) == -1)
 		err(1, "pledge");
 
 	if (subject != NULL) {
@@ -199,9 +203,6 @@ main(int argc, char *argv[])
 	if (mailbox_setup(fd, &mailbox) == -1)
 		err(1, "mailbox_setup");
 
-	/* dont need to reopen this ever */
-	if (mailbox.type == MAILBOX_MBOX && unveil(argv[0], "") == -1)
-		err(1, "unveil");
 	/* only need 'cur' directory for maildir */
 	if (mailbox.type == MAILBOX_MAILDIR) {
 		char path[PATH_MAX];
@@ -220,9 +221,19 @@ main(int argc, char *argv[])
 			err(1, "unveil");
 		if (unveil(argv[0], "") == -1)
 			err(1, "unveil");
+		if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
+			err(1, "pledge");
 	}
-	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
-		err(1, "pledge");
+
+	if (mailbox.type == MAILBOX_MBOX) {
+		/* dont need to reopen this ever */
+		if (unveil(argv[0], "") == -1)
+			err(1, "unveil");
+		if (lock_interactive(fd, 0, "mbox") == -1)
+			err(1, "flock_interactive");
+		if (pledge("stdio rpath cpath wpath proc exec flock", NULL) == -1)
+			err(1, "pledge");
+	}
 
 	if (mailbox_read(&mailbox, options.view_seen) == -1)
 		err(1, "mailbox_read");
@@ -314,8 +325,19 @@ main(int argc, char *argv[])
 	good:
 	rv = 0;
 	fail:
+	if (mailbox.type == MAILBOX_MBOX) {
+		/* drop our lock to avoid deadlock */
+		if (unlock(fd) == -1)
+			rv = 1;
+		else if (lock_interactive(fd, 1, "mbox") == -1)
+			rv = 1;
+	}
 	mailbox_free(&mailbox);
-	if (rmdir("/tmp/mail") == -1 && errno != ENOTEMPTY) {
+	if (mailbox.type == MAILBOX_MBOX) {
+		if (unlock(fd) == -1)
+			rv = 1;
+	}
+	if (rmdir("/tmp/mail") == -1 && errno != ENOTEMPTY && errno != ENOENT) {
 		warn("rmdir");
 		rv = 1;
 	}
@@ -324,6 +346,54 @@ main(int argc, char *argv[])
 	free(line);
 	options_free(&options);
 	return rv;
+}
+
+static int
+unlock(int fd)
+{
+	struct flock lock;
+
+	lock.l_start = 0;
+	lock.l_len = 0;
+	lock.l_pid = getpid();
+	lock.l_type = F_UNLCK;
+	lock.l_whence = 0;
+
+	if (fcntl(fd, F_SETLK, &lock) == -1)
+		return -1;
+	return 0;
+}
+
+static int
+lock_interactive(int fd, int ex, const char *what)
+{
+	struct flock lock;
+
+	lock.l_start = 0;
+	lock.l_len = 0;
+	lock.l_pid = getpid();
+	lock.l_type = ex ? F_WRLCK : F_RDLCK;
+	lock.l_whence = SEEK_SET;
+
+	if (fcntl(fd, F_GETLK, &lock) == -1)
+		return -1;
+	if (lock.l_type != F_UNLCK) {
+		if (fprintf(stderr, "trying to lock %s... (pid %d has a lock)\n",
+				what, lock.l_pid) < 0)
+		return -1;
+	}
+
+	lock.l_start = 0;
+	lock.l_len = 0;
+	lock.l_pid = getpid();
+	lock.l_type = ex ? F_WRLCK : F_RDLCK;
+	lock.l_whence = SEEK_SET;
+	if (fcntl(fd, F_SETLKW, &lock) == -1) {
+		warn("failed to lock %s", what);
+		return -1;
+	}
+
+	return 0;
 }
 
 static void
