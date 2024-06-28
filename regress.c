@@ -160,6 +160,7 @@ letter_test(void)
 	FILE *fp;
 	struct letter letter;
 	int seen;
+	struct getline gl;
 
 	if (pledge("stdio rpath", NULL) == -1)
 		err(1, "pledge");
@@ -168,7 +169,10 @@ letter_test(void)
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
 
-	if (letter_read(fp, &letter, MAILBOX_MBOX, &seen) == -1) {
+	gl.line = NULL;
+	gl.n = 0;
+	if (letter_read(fp, &letter, MAILBOX_MBOX, &seen, &gl) == -1) {
+		free(gl.line);
 		fclose(fp);
 		return 1;
 	}
@@ -185,6 +189,7 @@ letter_test(void)
 	free(letter.subject);
 	free(letter.from);
 	fclose(fp);
+	free(gl.line);
 
 	return 0;
 }

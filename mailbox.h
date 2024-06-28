@@ -66,7 +66,12 @@ int mailbox_letter_mark_unread(struct mailbox *, struct letter *);
 int from_extract(char *, struct from *);
 
 #ifdef MAILBOX_INTERNALS
+struct getline {
+	char *line;
+	size_t n;
+};
+
 void letter_free(int, struct letter *);
-int letter_read(FILE *, struct letter *, int, int *);
+int letter_read(FILE *, struct letter *, int, int *, struct getline *);
 #endif /* MAILBOX_INTERNALS */
 #endif /* MAILZ_MAILBOX_H */

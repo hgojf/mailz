@@ -61,7 +61,7 @@ static DIR *opendirat(int, const char *);
 static int header_ignore(struct header *, const struct options *);
 static int header_push(struct header *, struct letter *);
 static int header_push2(struct header *, struct headers *);
-static int header_read(FILE *, char **, size_t *, struct header *);
+static int header_read(FILE *, struct getline *, struct header *);
 
 static int letter_cmp(const void *, const void *);
 static int letter_push(struct letter *, struct mailbox *);
@@ -130,6 +130,7 @@ mailbox_setup(const char *path, struct mailbox *out)
 int
 mailbox_read(struct mailbox *out, int view_seen)
 {
+	struct getline gl;
 	FILE *fp, *mbox;
 	DIR *mdir;
 	int dfd, rv, type;
@@ -149,6 +150,9 @@ mailbox_read(struct mailbox *out, int view_seen)
 
 	out->letters = NULL;
 	out->nletters = 0;
+
+	gl.line = NULL;
+	gl.n = 0;
 
 	/* first message has 'From' on the first line */
 	if (type == MAILBOX_MBOX) {
@@ -181,7 +185,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 
 		if ((off = ftell(fp)) == -1)
 			goto fail;
-		if (letter_read(fp, &letter, type, &seen) == -1)
+		if (letter_read(fp, &letter, type, &seen, &gl) == -1)
 			goto fail;
 		letter.ident.mbox.offset = off;
 		letter.ident.mbox.seen = 0;
@@ -245,7 +249,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 				goto fail;
 		}
 
-		if (letter_read(fp, &letter, type, &seen) == -1)
+		if (letter_read(fp, &letter, type, &seen, &gl) == -1)
 			goto fail;
 
 		if (type == MAILBOX_MAILDIR) {
@@ -278,6 +282,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 
 	rv = 0;
 	fail:
+	free(gl.line);
 	if (type == MAILBOX_MAILDIR && fp != NULL) {
 		if (fclose(fp) == EOF)
 			rv = -1;
@@ -485,10 +490,9 @@ letter_push(struct letter *letter, struct mailbox *mailbox)
 }
 
 int
-letter_read(FILE *fp, struct letter *letter, int type, int *seen)
+letter_read(FILE *fp, struct letter *letter, int type, int *seen, 
+	struct getline *gl)
 {
-	char *line = NULL;
-	size_t n = 0;
 	ssize_t len;
 
 	letter->subject = NULL;
@@ -498,13 +502,13 @@ letter_read(FILE *fp, struct letter *letter, int type, int *seen)
 	for (;;) {
 		struct header header;
 
-		if ((len = getline(&line, &n, fp)) == -1)
+		if ((len = getline(&gl->line, &gl->n, fp)) == -1)
 			goto letter;
-		if (line[len - 1] == '\n')
-			line[len - 1] = '\0';
-		if (*line == '\0')
+		if (gl->line[len - 1] == '\n')
+			gl->line[len - 1] = '\0';
+		if (*gl->line == '\0')
 			break;
-		if (header_read(fp, &line, &n, &header) == -1)
+		if (header_read(fp, gl, &header) == -1)
 			goto letter;
 		if (type == MAILBOX_MBOX && strcmp(header.key, "Status") == 0) {
 			if (strchr(header.val, 'R') != NULL)
@@ -520,14 +524,11 @@ letter_read(FILE *fp, struct letter *letter, int type, int *seen)
 	if (letter->from == NULL || letter->date == -1)
 		goto letter;
 
-	free(line);
 	return 0;
 
 	letter:
 	free(letter->subject);
 	free(letter->from);
-
-	free(line);
 	return -1;
 }
 
@@ -658,18 +659,18 @@ strip_trailing(char *p)
 }
 
 static int
-header_read(FILE *fp, char **lp, size_t *np, struct header *out)
+header_read(FILE *fp, struct getline *gl, struct header *out)
 {
 	size_t vlen;
 
-	if ((out->val = strchr(*lp, ':')) == NULL)
+	if ((out->val = strchr(gl->line, ':')) == NULL)
 		return -1;
 	*out->val++ = '\0';
 	/* strip leading ws */
 	out->val += strspn(out->val, " \t");
 	(void) strip_trailing(out->val);
 
-	out->key = *lp;
+	out->key = gl->line;
 	(void) strip_trailing(out->val);
 
 	for (size_t i = 0; out->key[i] != '\0'; i++) {
@@ -702,13 +703,12 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 			break;
 		}
 
-		if ((len = getline(lp, np, fp)) == -1)
+		if ((len = getline(&gl->line, &gl->n, fp)) == -1)
 			goto val;
-		if ((*lp)[len - 1] == '\n') {
-			(*lp)[len - 1] = '\0';
-		}
+		if (gl->line[len - 1] == '\n')
+			gl->line[len - 1] = '\0';
 
-		line = (*lp) + strspn(*lp, " \t");
+		line = gl->line + strspn(gl->line, " \t");
 		e = strip_trailing(line);
 		len = e - line;
 
@@ -780,9 +780,9 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	const struct options *options, FILE *out)
 {
 	struct headers headers;
+	struct getline gl;
 	FILE *fp;
-	char *line;
-	size_t lastnl, n;
+	size_t lastnl;
 	ssize_t len;
 	struct header *h, *h2;
 	int c, rv;
@@ -803,18 +803,18 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 
 	RB_INIT(&headers);
 
-	line = NULL;
-	n = 0;
+	gl.line = NULL;
+	gl.n = 0;
 	for (;;) {
 		struct header header;
 
-		if ((len = getline(&line, &n, fp)) == -1)
+		if ((len = getline(&gl.line, &gl.n, fp)) == -1)
 			goto headers;
-		if (line[len - 1] == '\n')
-			line[len - 1] = '\0';
-		if (*line == '\0')
+		if (gl.line[len - 1] == '\n')
+			gl.line[len - 1] = '\0';
+		if (*gl.line == '\0')
 			break;
-		if (header_read(fp, &line, &n, &header) == -1)
+		if (header_read(fp, &gl, &header) == -1)
 			goto headers;
 		if (header_push2(&header, &headers) == -1)
 			goto headers;
@@ -892,7 +892,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 		free(h);
 	}
 
-	free(line);
+	free(gl.line);
 	if (mailbox->type == MAILBOX_MAILDIR && fclose(fp) == EOF)
 		rv = -1;
 	return rv;
@@ -999,6 +999,7 @@ int
 mailbox_letter_print_content(struct mailbox *mailbox, 
 	struct letter *letter, FILE *out)
 {
+	struct getline gl;
 	FILE *fp;
 	int c, type, rv;
 	struct letter tl;
@@ -1032,11 +1033,16 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 			return -1;
 	}
 
+	gl.line = NULL;
+	gl.n = 0;
 	/* advances file pointer to just past the letter content */
-	if (letter_read(fp, &tl, type, &seen) == -1)
+	if (letter_read(fp, &tl, type, &seen, &gl) == -1) {
+		free(gl.line);
 		goto fail;
+	}
 	free(tl.subject);
 	free(tl.from);
+	free(gl.line);
 
 	if (fprintf(out, "On %s, %.*s wrote:\n", date, from.nl, from.name) < 0)
 		goto fail;
@@ -1104,10 +1110,9 @@ mbox_flush(struct mailbox *mailbox)
 static int
 mbox_rejig(struct mailbox *mailbox, size_t idx)
 {
+	struct getline gl;
 	struct letter *letter; 
 	FILE *fp;
-	char *line;
-	size_t n;
 	int rv;
 
 	fp = mailbox->val.mbox_file;
@@ -1117,20 +1122,20 @@ mbox_rejig(struct mailbox *mailbox, size_t idx)
 	if (fseek(fp, letter->ident.mbox.offset, SEEK_SET) == -1)
 		return -1;
 
-	line = NULL;
-	n = 0;
+	gl.line = NULL;
+	gl.n = 0;
 	for (;;) {
 		struct header header;
 		ssize_t len;
 		int same, hr;
 
-		if ((len = getline(&line, &n, fp)) == -1)
+		if ((len = getline(&gl.line, &gl.n, fp)) == -1)
 			goto fail;
-		if (line[len - 1] == '\n')
-			line[len - 1] = '\0';
-		if (*line == '\0')
+		if (gl.line[len - 1] == '\n')
+			gl.line[len - 1] = '\0';
+		if (*gl.line == '\0')
 			break;
-		if (header_read(fp, &line, &n, &header) == -1)
+		if (header_read(fp, &gl, &header) == -1)
 			goto fail;
 
 		same = strcmp(header.key, "Status") == 0;
@@ -1142,7 +1147,7 @@ mbox_rejig(struct mailbox *mailbox, size_t idx)
 		if (same) {
 			/* Status header already present with 'R', nothing to do. */
 			if (hr) {
-				free(line);
+				free(gl.line);
 				return 0;
 			}
 			/* Append 'R' to the header */
@@ -1150,7 +1155,7 @@ mbox_rejig(struct mailbox *mailbox, size_t idx)
 				goto fail;
 			if (fwriteat(fp, "R") == -1)
 				goto fail;
-			free(line);
+			free(gl.line);
 			return 0;
 		}
 	}
@@ -1162,7 +1167,7 @@ mbox_rejig(struct mailbox *mailbox, size_t idx)
 
 	rv = 0;
 	fail:
-	free(line);
+	free(gl.line);
 	return rv;
 }
 
