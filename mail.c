@@ -101,15 +101,16 @@ static struct command commands[] =
 int
 main(int argc, char *argv[])
 {
-	int ch, fd, rv;
-	char *line = NULL;
-	const char *subject;
-	size_t n = 0;
-	ssize_t len;
 	struct options options;
-	const char *cfg;
 	struct mailbox mailbox;
+	char *line;
+	const char *cfg, *subject;
+	size_t n;
+	ssize_t len;
+	int ch, fd, rv;
 
+	line = NULL;
+	n = 0;
 	rv = 1;
 
 	memset(&options, 0, sizeof(options));
