@@ -1227,7 +1227,6 @@ mbox_letter_cmp(const void *one, const void *two)
 	const struct letter *n1 = one, *n2 = two;
 	long v1, v2;
 
-	return 0;
 	v1 = n1->ident.mbox.offset;
 	v2 = n2->ident.mbox.offset;
 
