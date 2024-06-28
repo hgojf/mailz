@@ -98,6 +98,8 @@ static struct command commands[] =
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #define nitems(a) (sizeof((a)) / sizeof((*a)))
 
+#define EX_USAGE 2
+
 int
 main(int argc, char *argv[])
 {
@@ -167,9 +169,10 @@ main(int argc, char *argv[])
 		}
 
 		if (options.address == NULL || options.name == NULL) {
-			(void) fputs("Must set an email address and real name\n", stderr);
 			options_free(&options);
-			return 1;
+			if (fputs("Must set an email address and real name\n", stderr) == EOF)
+				return 1;
+			return EX_USAGE;
 		}
 
 		letter.from.addr = options.address;
@@ -436,8 +439,9 @@ configure(struct mailbox *mailbox, struct options *options)
 static void
 usage(void)
 {
-	(void) fprintf(stderr, "usage: mailz [-s] <mailbox>\n");
-	exit(1);
+	if (fprintf(stderr, "usage: mailz [-s] <mailbox>\n") < 0)
+		exit(1);
+	exit(EX_USAGE);
 }
 
 static int
