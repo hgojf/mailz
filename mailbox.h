@@ -22,7 +22,10 @@ struct letter {
 	time_t date;
 	union {
 		char *maildir_path;
-		long mbox_offset;
+		struct {
+			long offset;
+			int seen;
+		} mbox;
 	} ident;
 };
 
@@ -63,6 +66,6 @@ int from_extract(char *, struct from *);
 
 #ifdef MAILBOX_INTERNALS
 void letter_free(int, struct letter *);
-int read_letter(FILE *, struct letter *);
+int read_letter(FILE *, struct letter *, int, int *);
 #endif /* MAILBOX_INTERNALS */
 #endif /* MAILZ_MAILBOX_H */

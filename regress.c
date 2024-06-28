@@ -159,6 +159,7 @@ letter_test(void)
 {
 	FILE *fp;
 	struct letter letter;
+	int seen;
 
 	if (pledge("stdio rpath", NULL) == -1)
 		err(1, "pledge");
@@ -167,7 +168,7 @@ letter_test(void)
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
 
-	if (read_letter(fp, &letter) == -1) {
+	if (read_letter(fp, &letter, MAILBOX_MBOX, &seen) == -1) {
 		fclose(fp);
 		return 1;
 	}
@@ -177,6 +178,8 @@ letter_test(void)
 	if (letter.subject == NULL || strcmp(letter.subject, "Test mail") != 0)
 		return 1;
 	if (letter.date != 1718936773)
+		return 1;
+	if (seen)
 		return 1;
 
 	free(letter.subject);
@@ -192,9 +195,9 @@ mbox_test(void)
 	struct mailbox mailbox;
 	int fd;
 
-	if (pledge("stdio rpath", NULL) == -1)
+	if (pledge("stdio rpath wpath", NULL) == -1)
 		err(1, "pledge");
-	if ((fd = open("tests/mbox", O_RDONLY)) == -1)
+	if ((fd = open("tests/mbox", O_RDWR)) == -1)
 		err(1, "open");
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");

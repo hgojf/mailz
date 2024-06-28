@@ -55,19 +55,24 @@ RB_GENERATE(headers, header, entry, header_cmp);
 static int equal_escape(FILE *);
 
 static FILE *fopenat(int, const char *);
+static int fwriteat(FILE *, const char *);
 static DIR *opendirat(int, const char *);
 
 static int header_push(struct header *, struct letter *);
 static int header_push2(struct header *, struct headers *);
 static int header_read(FILE *, char **, size_t *, struct header *);
 static int header_ignore(struct header *, const struct options *);
-static int push_letter(int, struct letter *, struct mailbox *);
+static int push_letter(struct letter *, struct mailbox *);
 
 static int letter_cmp(const void *, const void *);
 
 static DIR *maildir_setup(int);
 static int maildir_letter_set_flag(DIR *, struct letter *, char);
 static int maildir_letter_seen(const char *);
+
+static int mbox_flush(struct mailbox *);
+static int mbox_letter_cmp(const void *, const void *);
+static int mbox_rejig(struct mailbox *, size_t);
 
 static char *dupstr(const char *, size_t);
 
@@ -104,7 +109,7 @@ mailbox_setup(int fd, struct mailbox *out)
 	else {
 		FILE *fp;
 
-		if ((fp = fdopen(fd, "r")) == NULL)
+		if ((fp = fdopen(fd, "a+")) == NULL)
 			goto fail;
 		out->val.mbox_file = fp;
 	}
@@ -143,7 +148,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 	/* first message has 'From' on the first line */
 	if (type == MAILBOX_MBOX) {
 		char from[4];
-		int c;
+		int c, seen;
 		size_t n;
 		struct letter letter;
 		long off;
@@ -171,17 +176,24 @@ mailbox_read(struct mailbox *out, int view_seen)
 
 		if ((off = ftell(fp)) == -1)
 			goto fail;
-		if (read_letter(fp, &letter) == -1)
+		if (read_letter(fp, &letter, type, &seen) == -1)
 			goto fail;
-		letter.ident.mbox_offset = off;
+		letter.ident.mbox.offset = off;
+		letter.ident.mbox.seen = 0;
 
-		if (push_letter(type, &letter, out) == -1)
+		if (!view_seen && seen) {
+			letter_free(type, &letter);
+		}
+		else if (push_letter(&letter, out) == -1) {
+			letter_free(type, &letter);
 			goto fail;
+		}
 	}
 
 	for (;;) {
 		struct dirent *de;
 		long off;
+		int seen;
 		struct letter letter;
 
 		if (type == MAILBOX_MAILDIR) {
@@ -228,7 +240,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 				goto fail;
 		}
 
-		if (read_letter(fp, &letter) == -1)
+		if (read_letter(fp, &letter, type, &seen) == -1)
 			goto fail;
 
 		if (type == MAILBOX_MAILDIR) {
@@ -242,11 +254,20 @@ mailbox_read(struct mailbox *out, int view_seen)
 			fp = NULL;
 		}
 
-		if (type == MAILBOX_MBOX)
-			letter.ident.mbox_offset = off;
+		if (type == MAILBOX_MBOX) {
+			letter.ident.mbox.offset = off;
+			letter.ident.mbox.seen = 0;
+		}
 
-		if (push_letter(type, &letter, out) == -1)
+		if (!view_seen && seen) {
+			letter_free(type, &letter);
+			continue;
+		}
+
+		if (push_letter(&letter, out) == -1) {
+			letter_free(type, &letter);
 			goto fail;
+		}
 	}
 	done:
 
@@ -275,13 +296,15 @@ mailbox_read(struct mailbox *out, int view_seen)
 void
 mailbox_free(struct mailbox *mailbox)
 {
+	if (mailbox->type == MAILBOX_MBOX) {
+		(void) mbox_flush(mailbox);
+		(void) fclose(mailbox->val.mbox_file);
+	}
 	for (long long i = 0; i < mailbox->nletters; i++)
 		letter_free(mailbox->type, &mailbox->letters[i]);
 	free(mailbox->letters);
 	if (mailbox->type == MAILBOX_MAILDIR)
 		(void) closedir(mailbox->val.maildir_cur);
-	else if (mailbox->type == MAILBOX_MBOX)
-		(void) fclose(mailbox->val.mbox_file);
 }
 
 static int
@@ -306,7 +329,7 @@ mailbox_letter_mark_unread(struct mailbox *mailbox, struct letter *letter)
 			return -1;
 	}
 	else if (mailbox->type == MAILBOX_MBOX)
-		; /* STUB */
+		letter->ident.mbox.seen = 0;
 	return 0;
 }
 
@@ -318,7 +341,7 @@ mailbox_letter_mark_read(struct mailbox *mailbox, struct letter *letter)
 			return -1;
 	}
 	else if (mailbox->type == MAILBOX_MBOX)
-		; /* STUB */
+		letter->ident.mbox.seen = 1;
 	return 0;
 }
 
@@ -429,34 +452,27 @@ letter_free(int type, struct letter *letter)
 }
 
 static int
-push_letter(int type, struct letter *letter, struct mailbox *mailbox)
+push_letter(struct letter *letter, struct mailbox *mailbox)
 {
 	void *t;
 
 	/* should be impossible */
 	if (mailbox->nletters == LLONG_MAX)
-		goto letter;
+		return -1;
 
 	t = reallocarray(mailbox->letters, mailbox->nletters + 1,
 		sizeof(*mailbox->letters));
 	if (t == NULL)
-		goto letter;
+		return -1;
 	mailbox->letters = t;
 	mailbox->letters[mailbox->nletters] = *letter;
 	mailbox->nletters++;
 
 	return 0;
-
-	letter:
-	free(letter->subject);
-	free(letter->from);
-	if (type == MAILBOX_MAILDIR)
-		free(letter->ident.maildir_path);
-	return -1;
 }
 
 int
-read_letter(FILE *fp, struct letter *letter)
+read_letter(FILE *fp, struct letter *letter, int type, int *seen)
 {
 	char *line = NULL;
 	size_t n = 0;
@@ -465,6 +481,7 @@ read_letter(FILE *fp, struct letter *letter)
 	letter->subject = NULL;
 	letter->from = NULL;
 	letter->date = -1;
+	*seen = 0;
 	for (;;) {
 		struct header header;
 
@@ -476,8 +493,15 @@ read_letter(FILE *fp, struct letter *letter)
 			break;
 		if (header_read(fp, &line, &n, &header) == -1)
 			goto letter;
-		if (header_push(&header, letter) == -1)
+		if (type == MAILBOX_MBOX && strcmp(header.key, "Status") == 0) {
+			if (strchr(header.val, 'R') != NULL)
+				*seen = 1;
+		}
+		if (header_push(&header, letter) == -1) {
+			free(header.key);
+			free(header.val);
 			goto letter;
+		}
 	}
 
 	if (letter->from == NULL || letter->date == -1)
@@ -537,14 +561,14 @@ header_push(struct header *header, struct letter *letter)
 {
 	if (!strcasecmp(header->key, "Subject")) {
 		if (letter->subject != NULL)
-			goto header;
+			return -1;
 		letter->subject = header->val;
 		free(header->key);
 		return 0;
 	}
 	else if (!strcasecmp(header->key, "From")) {
 		if (letter->from != NULL)
-			goto header;
+			return -1;
 		/* takes ownership of header->val on success */
 		letter->from = header->val;
 		free(header->key);
@@ -557,27 +581,27 @@ header_push(struct header *header, struct letter *letter)
 		const char *fmt;
 
 		if (letter->date != -1)
-			goto header;
+			return -1;
 
 		/* dont yet support ignoring comments except in this common case */
 		if ((b = strrchr(header->val, '(')) != NULL)
 			*b = '\0';
 		if ((tz = strrchr(header->val, ' ')) == NULL)
-			goto header;
+			return -1;
 		*tz++ = '\0';
 		if ((off = tz_tosec(tz)) == TZ_INVALIDSEC)
-			goto header;
+			return -1;
 		memset(&tm, 0, sizeof(tm));
 		if (strchr(header->val, ',') != NULL)
 			fmt = "%a, %d %b %Y %H:%M:%S";
 		else
 			fmt = "%d %b %Y %H:%M:%S";
 		if (strptime(header->val, fmt, &tm) == NULL)
-			goto header;
+			return -1;
 		if ((letter->date = mktime(&tm)) == -1)
-			goto header;
+			return -1;
 		if (letter->date < off)
-			goto header;
+			return -1;
 		letter->date -= off;
 		free(header->key);
 		free(header->val);
@@ -588,11 +612,6 @@ header_push(struct header *header, struct letter *letter)
 		free(header->val);
 		return 0;
 	}
-
-	header:
-	free(header->key);
-	free(header->val);
-	return -1;
 }
 
 static int
@@ -747,7 +766,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 
 	if (mailbox->type == MAILBOX_MBOX) {
 		fp = mailbox->val.mbox_file;
-		if (fseek(fp, letter->ident.mbox_offset, SEEK_SET) == -1)
+		if (fseek(fp, letter->ident.mbox.offset, SEEK_SET) == -1)
 			return -1;
 	}
 	if (mailbox->type == MAILBOX_MAILDIR) {
@@ -960,7 +979,7 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 	struct tm *tm;
 	char date[33];
 	struct from from;
-	int lastnl;
+	int lastnl, seen;
 
 	rv = -1;
 
@@ -976,7 +995,7 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 
 	if (type == MAILBOX_MBOX) {
 		fp = mailbox->val.mbox_file;
-		if (fseek(fp, letter->ident.mbox_offset, SEEK_SET) == -1)
+		if (fseek(fp, letter->ident.mbox.offset, SEEK_SET) == -1)
 			return -1;
 	}
 	if (type == MAILBOX_MAILDIR) {
@@ -988,7 +1007,7 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 	}
 
 	/* advances file pointer to just past the letter content */
-	if (read_letter(fp, &tl) == -1)
+	if (read_letter(fp, &tl, type, &seen) == -1)
 		goto fail;
 	free(tl.subject);
 	free(tl.from);
@@ -1036,4 +1055,158 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 			rv = -1;
 	}
 	return rv;
+}
+
+/* 
+ * flushes changes to mbox file, destructive to mailbox,
+ * as it reorders the letters, and invalidates all offsets
+ */
+static int
+mbox_flush(struct mailbox *mailbox)
+{
+	qsort(mailbox->letters, mailbox->nletters,
+		sizeof(*mailbox->letters), mbox_letter_cmp);
+	for (long long i = 0; i < mailbox->nletters; i++) {
+		if (!mailbox->letters[i].ident.mbox.seen)
+			continue;
+		if (mbox_rejig(mailbox, i) == -1)
+			return -1;
+	}
+	return 0;
+}
+
+static int
+mbox_rejig(struct mailbox *mailbox, size_t idx)
+{
+	struct letter *letter; 
+	FILE *fp;
+	char *line;
+	size_t n;
+	int rv;
+
+	fp = mailbox->val.mbox_file;
+	letter = &mailbox->letters[idx];
+	rv = -1;
+
+	if (fseek(fp, letter->ident.mbox.offset, SEEK_SET) == -1)
+		return -1;
+
+	line = NULL;
+	n = 0;
+	for (;;) {
+		struct header header;
+		ssize_t len;
+		int same, hr;
+
+		if ((len = getline(&line, &n, fp)) == -1)
+			goto fail;
+		if (line[len - 1] == '\n')
+			line[len - 1] = '\0';
+		if (*line == '\0')
+			break;
+		if (header_read(fp, &line, &n, &header) == -1)
+			goto fail;
+
+		same = strcmp(header.key, "Status") == 0;
+		hr = strchr(header.val, 'R') != NULL;
+
+		free(header.key);
+		free(header.val);
+
+		if (same) {
+			/* Status header already present with 'R', nothing to do. */
+			if (hr) {
+				free(line);
+				return 0;
+			}
+			/* Append 'R' to the header */
+			if (fseek(fp, -1, SEEK_CUR) == -1)
+				goto fail;
+			if (fwriteat(fp, "R") == -1)
+				goto fail;
+			free(line);
+			return 0;
+		}
+	}
+
+	if (fseek(fp, -1, SEEK_CUR) == -1)
+		goto fail;
+	if (fwriteat(fp, "Status: R\n") == -1)
+		goto fail;
+
+	rv = 0;
+	fail:
+	free(line);
+	return rv;
+}
+
+static int
+fwriteat(FILE *fp, const char *str)
+{
+	int ch, tfd, fd, rv;
+	long off;
+	FILE *cp;
+	char path[] = "/tmp/mail/flush.XXXXXX";
+
+	rv = -1;
+
+	if ((fd = mkstemp(path)) == -1)
+		return -1;
+	if (unlink(path) == -1) {
+		(void) close(fd);
+		return -1;
+	}
+	if ((cp = fdopen(fd, "a+")) == NULL) {
+		(void) close(fd);
+		return -1;
+	}
+
+	if ((off = ftell(fp)) == -1)
+		goto fail;
+	while ((ch = fgetc(fp)) != EOF) {
+		if (fputc(ch, cp) == EOF)
+			goto fail;
+	}
+	if (ferror(fp))
+		goto fail;
+	if (fseek(cp, 0, SEEK_SET) == -1)
+		goto fail;
+	if (fseek(fp, off, SEEK_SET) == -1)
+		goto fail;
+	if ((tfd = fileno(fp)) == -1)
+		goto fail;
+	if (ftruncate(tfd, off) == -1)
+		goto fail;
+
+	if (fputs(str, fp) == EOF)
+		goto fail;
+	while ((ch = fgetc(cp)) != EOF) {
+		if (fputc(ch, fp) == EOF)
+			goto fail;
+	}
+
+	rv = 0;
+	fail:
+	if (fclose(fp) == -1)
+		rv = -1;
+	return rv;
+}
+
+/* descending order based on offset */
+static int
+mbox_letter_cmp(const void *one, const void *two)
+{
+	const struct letter *n1 = one, *n2 = two;
+	long v1, v2;
+
+	return 0;
+	v1 = n1->ident.mbox.offset;
+	v2 = n2->ident.mbox.offset;
+
+	if (v1 < v2)
+		return 1;
+	else if (v1 == v2)
+		return 0;
+	else
+		return -1;
 }

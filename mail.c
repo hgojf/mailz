@@ -191,10 +191,10 @@ main(int argc, char *argv[])
 	}
 	/* else */
 
-	if (unveil(argv[0], "rc") == -1)
+	if (unveil(argv[0], "rwc") == -1)
 		err(1, "unveil");
 
-	if ((fd = open(argv[0], O_RDONLY | O_CLOEXEC)) == -1)
+	if ((fd = open(argv[0], O_RDWR | O_CLOEXEC, 0600)) == -1)
 		err(1, "open %s", argv[0]);
 	if (mailbox_setup(fd, &mailbox) == -1)
 		err(1, "mailbox_setup");
@@ -314,8 +314,7 @@ main(int argc, char *argv[])
 	good:
 	rv = 0;
 	fail:
-	if (pledge("stdio cpath", NULL) == -1)
-		err(1, "pledge");
+	mailbox_free(&mailbox);
 	if (rmdir("/tmp/mail") == -1 && errno != ENOTEMPTY) {
 		warn("rmdir");
 		rv = 1;
@@ -323,7 +322,6 @@ main(int argc, char *argv[])
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
 	free(line);
-	mailbox_free(&mailbox);
 	options_free(&options);
 	return rv;
 }
