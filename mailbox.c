@@ -58,13 +58,13 @@ static FILE *fopenat(int, const char *);
 static int fwriteat(FILE *, const char *);
 static DIR *opendirat(int, const char *);
 
+static int header_ignore(struct header *, const struct options *);
 static int header_push(struct header *, struct letter *);
 static int header_push2(struct header *, struct headers *);
 static int header_read(FILE *, char **, size_t *, struct header *);
-static int header_ignore(struct header *, const struct options *);
-static int push_letter(struct letter *, struct mailbox *);
 
 static int letter_cmp(const void *, const void *);
+static int letter_push(struct letter *, struct mailbox *);
 
 static DIR *maildir_setup(int);
 static int maildir_letter_set_flag(DIR *, struct letter *, char);
@@ -75,7 +75,7 @@ static int mbox_letter_cmp(const void *, const void *);
 static int mbox_rejig(struct mailbox *, size_t);
 
 static char *dupstr(const char *, size_t);
-static char * strip_trailing(char *);
+static char *strip_trailing(char *);
 
 /* function takes ownership of 'fd', closing on failure */
 int
@@ -181,7 +181,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 
 		if ((off = ftell(fp)) == -1)
 			goto fail;
-		if (read_letter(fp, &letter, type, &seen) == -1)
+		if (letter_read(fp, &letter, type, &seen) == -1)
 			goto fail;
 		letter.ident.mbox.offset = off;
 		letter.ident.mbox.seen = 0;
@@ -189,7 +189,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 		if (!view_seen && seen) {
 			letter_free(type, &letter);
 		}
-		else if (push_letter(&letter, out) == -1) {
+		else if (letter_push(&letter, out) == -1) {
 			letter_free(type, &letter);
 			goto fail;
 		}
@@ -245,7 +245,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 				goto fail;
 		}
 
-		if (read_letter(fp, &letter, type, &seen) == -1)
+		if (letter_read(fp, &letter, type, &seen) == -1)
 			goto fail;
 
 		if (type == MAILBOX_MAILDIR) {
@@ -269,7 +269,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 			continue;
 		}
 
-		if (push_letter(&letter, out) == -1) {
+		if (letter_push(&letter, out) == -1) {
 			letter_free(type, &letter);
 			goto fail;
 		}
@@ -465,7 +465,7 @@ letter_free(int type, struct letter *letter)
 }
 
 static int
-push_letter(struct letter *letter, struct mailbox *mailbox)
+letter_push(struct letter *letter, struct mailbox *mailbox)
 {
 	void *t;
 
@@ -485,7 +485,7 @@ push_letter(struct letter *letter, struct mailbox *mailbox)
 }
 
 int
-read_letter(FILE *fp, struct letter *letter, int type, int *seen)
+letter_read(FILE *fp, struct letter *letter, int type, int *seen)
 {
 	char *line = NULL;
 	size_t n = 0;
@@ -1035,7 +1035,7 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 	}
 
 	/* advances file pointer to just past the letter content */
-	if (read_letter(fp, &tl, type, &seen) == -1)
+	if (letter_read(fp, &tl, type, &seen) == -1)
 		goto fail;
 	free(tl.subject);
 	free(tl.from);

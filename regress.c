@@ -168,7 +168,7 @@ letter_test(void)
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
 
-	if (read_letter(fp, &letter, MAILBOX_MBOX, &seen) == -1) {
+	if (letter_read(fp, &letter, MAILBOX_MBOX, &seen) == -1) {
 		fclose(fp);
 		return 1;
 	}

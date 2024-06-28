@@ -67,6 +67,6 @@ int from_extract(char *, struct from *);
 
 #ifdef MAILBOX_INTERNALS
 void letter_free(int, struct letter *);
-int read_letter(FILE *, struct letter *, int, int *);
+int letter_read(FILE *, struct letter *, int, int *);
 #endif /* MAILBOX_INTERNALS */
 #endif /* MAILZ_MAILBOX_H */
