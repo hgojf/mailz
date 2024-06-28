@@ -193,16 +193,13 @@ static int
 mbox_test(void)
 {
 	struct mailbox mailbox;
-	int fd;
 
 	if (pledge("stdio rpath wpath", NULL) == -1)
 		err(1, "pledge");
-	if ((fd = open("tests/mbox", O_RDWR)) == -1)
-		err(1, "open");
+	if (mailbox_setup("tests/mbox", &mailbox) == -1)
+		return 1;
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
-	if (mailbox_setup(fd, &mailbox) == -1)
-		return 1;
 	if (mailbox_read(&mailbox, 1) == -1)
 		return 1;
 	mailbox_free(&mailbox);
