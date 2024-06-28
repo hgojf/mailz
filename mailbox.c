@@ -75,6 +75,7 @@ static int mbox_letter_cmp(const void *, const void *);
 static int mbox_rejig(struct mailbox *, size_t);
 
 static char *dupstr(const char *, size_t);
+static char * strip_trailing(char *);
 
 /* function takes ownership of 'fd', closing on failure */
 int
@@ -642,6 +643,20 @@ letter_cmp(const void *one, const void *two)
 		return -1;
 }
 
+static char *
+strip_trailing(char *p)
+{
+	char *e;
+
+	e = &p[strlen(p) - 1];
+	while (e > p && (*e == ' ' || *e == '\t'))
+		e--;
+	if (e != p)
+		e++;
+	*e = '\0';
+	return e;
+}
+
 static int
 header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 {
@@ -650,12 +665,12 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 	if ((out->val = strchr(*lp, ':')) == NULL)
 		return -1;
 	*out->val++ = '\0';
-	/* strip trailing ws */
+	/* strip leading ws */
 	out->val += strspn(out->val, " \t");
+	(void) strip_trailing(out->val);
 
 	out->key = *lp;
-	/* strip trailing ws */
-	out->key[strcspn(out->key, " \t")] = '\0';
+	(void) strip_trailing(out->val);
 
 	for (size_t i = 0; out->key[i] != '\0'; i++) {
 		if (!isprint(out->key[i]))
@@ -676,7 +691,8 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 		char *line;
 		int c;
 		void *t;
-		ssize_t len, ws;
+		ssize_t len;
+		char *e;
 
 		if ((c = fgetc(fp)) == EOF)
 			goto val;
@@ -693,9 +709,9 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 			len--;
 		}
 
-		ws = strspn(*lp, " \t");
-		len -= ws;
-		line = (*lp) + ws;
+		line = (*lp) + strspn(*lp, " \t");
+		e = strip_trailing(line);
+		len = e - line;
 
 		for (size_t i = 0; line[i] != '\0'; i++) {
 			if (!isascii(line[i]))
