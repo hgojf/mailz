@@ -293,6 +293,14 @@ mailbox_read(struct mailbox *out, int view_seen)
 	return rv;
 }
 
+int
+mailbox_close(struct mailbox *mailbox)
+{
+	if (mailbox->type == MAILBOX_MBOX)
+		return mbox_flush(mailbox);
+	return 0;
+}
+
 void
 mailbox_free(struct mailbox *mailbox)
 {

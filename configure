@@ -32,13 +32,18 @@ have_function() {
 		rm a.out
 	fi
 	if [ $ex -ne 0 ]; then
-		if [ "$3" = "NULL" ]; then
+		if [ "$3" = "HAVE" ]; then
+			:
+		elif [ "$3" = "NULL" ]; then
 			echo "#define $4 $5" >> config.h
 		else
 			echo SRCS += "$3" >> config.mk
 		fi
 		printf 'Not Found\n'
 	else
+		if [ "$3" = "HAVE" ]; then
+			echo "#define $4" >> config.h
+		fi
 		printf 'Found\n'
 	fi
 	rm test.c
@@ -175,6 +180,24 @@ have_function strsep string.h strsep.c <<-EOF
 		return 1;
 	if (strcmp(s, "vi -- file") != 0)
 		return 1;
+	return 0;
+	EOF
+have_function flock "stdlib.h fcntl.h" HAVE HAVE_FLOCK <<-EOF
+	char path[] = "/tmp/lock.XXXXXXX";
+	int fd, rv;
+
+	rv = 1;
+	if ((fd = mkstemp(path)) == -1)
+		return 1;
+	if (flock(fd, LOCK_EX | LOCK_NB) == -1)
+		goto fail;
+	if (flock(fd, LOCK_UN) == -1)
+		goto fail;
+
+	rv = 0;
+	fail:
+	if (unlink(path) == -1)
+		rv = 1;
 	return 0;
 	EOF
 

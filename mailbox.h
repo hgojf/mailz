@@ -50,6 +50,7 @@ struct from {
 	char *name;
 };
 
+int mailbox_close(struct mailbox *);
 void mailbox_free(struct mailbox *);
 int mailbox_setup(int, struct mailbox *);
 int mailbox_read(struct mailbox *, int);

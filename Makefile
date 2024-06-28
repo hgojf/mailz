@@ -6,7 +6,7 @@ PREFIX ?= /usr/local
 CFLAGS = -O2 -g
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
-SRCS = date.c mail.c mailbox.c sendmail.c
+SRCS = date.c lock.c mail.c mailbox.c sendmail.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
 INSTALL ?= install
