@@ -109,7 +109,7 @@ main(int argc, char *argv[])
 	const char *cfg, *subject;
 	size_t n;
 	ssize_t len;
-	int ch, fd, rv;
+	int ch, rv;
 
 	line = NULL;
 	n = 0;
@@ -199,9 +199,7 @@ main(int argc, char *argv[])
 	if (unveil(argv[0], "rwc") == -1)
 		err(1, "unveil");
 
-	if ((fd = open(argv[0], O_RDWR | O_CLOEXEC, 0600)) == -1)
-		err(1, "open %s", argv[0]);
-	if (mailbox_setup(fd, &mailbox) == -1)
+	if (mailbox_setup(argv[0], &mailbox) == -1)
 		err(1, "mailbox_setup");
 
 	/* only need 'cur' directory for maildir */
@@ -227,6 +225,10 @@ main(int argc, char *argv[])
 	}
 
 	if (mailbox.type == MAILBOX_MBOX) {
+		int fd;
+
+		if ((fd = fileno(mailbox.val.mbox_file)) == -1)
+			err(1, "fileno");
 		/* dont need to reopen this ever */
 		if (unveil(argv[0], "") == -1)
 			err(1, "unveil");
@@ -327,6 +329,11 @@ main(int argc, char *argv[])
 	rv = 0;
 	fail:
 	if (mailbox.type == MAILBOX_MBOX) {
+		int fd;
+
+		if ((fd = fileno(mailbox.val.mbox_file)) == -1)
+			err(1, "fileno");
+
 		/* drop our lock to avoid deadlock */
 		/* dont flush mbox changes if locking fails */
 		if (unlock(fd) == -1)

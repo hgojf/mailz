@@ -52,7 +52,7 @@ struct from {
 
 int mailbox_close(struct mailbox *);
 void mailbox_free(struct mailbox *);
-int mailbox_setup(int, struct mailbox *);
+int mailbox_setup(const char *, struct mailbox *);
 int mailbox_read(struct mailbox *, int);
 int mailbox_print(struct mailbox *, size_t, size_t);
 int mailbox_letter_print(size_t, struct letter *);

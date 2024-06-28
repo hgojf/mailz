@@ -78,23 +78,27 @@ static char *dupstr(const char *, size_t);
 
 /* function takes ownership of 'fd', closing on failure */
 int
-mailbox_setup(int fd, struct mailbox *out)
+mailbox_setup(const char *path, struct mailbox *out)
 {
-	int type, rv;
+	int type, rv, fd;
 	struct stat sb;
 
 	rv = -1;
-	if (fstat(fd, &sb) == -1)
-		goto fail;
+	if (stat(path, &sb) == -1)
+		return -1;
 	switch (sb.st_mode & S_IFMT) {
 	case S_IFDIR:
 		type = MAILBOX_MAILDIR;
+		if ((fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+			return -1;
 		break;
 	case S_IFREG:
 		type = MAILBOX_MBOX;
+		if ((fd = open(path, O_RDWR | O_CLOEXEC)) == -1)
+			return -1;
 		break;
 	default:
-		goto fail;
+		return -1;
 	}
 
 	if (type == MAILBOX_MAILDIR) {
