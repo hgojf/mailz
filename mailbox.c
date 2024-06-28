@@ -706,7 +706,6 @@ header_read(FILE *fp, char **lp, size_t *np, struct header *out)
 			goto val;
 		if ((*lp)[len - 1] == '\n') {
 			(*lp)[len - 1] = '\0';
-			len--;
 		}
 
 		line = (*lp) + strspn(*lp, " \t");
@@ -790,7 +789,6 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 
 	rv = -1;
 	assert(mailbox->type == MAILBOX_MBOX || mailbox->type == MAILBOX_MAILDIR);
-	assert(options->linewrap >= 0);
 
 	if (mailbox->type == MAILBOX_MBOX) {
 		fp = mailbox->val.mbox_file;

@@ -77,7 +77,7 @@ sendmail(int edit, struct sendmail *letter)
 				else
 					tm = 1;
 			}
-			if (tm || ch != '\n' || ch == 'q') {
+			if (tm || ch != '\n') {
 				if (unlink(path) == -1)
 					return -1;
 				if (tm || ch != 'q') {
