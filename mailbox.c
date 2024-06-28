@@ -68,6 +68,7 @@ static int letter_push(struct letter *, struct mailbox *);
 
 static DIR *maildir_setup(int);
 static int maildir_letter_set_flag(DIR *, struct letter *, char);
+static int maildir_letter_unset_flag(DIR *, struct letter *, char);
 static int maildir_letter_seen(const char *);
 
 static int mbox_flush(struct mailbox *);
@@ -342,7 +343,7 @@ int
 mailbox_letter_mark_unread(struct mailbox *mailbox, struct letter *letter)
 {
 	if (mailbox->type == MAILBOX_MAILDIR) {
-		if (maildir_letter_set_flag(mailbox->val.maildir_cur, letter, '\0') == -1)
+		if (maildir_letter_unset_flag(mailbox->val.maildir_cur, letter, 'S') == -1)
 			return -1;
 	}
 	else if (mailbox->type == MAILBOX_MBOX)
@@ -363,6 +364,43 @@ mailbox_letter_mark_read(struct mailbox *mailbox, struct letter *letter)
 }
 
 static int
+maildir_letter_unset_flag(DIR *dir, struct letter *letter, char f)
+{
+	char *path, name[NAME_MAX], *flags, *fl, *t;
+	size_t len;
+	int dfd;
+
+	path = letter->ident.maildir_path;
+
+	if (strlcpy(name, path, sizeof(name)) >= sizeof(name))
+		return -1;
+
+	if ((flags = strchr(name, ':')) == NULL)
+		return -1;
+	/* not set, nothing to do */
+	if ((fl = strchr(flags, f)) == NULL)
+		return 0;
+
+	/* fl[1] is valid because fl is NUL terminated */
+	len = strlen(fl);
+	(void) memmove(fl, &fl[1], len - 1);
+	fl[len - 1] = '\0';
+
+	dfd = dirfd(dir);
+
+	if (renameat(dfd, path, dfd, name) == -1)
+		return -1;
+
+	/* need to dup since string has changed */
+	t = strdup(name);
+	if (t == NULL)
+		return -1;
+	free(path);
+	letter->ident.maildir_path = t;
+	return 0;
+}
+
+static int
 maildir_letter_set_flag(DIR *dir, struct letter *letter, char f)
 {
 	char name[NAME_MAX], *flags, *t, *path;
@@ -370,27 +408,24 @@ maildir_letter_set_flag(DIR *dir, struct letter *letter, char f)
 
 	path = letter->ident.maildir_path;
 
-	/* remove existing flags, if they exist */
 	if ((flags = strchr(path, ':')) == NULL)
 		return -1;
-	*flags = '\0';
+	/* already set, nothing to do */
+	if (strchr(flags, f) != NULL)
+		return 0;
 
-	/* hide flags for this call */
-	n = snprintf(name, NAME_MAX, "%s:2,%c", path, f);
-
-	/* now unhide */
-	*flags = ':';
+	/* append a flag */
+	n = snprintf(name, NAME_MAX, "%s%c", path, f);
 
 	if (n < 0 || n >= NAME_MAX)
 		return -1;
-
 
 	dfd = dirfd(dir);
 
 	if (renameat(dfd, path, dfd, name) == -1)
 		return -1;
 
-	/* need to dup in case flags changed, could be more selective */
+	/* need to dup since string has changed */
 	t = strdup(name);
 	if (t == NULL)
 		return -1;
