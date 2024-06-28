@@ -77,7 +77,6 @@ static int mbox_rejig(struct mailbox *, size_t);
 static char *dupstr(const char *, size_t);
 static char *strip_trailing(char *);
 
-/* function takes ownership of 'fd', closing on failure */
 int
 mailbox_setup(const char *path, struct mailbox *out)
 {
