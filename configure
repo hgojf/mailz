@@ -182,7 +182,7 @@ have_function strsep string.h strsep.c <<-EOF
 		return 1;
 	return 0;
 	EOF
-have_function flock "stdlib.h fcntl.h" HAVE HAVE_FLOCK <<-EOF
+have_function flock "stdlib.h fcntl.h unistd.h" HAVE HAVE_FLOCK <<-EOF
 	char path[] = "/tmp/lock.XXXXXXX";
 	int fd, rv;
 

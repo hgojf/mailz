@@ -23,16 +23,44 @@
 #include "config.h"
 
 #ifdef HAVE_FLOCK
+static int flock_unlock(int);
+static int flock_lock_interactive(int, int, const char *);
+#else
+static int fcntl_unlock(int);
+static int fcntl_lock_interactive(int, int, const char *);
+#endif /* HAVE_FLOCK */
+
 int
 unlock(int fd)
+{
+	#ifdef HAVE_FLOCK
+	return flock_unlock(fd);
+	#else
+	return fcntl_unlock(fd);
+	#endif /* HAVE_FLOCK */
+}
+
+int
+lock_interactive(int fd, int ex, const char *what)
+{
+	#ifdef HAVE_FLOCK
+	return flock_lock_interactive(fd, ex, what);
+	#else
+	return fcntl_lock_interactive(fd, ex, what);
+	#endif /* HAVE_FLOCK */
+}
+
+#ifdef HAVE_FLOCK
+static int
+flock_unlock(int fd)
 {
 	if (flock(fd, LOCK_UN) == -1)
 		return -1;
 	return 0;
 }
 
-int
-lock_interactive(int fd, int ex, const char *what)
+static int
+flock_lock_interactive(int fd, int ex, const char *what)
 {
 	int cmd, fv;
 
@@ -56,8 +84,8 @@ lock_interactive(int fd, int ex, const char *what)
 }
 
 #else
-int
-unlock(int fd)
+static int
+fcntl_unlock(int fd)
 {
 	struct flock lock;
 
@@ -72,8 +100,8 @@ unlock(int fd)
 	return 0;
 }
 
-int
-lock_interactive(int fd, int ex, const char *what)
+static int
+fcntl_lock_interactive(int fd, int ex, const char *what)
 {
 	struct flock lock;
 
