@@ -40,6 +40,7 @@
 #include "mail.h"
 #include "mailbox.h"
 #include "reallocarray.h"
+#include "strlcpy.h"
 
 struct header {
 	char *key;

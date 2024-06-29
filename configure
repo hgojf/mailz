@@ -182,6 +182,14 @@ have_function strsep string.h strsep.c <<-EOF
 		return 1;
 	return 0;
 	EOF
+have_function strlcpy "string.h" strlcpy.c <<-EOF
+	char s[12];
+	if (strlcpy(s, "Hello", sizeof(s)) >= sizeof(s))
+		return 1;
+	if (strlcpy(s, "HIIIIIIIIIIIIIII", sizeof(s)) < sizeof(s))
+		return 1;
+	return 0;
+	EOF
 have_function flock "stdlib.h fcntl.h unistd.h" HAVE HAVE_FLOCK <<-EOF
 	char path[] = "/tmp/lock.XXXXXXX";
 	int fd, rv;
