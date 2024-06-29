@@ -37,7 +37,7 @@ have_function() {
 		elif [ "$3" = "NULL" ]; then
 			echo "#define $4 $5" >> config.h
 		else
-			echo SRCS += "$3" >> config.mk
+			echo SRCS_COMPAT += "$3" >> config.mk
 		fi
 		printf 'Not Found\n'
 	else
@@ -79,7 +79,7 @@ have_compiler_flag() {
 		EOF
 	if cc "$@" test.c; then
 		if [ "${optional}" != "testonly" ]; then
-			echo CFLAGS += "$@" >> config.mk
+			echo CFLAGS_CONFIG += "$@" >> config.mk
 		fi
 		printf 'Found\n'
 		rm a.out

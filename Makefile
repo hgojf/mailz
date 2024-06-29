@@ -2,34 +2,41 @@
 
 .PHONY: all clean install test tidy
 
+include config.mk
+
 PREFIX ?= /usr/local
-CFLAGS = -O2 -g
+CFLAGS = -O2 -g ${CFLAGS_CONFIG}
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+
+OBJS_COMPAT = $(SRCS_COMPAT:.c=.o)
+DEPS_COMPAT = $(SRCS_COMPAT:.c=.d)
+
 SRCS = date.c lock.c mail.c mailbox.c sendmail.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
-INSTALL ?= install
 
-include config.mk
+CTAGS ?= ctags
+INSTALL ?= install
 
 all: mail mailwrapper
 
-mail: ${OBJS}
-	$(CC) -o $@ ${LDFLAGS} ${OBJS}
+mail: ${OBJS} ${OBJS_COMPAT}
+	$(CC) -o $@ ${LDFLAGS} ${OBJS} ${OBJS_COMPAT}
 
 mailwrapper: mailwrapper.o
 	$(CC) -o $@ ${CFLAGS} ${LDFLAGS} mailwrapper.o
 
 clean:
-	rm -f ${DEPS} ${OBJS} mail mailwrapper mailwrapper.o mailwrapper.d regress.o regress
+	rm -f ${DEPS} ${OBJS} ${DEPS_COMPAT} ${OBJS_COMPAT} mail \
+	mailwrapper mailwrapper.o mailwrapper.d regress.o regress
 
 install:
 	$(INSTALL) -m 0755 mail ${PREFIX}/bin/mailz
 	$(INSTALL) -m 0755 mailwrapper ${PREFIX}/libexec/mailzwrapper
 
-regress: date.o mailbox.o sendmail.o regress.o
-	$(CC) -o $@ ${LDFLAGS} date.o mailbox.o sendmail.o regress.o
+regress: date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
+	$(CC) -o $@ ${LDFLAGS} date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
 
 tags: ${SRCS}
 	$(CTAGS) ${SRCS}
