@@ -709,12 +709,12 @@ header_read(FILE *fp, struct getline *gl, struct header *out)
 	(void) strip_trailing(out->val);
 
 	for (size_t i = 0; out->key[i] != '\0'; i++) {
-		if (!isprint(out->key[i]))
+		if (!isprint( (unsigned char) out->key[i]))
 			return -1;
 	}
 
 	for (vlen = 0; out->val[vlen] != '\0'; vlen++) {
-		if (!isascii(out->val[vlen]))
+		if (!isascii( (unsigned char) out->val[vlen]))
 			return -1;
 	}
 
@@ -748,7 +748,7 @@ header_read(FILE *fp, struct getline *gl, struct header *out)
 		len = e - line;
 
 		for (size_t i = 0; line[i] != '\0'; i++) {
-			if (!isascii(line[i]))
+			if (!isascii( (unsigned char) line[i]))
 				goto val;
 		}
 

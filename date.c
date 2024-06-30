@@ -63,7 +63,7 @@ tzparse(const char *tz, struct timezone_offset *out)
 	case 1: {
 		/* Military time zone codes, a-i, j-z, all 0 */
 		char u;
-		u = toupper(tz[0]);
+		u = toupper( (unsigned char) tz[0]);
 		if (u < 'A' || u == 'J' || u > 'Z')
 			return -1;
 		hr = 0;
@@ -115,7 +115,7 @@ tzparse(const char *tz, struct timezone_offset *out)
 			return -1;
 		ng = tz[0] == '-';
 		for (int i = 1; i < 5; i++)
-			if (!isdigit(tz[i]))
+			if (!isdigit( (unsigned char) tz[i]))
 				return -1;
 		hr = 0;
 		hr += (tz[1] - '0') * 10;
@@ -131,7 +131,7 @@ tzparse(const char *tz, struct timezone_offset *out)
 	default:
 		/* any other alphabetical time zone */
 		for (size_t i = 0; i < len; i++)
-			if (!isalpha(tz[i]))
+			if (!isalpha( (unsigned char) tz[i]))
 				return -1;
 		hr = 0;
 		ng = 1;

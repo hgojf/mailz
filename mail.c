@@ -271,7 +271,7 @@ main(int argc, char *argv[])
 					&options, stdout) == -1)
 				goto fail;
 		}
-		else if (isdigit(*line)) {
+		else if (isdigit( (unsigned char) *line)) {
 			const char *errstr;
 			long long msg;
 
