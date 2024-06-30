@@ -15,10 +15,12 @@
  */
 
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "date.h"
@@ -141,5 +143,19 @@ tzparse(const char *tz, struct timezone_offset *out)
 	out->hour = hr;
 	out->minute = mn;
 	out->negative = ng;
+	return 0;
+}
+
+int
+date_test(void)
+{
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+	if (tz_tosec("GMT") != 0)
+		return 1;
+	if (tz_tosec("-2300") != -82800)
+		return 1;
+	if (tz_tosec("+2300") != 82800)
+		return 1;
 	return 0;
 }

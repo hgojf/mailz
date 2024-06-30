@@ -27,6 +27,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <err.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -41,6 +42,11 @@
 #include "mailbox.h"
 #include "reallocarray.h"
 #include "strlcpy.h"
+
+struct getline {
+	char *line;
+	size_t n;
+};
 
 struct header {
 	char *key;
@@ -65,7 +71,9 @@ static int header_push2(struct header *, struct headers *);
 static int header_read(FILE *, struct getline *, struct header *);
 
 static int letter_cmp(const void *, const void *);
+static void letter_free(int, struct letter *);
 static int letter_push(struct letter *, struct mailbox *);
+static int letter_read(FILE *, struct letter *, int, int *, struct getline *);
 
 static DIR *maildir_setup(int);
 static int maildir_letter_set_flag(DIR *, struct letter *, char);
@@ -1270,4 +1278,105 @@ mbox_letter_cmp(const void *one, const void *two)
 		return 0;
 	else
 		return -1;
+}
+
+int
+from_test(void)
+{
+	struct from from;
+	char *addr;
+
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+
+	addr = "Hello <user@invalid.gfy";
+	if (from_extract(addr, &from) != -1)
+		return 1;
+
+	memset(&from, 0, sizeof(from));
+
+	addr = "User <guy@valid.com>";
+	if (from_extract(addr, &from) == -1)
+		return 1;
+	if (from.al != 13
+		|| strncmp(from.addr, "guy@valid.com", 13) != 0
+		|| from.nl != 4
+		|| strncmp(from.name, "User", 4) != 0)
+		return 1;
+
+	memset(&from, 0, sizeof(from));
+
+	addr = "guy@valid.com";
+	if (from_extract(addr, &from) == -1)
+		return 1;
+	if (from.al != 13 
+		|| strncmp(from.addr, "guy@valid.com", 13) != 0
+		|| from.nl != 0)
+		return 1;
+
+	addr = "<odd@mail.com>";
+	if (from_extract(addr, &from) == -1)
+		return 1;
+	if (from.nl != 0
+		|| from.al != 12
+		|| strncmp(from.addr, "odd@mail.com", 12) != 0)
+		return 1;
+	return 0;
+}
+
+int
+letter_test(void)
+{
+	FILE *fp;
+	struct letter letter;
+	int seen;
+	struct getline gl;
+
+	if (pledge("stdio rpath", NULL) == -1)
+		err(1, "pledge");
+	if ((fp = fopen("tests/letter", "r")) == NULL)
+		err(1, "fopen");
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+
+	gl.line = NULL;
+	gl.n = 0;
+	if (letter_read(fp, &letter, MAILBOX_MBOX, &seen, &gl) == -1) {
+		free(gl.line);
+		fclose(fp);
+		return 1;
+	}
+
+	if (strcmp(letter.from, "A friend <gary@nota.realdomain>") != 0)
+		return 1;
+	if (letter.subject == NULL || strcmp(letter.subject, "Test mail") != 0)
+		return 1;
+	if (letter.date != 1718936773)
+		return 1;
+	if (seen)
+		return 1;
+
+	free(letter.subject);
+	free(letter.from);
+	fclose(fp);
+	free(gl.line);
+
+	return 0;
+}
+
+int
+mbox_test(void)
+{
+	struct mailbox mailbox;
+
+	if (pledge("stdio rpath wpath", NULL) == -1)
+		err(1, "pledge");
+	if (mailbox_setup("tests/mbox", &mailbox) == -1)
+		return 1;
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+	if (mailbox_read(&mailbox, 1) == -1)
+		return 1;
+	mailbox_free(&mailbox);
+	return 0;
 }

@@ -14,13 +14,12 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define MAILBOX_INTERNALS
+#define REGRESS
 
 #include <sys/wait.h>
 
 #include <dirent.h>
 #include <err.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,11 +35,6 @@ struct test {
 	const char *id;
 	int (*fn) (void);
 };
-
-static int date_test(void);
-static int from_test(void);
-static int letter_test(void);
-static int mbox_test(void);
 
 static int test_cmp(const void *, const void *);
 
@@ -110,119 +104,4 @@ test_cmp(const void *one, const void *two)
 	n2 = two;
 
 	return strcmp(n1, n2->id);
-}
-
-static int
-date_test(void)
-{
-	if (pledge("stdio", NULL) == -1)
-		err(1, "pledge");
-	if (tz_tosec("GMT") != 0)
-		return 1;
-	if (tz_tosec("-2300") != -82800)
-		return 1;
-	if (tz_tosec("+2300") != 82800)
-		return 1;
-	return 0;
-}
-
-static int
-from_test(void)
-{
-	struct from from;
-	char *addr;
-
-	if (pledge("stdio", NULL) == -1)
-		err(1, "pledge");
-
-	addr = "Hello <user@invalid.gfy";
-	if (from_extract(addr, &from) != -1)
-		return 1;
-
-	memset(&from, 0, sizeof(from));
-
-	addr = "User <guy@valid.com>";
-	if (from_extract(addr, &from) == -1)
-		return 1;
-	if (from.al != 13
-		|| strncmp(from.addr, "guy@valid.com", 13) != 0
-		|| from.nl != 4
-		|| strncmp(from.name, "User", 4) != 0)
-		return 1;
-
-	memset(&from, 0, sizeof(from));
-
-	addr = "guy@valid.com";
-	if (from_extract(addr, &from) == -1)
-		return 1;
-	if (from.al != 13 
-		|| strncmp(from.addr, "guy@valid.com", 13) != 0
-		|| from.nl != 0)
-		return 1;
-
-	addr = "<odd@mail.com>";
-	if (from_extract(addr, &from) == -1)
-		return 1;
-	if (from.nl != 0
-		|| from.al != 12
-		|| strncmp(from.addr, "odd@mail.com", 12) != 0)
-		return 1;
-	return 0;
-}
-
-static int
-letter_test(void)
-{
-	FILE *fp;
-	struct letter letter;
-	int seen;
-	struct getline gl;
-
-	if (pledge("stdio rpath", NULL) == -1)
-		err(1, "pledge");
-	if ((fp = fopen("tests/letter", "r")) == NULL)
-		err(1, "fopen");
-	if (pledge("stdio", NULL) == -1)
-		err(1, "pledge");
-
-	gl.line = NULL;
-	gl.n = 0;
-	if (letter_read(fp, &letter, MAILBOX_MBOX, &seen, &gl) == -1) {
-		free(gl.line);
-		fclose(fp);
-		return 1;
-	}
-
-	if (strcmp(letter.from, "A friend <gary@nota.realdomain>") != 0)
-		return 1;
-	if (letter.subject == NULL || strcmp(letter.subject, "Test mail") != 0)
-		return 1;
-	if (letter.date != 1718936773)
-		return 1;
-	if (seen)
-		return 1;
-
-	free(letter.subject);
-	free(letter.from);
-	fclose(fp);
-	free(gl.line);
-
-	return 0;
-}
-
-static int
-mbox_test(void)
-{
-	struct mailbox mailbox;
-
-	if (pledge("stdio rpath wpath", NULL) == -1)
-		err(1, "pledge");
-	if (mailbox_setup("tests/mbox", &mailbox) == -1)
-		return 1;
-	if (pledge("stdio", NULL) == -1)
-		err(1, "pledge");
-	if (mailbox_read(&mailbox, 1) == -1)
-		return 1;
-	mailbox_free(&mailbox);
-	return 0;
 }
