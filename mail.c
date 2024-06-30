@@ -441,10 +441,14 @@ command_run(char *args, struct mailbox *mailbox, struct options *options)
 {
 	struct command *cmd;
 	const char *command;
+	char *comment;
 	int cv;
 
+	if ((comment = strchr(args, '#')) != NULL)
+		*comment = '\0';
+
 	if ((command = strsep(&args, " \t")) == NULL)
-		return -1;
+		return 0; /* empty line */
 	cmd = bsearch(command, commands, nitems(commands), 
 		sizeof(*commands), command_cmp);
 	if (cmd == NULL) {
