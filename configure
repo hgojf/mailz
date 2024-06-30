@@ -13,6 +13,13 @@ print_plural() {
 	printf '... '
 }
 
+# macro, (optional) value
+define_macro() {
+	echo "#ifndef $1"
+	echo "#define $1 $2"
+	echo "#endif /* $1 */"
+}
+
 # function name, header name, replacement to source. Stdin is test program
 have_function() {
 	cat < /dev/null > test.c
@@ -35,14 +42,14 @@ have_function() {
 		if [ "$3" = "HAVE" ]; then
 			:
 		elif [ "$3" = "NULL" ]; then
-			echo "#define $4 $5" >> config.h
+			define_macro "$4" "$5" >> config.h
 		else
 			echo SRCS_COMPAT += "$3" >> config.mk
 		fi
 		printf 'Not Found\n'
 	else
 		if [ "$3" = "HAVE" ]; then
-			echo "#define $4" >> config.h
+			define_macro "$4" >> config.h
 		fi
 		printf 'Found\n'
 	fi
@@ -56,7 +63,7 @@ have_header() {
 	echo "int main(void) { }" >> test.c
 	printf -- "Checking for header %s... " "$1"
 	if cc test.c 2>/dev/null ; then
-		echo "#define $2" >> config.h
+		define_macro "$2" >> config.h
 		printf 'Found\n'
 		rm a.out
 	else
@@ -209,16 +216,15 @@ have_function flock "stdlib.h fcntl.h unistd.h" HAVE HAVE_FLOCK <<-EOF
 	return 0;
 	EOF
 
-echo "#define _XOPEN_SOURCE 700" >> config.h
+define_macro _XOPEN_SOURCE 700 >> config.h
 if [ -n "${DEFINE}" ]; then
-	echo "#ifndef ${DEFINE}" >> config.h
-	echo "#define ${DEFINE}" >> config.h
-	echo "#endif /* ${DEFINE} */" >> config.h
+	define_macro "${DEFINE}" >> config.h
 fi
 
 have_header sys/tree.h HAVE_SYS_TREE_H
 
-echo "#define PREFIX \"${PREFIX}\"" >> config.h
+define_macro PREFIX "\"${PREFIX}\"" >> config.h
+
 echo "#endif /* MAILZ_CONFIG_H */" >> config.h
 
 have_compiler_flag optional -MD -MP
