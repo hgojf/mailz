@@ -1,0 +1,145 @@
+.Dd $Mdocdate: Jun 30 2024$
+.Dt mailz 1
+.Sh NAME
+.Nm mailz
+.Nd send and receive mail
+.Sh SYNOPSIS
+.Nm
+.Op Fl a
+.Ar mailbox
+.Nm
+.Op Fl s Ar subject
+.Ar to-addr
+.Sh DESCRIPTION
+.Nm
+is a mail client with a command line interface.
+.Pp
+The options are as follows:
+.Bl -tag -width a
+.It Fl a
+Show messages that have been marked as read.
+.It Fl s Ar subject
+Set the subject for the mail to send.
+.El
+.Ss Sending mail
+When invoked with the
+.Fl s
+flag
+.Nm
+will attempt to send an email to 
+.Ar to-addr
+containing the contents of standard input.
+.Ss Reading mail
+When invoked normally,
+.Nm
+will read mail from
+.Ar mailbox
+which can either be a directory using the Maildir format, or a
+regular file using the mbox format.
+.Pp
+After starting up,
+.Nm
+will display an interactive prompt where several commands may be
+entered.
+See
+.Sx COMMANDS
+for a full list of commands.
+.Sh COMMANDS
+Commands are read one line at a time, with arguments being seperated
+by whitespace. Some commands have single character aliases that can
+be used instead of typing the entire command. 
+.Pp
+.Bl -tag -width "thread (t)"
+.It Ic ignore
+adds a list of headers to be ignored when printing mail.
+.It Ic more
+displays a letter inside of a pager. If no letter is specified, the
+last letter interacted with will be used.
+.It Ic print (p)
+prints a letter to the standard output. If no letter is specified, the
+last letter interacted with will be used.
+.It Ic read (r)
+marks the specified letter as having been read.
+.It Ic reorder
+specifies the order in which headers should be outputted when displayed.
+letters not specified in this list will be outputted in an indeterminate
+order after those in this list have been outputted.
+.It Ic reply
+send a reply to the specified letter. A template email will be created,
+containing the quoted contents of the message being replied to.
+If no letter is specified, the last letter interacted with will be used.
+.It Ic save (s)
+saves the specified letter to a temporary directory, outputting the
+location of the letter.  If no letter is specified, the last letter 
+interacted with will be used.
+.It Ic send
+sends an email to the address specified in the first argument, treating
+the rest of the arguments as the subject of the mail.
+.It Ic set
+sets the value of program variables, see
+.Sx VARIABLES
+.It Ic thread (t)
+displays a list of emails which are a part of the same thread
+as the email specified. mails are considered to be part of the same
+thread if they one has the subject "Same thing", and the other has the
+subject "Re: Same thing", or if both mails have the subject 
+"Re: Same thing". If no letter is specified, the last letter 
+interacted with will be used.
+.It Ic unignore
+adds a list of headers to be displayed when printing mail. if specified,
+no other headers will be displayed.
+.It Ic x
+marks the last letter interacted with as being unread.
+.El
+.Sh VARIABLES
+Several variables affect the operation of
+.Nm
+these variables can be set with the
+.Sy set
+command, and are documented here.
+.Bl -tag -width linewrap
+.It Ic address
+sets the address to be used when sending mail.
+.It Ic linewrap
+sets the line length at which lines will be wrapped when outputting mail.
+if no argument is provided,
+.Sy linewrap
+will be set to 72.
+if set to 0 (the default), no line wrapping will be performed.
+.It Ic name
+sets the real name to be used when sending mail.
+.It Ic edit
+sets the editing mode to be used when sending mail.
+the argument can either be
+.Em vi ,
+in which case the
+.Xr vi 1
+editor will be invoked to edit mail before sending,
+or
+.Em manual ,
+in which case the name of file containing the mail
+will be outputted, which can then be edited before sending the mail.
+this option defaults to
+.Em vi
+.El
+.Sh FILES
+.Bl -tag -width /tmp/mail/letter.* -compact
+.It Pa ~/.mailzrc
+file containing initial commands to be run;
+can be overridden by setting the
+.Ev MAILZRC
+environment variable.
+.It Pa /tmp/mail/
+temporary files
+.It Pa /tmp/mail/letter.*
+letters saved by the
+.Sy save
+command.
+.El
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, 1 on failure, and 2 on invalid usage.
+.Sh SEE ALSO
+.Xr sendmail 8 ,
+.Xr vi 1

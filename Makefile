@@ -1,6 +1,6 @@
 .POSIX:
 
-.PHONY: all clean install test tidy
+.PHONY: all clean install install-man test tidy
 
 include config.mk
 
@@ -34,6 +34,9 @@ clean:
 install:
 	$(INSTALL) -m 0755 mail ${PREFIX}/bin/mailz
 	$(INSTALL) -m 0755 mailwrapper ${PREFIX}/libexec/mailzwrapper
+
+install-man:
+	$(INSTALL) -m 0644 mailz.1 ${PREFIX}/man/man1/
 
 regress: date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
 	$(CC) -o $@ ${LDFLAGS} date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}

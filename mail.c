@@ -91,13 +91,17 @@ static struct command commands[] =
 	{ "ignore", "[headers...]", COMMAND_OPTION, .fn.option = ignore },
 	{ "more", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = more },
 	{ "p", "", COMMAND_INTERACTIVE, .fn.interactive = print },
+	{ "print", "", COMMAND_INTERACTIVE, .fn.interactive = print },
 	{ "r", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = see },
+	{ "read", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = see },
 	{ "reorder", "[headers...]", COMMAND_OPTION, .fn.option = reorder },
 	{ "reply", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = reply },
 	{ "s", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = save },
+	{ "save", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = save },
 	{ "send", "<address>", COMMAND_INTERACTIVE, .fn.interactive = send },
 	{ "set", "variable [value]", COMMAND_OPTION, .fn.option = set },
 	{ "t", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = thread },
+	{ "thread", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = thread },
 	{ "unignore", "[headers...]", COMMAND_OPTION, .fn.option = unignore },
 	{ "x", "", COMMAND_INTERACTIVE, .fn.interactive = unsee },
 };
@@ -160,6 +164,9 @@ main(int argc, char *argv[])
 	if (subject != NULL) {
 		struct sendmail letter;
 		size_t tl;
+
+		if (options.view_seen)
+			usage();
 
 		if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
 			err(1, "pledge");
@@ -422,7 +429,9 @@ configure(struct options *options)
 static void
 usage(void)
 {
-	if (fprintf(stderr, "usage: mailz [-s] <mailbox>\n") < 0)
+	if (fprintf(stderr, 
+		"usage: mailz [-a] <mailbox>\n"
+		"       mailz [-s subject] to-addr\n") < 0)
 		exit(1);
 	exit(EX_USAGE);
 }
