@@ -78,9 +78,8 @@ tzparse(const char *tz, struct timezone_offset *out)
 		else
 			return -1;
 		break;
-	case 3: {
+	case 3:
 		/* USA obsolete time zones + GMT */
-		int rv, d;
 
 		if (tz[2] != 'T')
 			return -1;
@@ -89,32 +88,28 @@ tzparse(const char *tz, struct timezone_offset *out)
 			hr = 0;
 			break;
 		}
-		if (tz[1] == 'D')
-			d = 1;
-		else if (tz[1] == 'S')
-			d = 0;
-		else
-			return -1;
 		switch (tz[0]) {
 		case 'E':
-			rv = -5;
+			hr = -5;
 			break;
 		case 'C':
-			rv = -6;
+			hr = -6;
 			break;
 		case 'M':
-			rv = -7;
+			hr = -7;
 			break;
 		case 'P':
-			rv = -8;
+			hr = -8;
 			break;
 		default:
 			return -1;
 		}
-		hr =  rv + d;
+		if (tz[1] == 'D')
+			hr += 1;
+		else if (tz[1] != 'S')
+			return -1;
 		break;
-	}
-	case 5: {
+	case 5:
 		/* official ([+-])DDDD utc offset */
 		if (tz[0] != '+' && tz[0] != '-')
 			return -1;
@@ -133,7 +128,6 @@ tzparse(const char *tz, struct timezone_offset *out)
 		if (hr > 23 || mn > 59)
 			return -1;
 		break;
-	}
 	default:
 		/* any other alphabetical time zone */
 		for (size_t i = 0; i < len; i++)
