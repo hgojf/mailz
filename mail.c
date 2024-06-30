@@ -448,21 +448,22 @@ command_run(char *args, struct mailbox *mailbox, struct options *options)
 	cmd = bsearch(command, commands, nitems(commands), 
 		sizeof(*commands), command_cmp);
 	if (cmd == NULL) {
-		warnx("unknown command %s", command);
-		return -1;
+		if (fprintf(stderr, "unknown command %s\n", command) < 0)
+			return -1;
+		return 0;
 	}
 	switch (cmd->type) {
 	case COMMAND_OPTION:
 		cv = cmd->fn.option(options, args);
 		break;
-		case COMMAND_INTERACTIVE:
+	case COMMAND_INTERACTIVE:
 		if (mailbox == NULL) {
 			if (fprintf(stderr, "interactive commands not "
 					"allowed in mailzrc\n") < 0)
 				return -1;
 			return 0;
 		}
-			cv = cmd->fn.interactive(mailbox, options, args);
+		cv = cmd->fn.interactive(mailbox, options, args);
 		break;
 	}
 	switch (cv) {
