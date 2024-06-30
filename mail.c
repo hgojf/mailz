@@ -55,44 +55,51 @@ struct command {
 	#define COMMAND_USAGE -2
 	#define COMMAND_ERROR -1
 	#define COMMAND_OK 0
-	int (*fn) (struct mailbox *, struct options *, char *);
+
+	#define COMMAND_OPTION 0
+	#define COMMAND_INTERACTIVE 1
+	int type;
+	union {
+		int (*option) (struct options *, char *);
+		int (*interactive) (struct mailbox *, struct options *, char *);
+	} fn;
 };
 
 static int argv_ify(char *, size_t *, char ***);
 static int command_run(char *, struct mailbox *, struct options *);
 static int command_cmp(const void *, const void *);
-static int configure(struct mailbox *, struct options *);
+static int configure(struct options *);
 static const char *config_location(void);
 static void options_free(struct options *);
 static void usage(void);
 
-static int ignore(struct mailbox *, struct options *, char *);
-static int unignore(struct mailbox *, struct options *, char *);
+static int ignore(struct options *, char *);
+static int unignore(struct options *, char *);
 static int more(struct mailbox *, struct options *, char *);
 static int print(struct mailbox *, struct options *, char *);
-static int reorder(struct mailbox *, struct options *, char *);
+static int reorder(struct options *, char *);
 static int reply(struct mailbox *, struct options *, char *);
 static int save(struct mailbox *, struct options *, char *);
 static int see(struct mailbox *, struct options *, char *);
-static int set(struct mailbox *, struct options *, char *);
+static int set(struct options *, char *);
 static int send(struct mailbox *, struct options *, char *);
 static int thread(struct mailbox *, struct options *, char *);
 static int unsee(struct mailbox *, struct options *, char *);
 
 static struct command commands[] =
 {
-	{ "ignore", "[headers...]", ignore },
-	{ "more", "[message number]", more },
-	{ "p", "", print },
-	{ "r", "[message number]", see },
-	{ "reorder", "[headers...]", reorder },
-	{ "reply", "[message number]", reply },
-	{ "s", "[message number]", save },
-	{ "send", "[message number]", send },
-	{ "set", "variable [value]", set },
-	{ "t", "[message number]", thread },
-	{ "unignore", "[headers...]", unignore },
-	{ "x", "", unsee },
+	{ "ignore", "[headers...]", COMMAND_OPTION, .fn.option = ignore },
+	{ "more", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = more },
+	{ "p", "", COMMAND_INTERACTIVE, .fn.interactive = print },
+	{ "r", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = see },
+	{ "reorder", "[headers...]", COMMAND_OPTION, .fn.option = reorder },
+	{ "reply", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = reply },
+	{ "s", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = save },
+	{ "send", "<address>", COMMAND_INTERACTIVE, .fn.interactive = send },
+	{ "set", "variable [value]", COMMAND_OPTION, .fn.option = set },
+	{ "t", "[message number]", COMMAND_INTERACTIVE, .fn.interactive = thread },
+	{ "unignore", "[headers...]", COMMAND_OPTION, .fn.option = unignore },
+	{ "x", "", COMMAND_INTERACTIVE, .fn.interactive = unsee },
 };
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -157,13 +164,7 @@ main(int argc, char *argv[])
 		if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
 			err(1, "pledge");
 
-		mailbox.nletters = 0;
-		mailbox.letters = NULL;
-		mailbox.type = MAILBOX_MAILDIR;
-		mailbox.val.mbox_file = NULL;
-		/* only mailbox.nletters = 0 should be necessary */
-
-		if (configure(&mailbox, &options) == -1) {
+		if (configure(&options) == -1) {
 			options_free(&options);
 			return 1;
 		}
@@ -247,7 +248,7 @@ main(int argc, char *argv[])
 		goto good;
 	}
 
-	if (configure(&mailbox, &options) == -1)
+	if (configure(&options) == -1)
 		goto fail;
 
 	if (mailbox_print(&mailbox, 0, mailbox.nletters) == -1)
@@ -287,36 +288,8 @@ main(int argc, char *argv[])
 			}
 		}
 		else {
-			struct command *cmd;
-			const char *command;
-			char *args;
-			int cv;
-
-			args = line;
-			if ((command = strsep(&args, " \t")) == NULL)
-				return -1;
-			cmd = bsearch(command, commands, nitems(commands), 
-			sizeof(*commands), command_cmp);
-			if (cmd == NULL) {
-				if (fprintf(stderr, "unknown command %s\n", command) < 0)
-					goto fail;
-				continue;
-			}
-			cv = cmd->fn(&mailbox, &options, args);
-
-			switch (cv) {
-			case COMMAND_USAGE:
-				if (fprintf(stderr, "usage: %s %s\n", cmd->ident,
-						cmd->usage) < 0)
-					goto fail;
-				break;
-			case COMMAND_ERROR:
-				if (fprintf(stderr, "command failed\n") < 0)
-					goto fail;
-				break;
-			case COMMAND_OK:
-				break;
-			}
+			if (command_run(line, &mailbox, &options) == -1)
+				goto fail;
 		}
 		if (fputs("> ", stdout) == EOF)
 			goto fail;
@@ -409,7 +382,7 @@ config_location(void)
 }
 
 static int
-configure(struct mailbox *mailbox, struct options *options)
+configure(struct options *options)
 {
 	const char *mailrc;
 	FILE *fp;
@@ -433,7 +406,7 @@ configure(struct mailbox *mailbox, struct options *options)
 	while ((len = getline(&line, &n, fp)) != -1) {
 		if (line[len - 1] == '\n')
 			line[len - 1] = '\0';
-		if (command_run(line, mailbox, options) == -1)
+		if (command_run(line, NULL, options) == -1)
 			goto fail;
 	}
 
@@ -463,11 +436,12 @@ command_cmp(const void *one, const void *two)
 	return strcmp(n1, n2->ident);
 }
 
-int
+static int
 command_run(char *args, struct mailbox *mailbox, struct options *options)
 {
-	const struct command *cmd;
-	char *command;
+	struct command *cmd;
+	const char *command;
+	int cv;
 
 	if ((command = strsep(&args, " \t")) == NULL)
 		return -1;
@@ -477,17 +451,45 @@ command_run(char *args, struct mailbox *mailbox, struct options *options)
 		warnx("unknown command %s", command);
 		return -1;
 	}
-	return cmd->fn(mailbox, options, args);
+	switch (cmd->type) {
+	case COMMAND_OPTION:
+		cv = cmd->fn.option(options, args);
+		break;
+		case COMMAND_INTERACTIVE:
+		if (mailbox == NULL) {
+			if (fprintf(stderr, "interactive commands not "
+					"allowed in mailzrc\n") < 0)
+				return -1;
+			return 0;
+		}
+			cv = cmd->fn.interactive(mailbox, options, args);
+		break;
+	}
+	switch (cv) {
+	case COMMAND_USAGE:
+		if (fprintf(stderr, "usage: %s %s\n", cmd->ident,
+				cmd->usage) < 0)
+			return -1;
+		break;
+	case COMMAND_ERROR:
+		if (fprintf(stderr, "command failed\n") < 0)
+			return -1;
+		break;
+	case COMMAND_OK:
+		break;
+	}
+
+	return 0;
 }
 
 static int
-ignore(__unused struct mailbox *mailbox, struct options *options, char *args)
+ignore(struct options *options, char *args)
 {
 	return argv_ify(args, &options->nignore, &options->ignore);
 }
 
 static int
-unignore(__unused struct mailbox *mailbox, struct options *options, char *args)
+unignore(struct options *options, char *args)
 {
 	return argv_ify(args, &options->nunignore, &options->unignore);
 }
@@ -549,7 +551,7 @@ more(struct mailbox *mailbox, struct options *options, char *args)
 }
 
 static int
-reorder(__unused struct mailbox *mailbox, struct options *options, char *args)
+reorder(struct options *options, char *args)
 {
 	return argv_ify(args, &options->nreorder, &options->reorder);
 }
@@ -651,7 +653,7 @@ see(struct mailbox *mailbox, struct options *options, char *args)
 }
 
 static int
-set(__unused struct mailbox *mailbox, struct options *options, char *args)
+set(struct options *options, char *args)
 {
 	const char *var, *val;
 	char *orig;
