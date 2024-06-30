@@ -329,15 +329,12 @@ mailbox_free(struct mailbox *mailbox)
 static int
 maildir_letter_seen(const char *name)
 {
-	char *flags, flag;
-	int n;
+	char *flags;
 
-	/* shouldnt have made it this far */
-	if ((flags = strchr(name, ':')) == NULL)
+	if ((flags = strstr(name, ":2,")) == NULL)
 		return -1;
-	flags++;
-	n = sscanf(flags, "2,%c", &flag);
-	return n == 1 && flag == 'S';
+	flags += 3;
+	return strchr(flags, 'S') != NULL;
 }
 
 int
@@ -434,7 +431,6 @@ maildir_letter_set_flag(DIR *dir, struct letter *letter, char f)
 	letter->ident.maildir_path = t;
 	return 0;
 }
-
 
 int
 mailbox_letter_print(size_t nth, struct letter *letter)
