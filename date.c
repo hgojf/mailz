@@ -33,9 +33,40 @@ struct timezone_offset {
 
 /* rfc 5322 date parsing */
 
+#define TZ_INVALIDSEC 1 /* 1 second offset from utc not defined in rfc 5322 */
+
+static time_t tz_tosec(const char *);
 static int tzparse(const char *, struct timezone_offset *);
 
 time_t
+rfc5322_dateparse(char *s)
+{
+	struct tm tm;
+	char *tz;
+	time_t date, off;
+	const char *fmt;
+
+	if ((tz = strrchr(s, ' ')) == NULL)
+		return -1;
+	*tz++ = '\0';
+	if ((off = tz_tosec(tz)) == TZ_INVALIDSEC)
+		return -1;
+	memset(&tm, 0, sizeof(tm));
+	if (strchr(s, ',') != NULL)
+		fmt = "%a, %d %b %Y %H:%M:%S";
+	else
+		fmt = "%d %b %Y %H:%M:%S";
+	if (strptime(s, fmt, &tm) == NULL)
+		return -1;
+	if ((date = mktime(&tm)) == -1)
+		return -1;
+	if (date < off)
+		return -1;
+
+	return date - off;
+}
+
+static time_t
 tz_tosec(const char *s)
 {
 	time_t rv;

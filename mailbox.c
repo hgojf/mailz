@@ -172,8 +172,10 @@ mailbox_read(struct mailbox *out, int view_seen)
 		long off;
 
 		for (;;) {
-			if ((c = fgetc(fp)) == EOF)
+			if ((c = fgetc(fp)) == EOF) {
+				warnx("unexpected EOF");
 				goto fail;
+			}
 			if (c != '\n') {
 				if (fseek(fp, -1, SEEK_CUR) == -1)
 					goto fail;
@@ -181,13 +183,19 @@ mailbox_read(struct mailbox *out, int view_seen)
 			}
 		}
 
-		if ((n = fread(from, 1, 4, fp)) == 0 || n != 4)
+		if ((n = fread(from, 1, 4, fp)) == 0 || n != 4) {
+			warn("unexpected EOF");
 			goto fail;
-		if (memcmp(from, "From", 4) != 0)
+		}
+		if (memcmp(from, "From", 4) != 0) {
+			warn("From line missing at beginning of file");
 			goto fail;
+		}
 		for (;;) {
-			if ((c = fgetc(fp)) == EOF)
+			if ((c = fgetc(fp)) == EOF) {
+				warnx("unexpected EOF");
 				goto fail;
+			}
 			if (c == '\n')
 				break;
 		}
@@ -225,8 +233,10 @@ mailbox_read(struct mailbox *out, int view_seen)
 				goto fail;
 			if (!view_seen && seen)
 				continue;
-			if ((fp = fopenat(dfd, de->d_name)) == NULL)
+			if ((fp = fopenat(dfd, de->d_name)) == NULL) {
+				warn("fopenat %s", de->d_name);
 				goto fail;
+			}
 		}
 
 		if (type == MAILBOX_MBOX) {
@@ -249,8 +259,10 @@ mailbox_read(struct mailbox *out, int view_seen)
 					goto fail;
 			}
 			for (;;) {
-				if ((c = fgetc(fp)) == EOF)
+				if ((c = fgetc(fp)) == EOF) {
+					warnx("unexpected EOF");
 					goto fail;
+				}
 				if (c == '\n')
 					break;
 			}
@@ -544,14 +556,18 @@ letter_read(FILE *fp, struct letter *letter, int type, int *seen,
 	for (;;) {
 		struct header header;
 
-		if ((len = getline(&gl->line, &gl->n, fp)) == -1)
+		if ((len = getline(&gl->line, &gl->n, fp)) == -1) {
+			warnx("unexpected EOF");
 			goto letter;
+		}
 		if (gl->line[len - 1] == '\n')
 			gl->line[len - 1] = '\0';
 		if (*gl->line == '\0')
 			break;
-		if (header_read(fp, gl, &header) == -1)
+		if (header_read(fp, gl, &header) == -1) {
+			warnx("invalid header");
 			goto letter;
+		}
 		if (type == MAILBOX_MBOX && strcmp(header.key, "Status") == 0) {
 			if (strchr(header.val, 'R') != NULL)
 				*seen = 1;
@@ -563,8 +579,13 @@ letter_read(FILE *fp, struct letter *letter, int type, int *seen,
 		}
 	}
 
-	if (letter->from == NULL || letter->date == -1)
+	if (ferror(fp))
 		goto letter;
+
+	if (letter->from == NULL || letter->date == -1) {
+		warnx("letter missing From or Date headers");
+		goto letter;
+	}
 
 	return 0;
 
@@ -631,34 +652,16 @@ header_push(struct header *header, struct letter *letter)
 		return 0;
 	}
 	else if (!strcasecmp(header->key, "Date")) {
-		struct tm tm;
-		char *tz, *b;
-		time_t off;
-		const char *fmt;
+		char *b;
 
 		if (letter->date != -1)
 			return -1;
-
-		/* dont yet support ignoring comments except in this common case */
 		if ((b = strrchr(header->val, '(')) != NULL)
 			*b = '\0';
-		if ((tz = strrchr(header->val, ' ')) == NULL)
+		if ((letter->date = rfc5322_dateparse(header->val)) == -1) {
+			warnx("letter has invalid Date header");
 			return -1;
-		*tz++ = '\0';
-		if ((off = tz_tosec(tz)) == TZ_INVALIDSEC)
-			return -1;
-		memset(&tm, 0, sizeof(tm));
-		if (strchr(header->val, ',') != NULL)
-			fmt = "%a, %d %b %Y %H:%M:%S";
-		else
-			fmt = "%d %b %Y %H:%M:%S";
-		if (strptime(header->val, fmt, &tm) == NULL)
-			return -1;
-		if ((letter->date = mktime(&tm)) == -1)
-			return -1;
-		if (letter->date < off)
-			return -1;
-		letter->date -= off;
+		}
 		free(header->key);
 		free(header->val);
 		return 0;

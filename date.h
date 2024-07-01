@@ -16,8 +16,7 @@
 
 #ifndef MAILZ_DATE_H
 #define MAILZ_DATE_H
-#define TZ_INVALIDSEC 1 /* 1 minute offset from utc not defined in rfc 5822 */
-time_t tz_tosec(const char *);
+time_t rfc5322_dateparse(char *);
 
 #ifdef REGRESS
 int date_test(void);

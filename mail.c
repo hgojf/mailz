@@ -246,8 +246,10 @@ main(int argc, char *argv[])
 			err(1, "pledge");
 	}
 
-	if (mailbox_read(&mailbox, options.view_seen) == -1)
-		err(1, "mailbox_read");
+	if (mailbox_read(&mailbox, options.view_seen) == -1) {
+		warnx("mailbox_read");
+		goto fail;
+	}
 
 	if (mailbox.nletters == 0) {
 		if (puts("No mail.") == EOF)
