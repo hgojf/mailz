@@ -445,6 +445,7 @@ int
 mailbox_letter_print(size_t nth, struct letter *letter)
 {
 	struct tm *tm;
+	const char *subject;
 	char date[30];
 	struct from from;
 
@@ -455,9 +456,10 @@ mailbox_letter_print(size_t nth, struct letter *letter)
 			|| strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
 		return -1;
 
+	subject = letter->subject == NULL ? "No Subject" : letter->subject;
+
 	if (printf("%4zu %-20s %-32.*s %-30s\n", nth, date, 
-		from.al, from.addr,
-		letter->subject == NULL ? "No Subject" : letter->subject) < 0)
+			from.al, from.addr, subject) < 0)
 		return -1;
 	return 0;
 }
@@ -919,6 +921,9 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 				goto headers;
 		}
 	}
+
+	if (ferror(fp))
+		goto headers;
 
 	if (mailbox_letter_mark_read(mailbox, letter) == -1)
 		goto headers;
