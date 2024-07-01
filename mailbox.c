@@ -262,14 +262,15 @@ mailbox_read(struct mailbox *out, int view_seen)
 			goto fail;
 
 		if (type == MAILBOX_MAILDIR) {
-			/* obviously this is weird, because it will 'try again' */
-			if (fclose(fp) == EOF)
+			if (fclose(fp) == EOF) {
+				fp = NULL;
 				goto fail;
+			}
+			fp = NULL;
 			if ((letter.ident.maildir_path = strdup(de->d_name)) == NULL) {
 				letter_free(type, &letter);
 				goto fail;
 			}
-			fp = NULL;
 		}
 
 		if (type == MAILBOX_MBOX) {
@@ -287,8 +288,8 @@ mailbox_read(struct mailbox *out, int view_seen)
 			goto fail;
 		}
 	}
-	done:
 
+	done:
 	rv = 0;
 	fail:
 	free(gl.line);
