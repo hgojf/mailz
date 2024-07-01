@@ -1263,7 +1263,7 @@ fwriteat(FILE *fp, const char *str)
 
 	rv = 0;
 	fail:
-	if (fclose(fp) == -1)
+	if (fclose(cp) == -1)
 		rv = -1;
 	return rv;
 }
