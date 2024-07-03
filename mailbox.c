@@ -118,8 +118,10 @@ mailbox_setup(const char *path, struct mailbox *out)
 		if ((dp = maildir_setup(fd)) == NULL)
 			goto fail;
 		out->val.maildir_cur = dp;
-		if (close(fd) == -1)
+		if (close(fd) == -1) {
+			(void) closedir(dp);
 			return -1;
+		}
 	}
 	else {
 		FILE *fp;
