@@ -62,7 +62,6 @@ RB_GENERATE(headers, header, entry, header_cmp);
 static int equal_escape(FILE *);
 
 static FILE *fopenat(int, const char *);
-static int fwriteat(FILE *, const char *);
 static DIR *opendirat(int, const char *);
 
 static int header_ignore(struct header *, const struct options *);
@@ -72,18 +71,14 @@ static int header_read(FILE *, struct getline *, struct header *);
 static int header_read1(FILE *, struct getline *, struct header *, int);
 
 static int letter_cmp(const void *, const void *);
-static void letter_free(int, struct letter *);
+static void letter_free(struct letter *);
 static int letter_push(struct letter *, struct mailbox *);
-static int letter_read(FILE *, struct letter *, int, int *, struct getline *);
+static int letter_read(FILE *, struct letter *, struct getline *);
 
 static DIR *maildir_setup(int);
 static int maildir_letter_set_flag(DIR *, struct letter *, char);
 static int maildir_letter_unset_flag(DIR *, struct letter *, char);
 static int maildir_letter_seen(const char *);
-
-static int mbox_flush(struct mailbox *);
-static int mbox_letter_cmp(const void *, const void *);
-static int mbox_rejig(struct mailbox *, size_t);
 
 static char *dupstr(const char *, size_t);
 static char *strip_trailing(char *);
@@ -91,74 +86,39 @@ static char *strip_trailing(char *);
 int
 mailbox_setup(const char *path, struct mailbox *out)
 {
-	int type, rv, fd;
-	struct stat sb;
+	int fd;
 
-	rv = -1;
-	if (stat(path, &sb) == -1)
-		return -1;
-	switch (sb.st_mode & S_IFMT) {
-	case S_IFDIR:
-		type = MAILBOX_MAILDIR;
-		if ((fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
-			return -1;
-		break;
-	case S_IFREG:
-		type = MAILBOX_MBOX;
-		if ((fd = open(path, O_RDWR | O_CLOEXEC)) == -1)
-			return -1;
-		break;
-	default:
+	if ((fd = open(path, O_RDONLY | O_CLOEXEC | O_DIRECTORY)) == -1) {
+		warn("open %s", path);
 		return -1;
 	}
 
-	if (type == MAILBOX_MAILDIR) {
-		DIR *dp;
-
-		if ((dp = maildir_setup(fd)) == NULL)
-			goto fail;
-		out->val.maildir_cur = dp;
-		if (close(fd) == -1) {
-			(void) closedir(dp);
-			return -1;
-		}
-	}
-	else {
-		FILE *fp;
-
-		if ((fp = fdopen(fd, "a+")) == NULL)
-			goto fail;
-		out->val.mbox_file = fp;
-	}
-
-	out->type = type;
-	rv = 0;
-	fail:
-	if (rv == -1)
+	if ((out->cur = maildir_setup(fd)) == NULL) {
 		(void) close(fd);
-	return rv;
+		return -1;
+	}
+
+	if (close(fd) == -1) {
+		(void) closedir(out->cur);
+		return -1;
+	}
+
+	return 0;
 }
 
 int
 mailbox_read(struct mailbox *out, int view_seen)
 {
 	struct getline gl;
-	FILE *fp, *mbox;
+	FILE *fp;
 	DIR *mdir;
-	int dfd, rv, type;
+	int dfd, rv;
 
 	rv = -1;
 
-	type = out->type;
-	assert(type == MAILBOX_MBOX || type == MAILBOX_MAILDIR);
-
-	if (type == MAILBOX_MBOX)
-		fp = mbox = out->val.mbox_file;
-	else if (type == MAILBOX_MAILDIR) {
-		mdir = out->val.maildir_cur;
-		dfd = dirfd(mdir);
-		fp = NULL;
-	}
+	mdir = out->cur;
+	dfd = dirfd(mdir);
+	fp = NULL;
 
 	out->letters = NULL;
 	out->nletters = 0;
@@ -166,160 +126,53 @@ mailbox_read(struct mailbox *out, int view_seen)
 	gl.line = NULL;
 	gl.n = 0;
 
-	/* first message has 'From' on the first line */
-	if (type == MAILBOX_MBOX) {
-		char from[4];
-		int c, seen;
-		size_t n;
-		struct letter letter;
-		long off;
-
-		for (;;) {
-			if ((c = fgetc(fp)) == EOF) {
-				warnx("unexpected EOF");
-				goto fail;
-			}
-			if (c != '\n') {
-				if (fseek(fp, -1, SEEK_CUR) == -1)
-					goto fail;
-				break;
-			}
-		}
-
-		if ((n = fread(from, 1, 4, fp)) == 0 || n != 4) {
-			warn("unexpected EOF");
-			goto fail;
-		}
-		if (memcmp(from, "From", 4) != 0) {
-			warn("From line missing at beginning of file");
-			goto fail;
-		}
-		for (;;) {
-			if ((c = fgetc(fp)) == EOF) {
-				warnx("unexpected EOF");
-				goto fail;
-			}
-			if (c == '\n')
-				break;
-		}
-
-		if ((off = ftell(fp)) == -1)
-			goto fail;
-		if (letter_read(fp, &letter, type, &seen, &gl) == -1)
-			goto fail;
-		letter.ident.mbox.offset = off;
-		letter.ident.mbox.seen = 0;
-
-		if (!view_seen && seen) {
-			letter_free(type, &letter);
-		}
-		else if (letter_push(&letter, out) == -1) {
-			letter_free(type, &letter);
-			goto fail;
-		}
-	}
-
 	for (;;) {
 		struct dirent *de;
-		long off;
 		int seen;
 		struct letter letter;
 
-		if (type == MAILBOX_MAILDIR) {
-			int seen;
-
-			if ((de = readdir(mdir)) == NULL)
-				break;
-			if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
-				continue;
-			if ((seen = maildir_letter_seen(de->d_name)) == -1)
-				goto fail;
-			if (!view_seen && seen)
-				continue;
-			if ((fp = fopenat(dfd, de->d_name)) == NULL) {
-				warn("fopenat %s", de->d_name);
-				goto fail;
-			}
+		if ((de = readdir(mdir)) == NULL)
+			break;
+		if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+			continue;
+		if ((seen = maildir_letter_seen(de->d_name)) == -1)
+			goto fail;
+		if (!view_seen && seen)
+			continue;
+		if ((fp = fopenat(dfd, de->d_name)) == NULL) {
+			warn("fopenat %s", de->d_name);
+			goto fail;
 		}
 
-		if (type == MAILBOX_MBOX) {
-			int c;
-
-			/* find next 'From' line */
-			for (;;) {
-				char from[4];
-				size_t n;
-
-				if ((c = fgetc(fp)) == EOF)
-					goto done;
-				if (c != '\n')
-					continue;
-				if ((n = fread(from, 1, 4, fp)) == 0)
-					goto done;
-				if (n == 4 && memcmp(from, "From", 4) == 0)
-					break;
-				if (fseek(fp, - (long) n, SEEK_CUR) == -1)
-					goto fail;
-			}
-			for (;;) {
-				if ((c = fgetc(fp)) == EOF) {
-					warnx("unexpected EOF");
-					goto fail;
-				}
-				if (c == '\n')
-					break;
-			}
-			if ((off = ftell(fp)) == -1)
-				goto fail;
-		}
-
-		if (letter_read(fp, &letter, type, &seen, &gl) == -1)
+		if (letter_read(fp, &letter, &gl) == -1)
 			goto fail;
 
-		if (type == MAILBOX_MAILDIR) {
-			if (fclose(fp) == EOF) {
-				fp = NULL;
-				goto fail;
-			}
+		if (fclose(fp) == EOF) {
 			fp = NULL;
-			if ((letter.ident.maildir_path = strdup(de->d_name)) == NULL) {
-				letter_free(type, &letter);
-				goto fail;
-			}
+			goto fail;
 		}
-
-		if (type == MAILBOX_MBOX) {
-			letter.ident.mbox.offset = off;
-			letter.ident.mbox.seen = 0;
-		}
-
-		if (!view_seen && seen) {
-			letter_free(type, &letter);
-			continue;
+		fp = NULL;
+		if ((letter.path = strdup(de->d_name)) == NULL) {
+			letter_free(&letter);
+			goto fail;
 		}
 
 		if (letter_push(&letter, out) == -1) {
-			letter_free(type, &letter);
+			letter_free(&letter);
 			goto fail;
 		}
 	}
 
-	done:
 	rv = 0;
 	fail:
 	free(gl.line);
-	if (type == MAILBOX_MAILDIR && fp != NULL) {
-		if (fclose(fp) == EOF)
-			rv = -1;
-	}
+	if (fp != NULL && fclose(fp) == EOF)
+		rv = -1;
 	if (rv == -1) {
 		for (long long i = 0; i < out->nletters; i++)
-			letter_free(type, &out->letters[i]);
+			letter_free(&out->letters[i]);
 		free(out->letters);
-		if (type == MAILBOX_MAILDIR)
-			(void) closedir(mdir);
-		else if (type == MAILBOX_MBOX)
-			(void) fclose(mbox);
+		(void) closedir(mdir);
 	}
 	else {
 		qsort(out->letters, out->nletters, sizeof(*out->letters),
@@ -328,26 +181,13 @@ mailbox_read(struct mailbox *out, int view_seen)
 	return rv;
 }
 
-int
-mailbox_close(struct mailbox *mailbox)
-{
-	if (mailbox->type == MAILBOX_MBOX)
-		return mbox_flush(mailbox);
-	return 0;
-}
-
 void
 mailbox_free(struct mailbox *mailbox)
 {
-	if (mailbox->type == MAILBOX_MBOX) {
-		(void) mbox_flush(mailbox);
-		(void) fclose(mailbox->val.mbox_file);
-	}
 	for (long long i = 0; i < mailbox->nletters; i++)
-		letter_free(mailbox->type, &mailbox->letters[i]);
+		letter_free(&mailbox->letters[i]);
 	free(mailbox->letters);
-	if (mailbox->type == MAILBOX_MAILDIR)
-		(void) closedir(mailbox->val.maildir_cur);
+	(void) closedir(mailbox->cur);
 }
 
 static int
@@ -364,25 +204,13 @@ maildir_letter_seen(const char *name)
 int
 mailbox_letter_mark_unread(struct mailbox *mailbox, struct letter *letter)
 {
-	if (mailbox->type == MAILBOX_MAILDIR) {
-		if (maildir_letter_unset_flag(mailbox->val.maildir_cur, letter, 'S') == -1)
-			return -1;
-	}
-	else if (mailbox->type == MAILBOX_MBOX)
-		letter->ident.mbox.seen = 0;
-	return 0;
+	return maildir_letter_unset_flag(mailbox->cur, letter, 'S');
 }
 
 int
 mailbox_letter_mark_read(struct mailbox *mailbox, struct letter *letter)
 {
-	if (mailbox->type == MAILBOX_MAILDIR) {
-		if (maildir_letter_set_flag(mailbox->val.maildir_cur, letter, 'S') == -1)
-			return -1;
-	}
-	else if (mailbox->type == MAILBOX_MBOX)
-		letter->ident.mbox.seen = 1;
-	return 0;
+	return maildir_letter_set_flag(mailbox->cur, letter, 'S');
 }
 
 static int
@@ -392,7 +220,7 @@ maildir_letter_unset_flag(DIR *dir, struct letter *letter, char f)
 	size_t len;
 	int dfd;
 
-	path = letter->ident.maildir_path;
+	path = letter->path;
 
 	if (strlcpy(name, path, sizeof(name)) >= sizeof(name))
 		return -1;
@@ -418,7 +246,7 @@ maildir_letter_unset_flag(DIR *dir, struct letter *letter, char f)
 	if (t == NULL)
 		return -1;
 	free(path);
-	letter->ident.maildir_path = t;
+	letter->path = t;
 	return 0;
 }
 
@@ -428,7 +256,7 @@ maildir_letter_set_flag(DIR *dir, struct letter *letter, char f)
 	char name[NAME_MAX], *flags, *t, *path;
 	int n, dfd;
 
-	path = letter->ident.maildir_path;
+	path = letter->path;
 
 	if ((flags = strchr(path, ':')) == NULL)
 		return -1;
@@ -452,7 +280,7 @@ maildir_letter_set_flag(DIR *dir, struct letter *letter, char f)
 	if (t == NULL)
 		return -1;
 	free(path);
-	letter->ident.maildir_path = t;
+	letter->path = t;
 	return 0;
 }
 
@@ -518,12 +346,11 @@ fopenat(int at, const char *path)
 }
 
 void
-letter_free(int type, struct letter *letter)
+letter_free(struct letter *letter)
 {
 	free(letter->subject);
 	free(letter->from);
-	if (type == MAILBOX_MAILDIR)
-		free(letter->ident.maildir_path);
+	free(letter->path);
 }
 
 static int
@@ -547,15 +374,13 @@ letter_push(struct letter *letter, struct mailbox *mailbox)
 }
 
 int
-letter_read(FILE *fp, struct letter *letter, int type, int *seen, 
-	struct getline *gl)
+letter_read(FILE *fp, struct letter *letter, struct getline *gl)
 {
 	ssize_t len;
 
 	letter->subject = NULL;
 	letter->from = NULL;
 	letter->date = -1;
-	*seen = 0;
 	for (;;) {
 		struct header header;
 
@@ -570,10 +395,6 @@ letter_read(FILE *fp, struct letter *letter, int type, int *seen,
 		if (header_read(fp, gl, &header) == -1) {
 			warnx("invalid header");
 			goto letter;
-		}
-		if (type == MAILBOX_MBOX && strcmp(header.key, "Status") == 0) {
-			if (strchr(header.val, 'R') != NULL)
-				*seen = 1;
 		}
 		if (header_push(&header, letter) == -1) {
 			free(header.key);
@@ -845,21 +666,13 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	size_t lastnl;
 	ssize_t len;
 	struct header *h, *h2;
-	int c, rv;
+	int dfd, c, rv;
 
 	rv = -1;
-	assert(mailbox->type == MAILBOX_MBOX || mailbox->type == MAILBOX_MAILDIR);
 
-	if (mailbox->type == MAILBOX_MBOX) {
-		fp = mailbox->val.mbox_file;
-		if (fseek(fp, letter->ident.mbox.offset, SEEK_SET) == -1)
-			return -1;
-	}
-	if (mailbox->type == MAILBOX_MAILDIR) {
-		int dfd = dirfd(mailbox->val.maildir_cur);
-		if ((fp = fopenat(dfd, letter->ident.maildir_path)) == NULL)
-			return -1;
-	}
+	dfd = dirfd(mailbox->cur);
+	if ((fp = fopenat(dfd, letter->path)) == NULL)
+		return -1;
 
 	RB_INIT(&headers);
 
@@ -924,20 +737,6 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 		}
 		else
 			lastnl++;
-
-		if (c == '\n' && mailbox->type == MAILBOX_MBOX) {
-			/* Find next 'From' line */
-			char from[4];
-			size_t n;
-
-			if ((n = fread(from, 1, 4, fp)) == 0)
-				break;
-			if (n == 4 && memcmp(from, "From", 4) == 0)
-				break;
-			/* allow these characters to be dealth with as normal */
-			if (fseek(fp, - (long) n, SEEK_CUR) == -1)
-				goto headers;
-		}
 	}
 
 	if (ferror(fp))
@@ -956,7 +755,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	}
 
 	free(gl.line);
-	if (mailbox->type == MAILBOX_MAILDIR && fclose(fp) == EOF)
+	if (fclose(fp) == EOF)
 		rv = -1;
 	return rv;
 }
@@ -1044,7 +843,6 @@ equal_escape(FILE *fp)
 	return '=';
 }
 
-
 static char *
 dupstr(const char *str, size_t n)
 {
@@ -1059,22 +857,18 @@ dupstr(const char *str, size_t n)
 }
 
 int
-mailbox_letter_print_content(struct mailbox *mailbox, 
+mailbox_letter_print_content(struct mailbox *mailbox,
 	struct letter *letter, FILE *out)
 {
 	struct getline gl;
 	FILE *fp;
-	int c, type, rv;
+	int c, dfd, lastnl, rv;
 	struct letter tl;
 	struct tm *tm;
 	char date[33];
 	struct from from;
-	int lastnl, seen;
 
 	rv = -1;
-
-	type = mailbox->type;
-	assert(type == MAILBOX_MBOX || type == MAILBOX_MAILDIR);
 
 	if ((tm = localtime(&letter->date)) == NULL)
 		return -1;
@@ -1083,23 +877,14 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 	if (from_extract(letter->from, &from) == -1)
 		return -1;
 
-	if (type == MAILBOX_MBOX) {
-		fp = mailbox->val.mbox_file;
-		if (fseek(fp, letter->ident.mbox.offset, SEEK_SET) == -1)
-			return -1;
-	}
-	if (type == MAILBOX_MAILDIR) {
-		int dfd;
-
-		dfd = dirfd(mailbox->val.maildir_cur);
-		if ((fp = fopenat(dfd, letter->ident.maildir_path)) == NULL)
-			return -1;
-	}
+	dfd = dirfd(mailbox->cur);
+	if ((fp = fopenat(dfd, letter->path)) == NULL)
+		return -1;
 
 	gl.line = NULL;
 	gl.n = 0;
 	/* advances file pointer to just past the letter content */
-	if (letter_read(fp, &tl, type, &seen, &gl) == -1) {
+	if (letter_read(fp, &tl, &gl) == -1) {
 		free(gl.line);
 		goto fail;
 	}
@@ -1114,19 +899,6 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 		goto fail;
 	lastnl = 0;
 	while ((c = fgetc(fp)) != EOF) {
-		/* find next 'From' line */
-		if (type == MAILBOX_MBOX && c == '\n') {
-			char from[4];
-			size_t n;
-
-			if ((n = fread(from, 1, 4, fp)) == 0)
-				goto done;
-			if (memcmp(from, "From", 4) == 0)
-				break;
-			if (fseek(fp, - (long) n, SEEK_CUR) == -1)
-				goto fail;
-		}
-
 		if (lastnl) {
 			if (fputs("> ", out) == EOF)
 				goto fail;
@@ -1138,170 +910,15 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 		if (c == '\n')
 			lastnl = 1;
 	}
-	done:
 
 	if (ferror(fp))
 		goto fail;
 
 	rv = 0;
 	fail:
-	if (type == MAILBOX_MAILDIR) {
-		if (fclose(fp) == EOF)
-			rv = -1;
-	}
-	return rv;
-}
-
-/* 
- * flushes changes to mbox file, destructive to mailbox,
- * as it reorders the letters, and invalidates all offsets
- */
-static int
-mbox_flush(struct mailbox *mailbox)
-{
-	qsort(mailbox->letters, mailbox->nletters,
-		sizeof(*mailbox->letters), mbox_letter_cmp);
-	for (long long i = 0; i < mailbox->nletters; i++) {
-		if (!mailbox->letters[i].ident.mbox.seen)
-			continue;
-		if (mbox_rejig(mailbox, i) == -1)
-			return -1;
-	}
-	return 0;
-}
-
-static int
-mbox_rejig(struct mailbox *mailbox, size_t idx)
-{
-	struct getline gl;
-	struct letter *letter; 
-	FILE *fp;
-	int rv;
-
-	fp = mailbox->val.mbox_file;
-	letter = &mailbox->letters[idx];
-	rv = -1;
-
-	if (fseek(fp, letter->ident.mbox.offset, SEEK_SET) == -1)
-		return -1;
-
-	gl.line = NULL;
-	gl.n = 0;
-	for (;;) {
-		struct header header;
-		ssize_t len;
-		int same, hr;
-
-		if ((len = getline(&gl.line, &gl.n, fp)) == -1)
-			goto fail;
-		if (gl.line[len - 1] == '\n')
-			gl.line[len - 1] = '\0';
-		if (*gl.line == '\0')
-			break;
-		if (header_read(fp, &gl, &header) == -1)
-			goto fail;
-
-		same = strcmp(header.key, "Status") == 0;
-		hr = strchr(header.val, 'R') != NULL;
-
-		free(header.key);
-		free(header.val);
-
-		if (same) {
-			/* Status header already present with 'R', nothing to do. */
-			if (hr) {
-				free(gl.line);
-				return 0;
-			}
-			/* Append 'R' to the header */
-			if (fseek(fp, -1, SEEK_CUR) == -1)
-				goto fail;
-			if (fwriteat(fp, "R") == -1)
-				goto fail;
-			free(gl.line);
-			return 0;
-		}
-	}
-
-	if (fseek(fp, -1, SEEK_CUR) == -1)
-		goto fail;
-	if (fwriteat(fp, "Status: R\n") == -1)
-		goto fail;
-
-	rv = 0;
-	fail:
-	free(gl.line);
-	return rv;
-}
-
-static int
-fwriteat(FILE *fp, const char *str)
-{
-	int ch, tfd, fd, rv;
-	long off;
-	FILE *cp;
-	char path[] = "/tmp/mail/flush.XXXXXX";
-
-	rv = -1;
-
-	if ((fd = mkstemp(path)) == -1)
-		return -1;
-	if (unlink(path) == -1) {
-		(void) close(fd);
-		return -1;
-	}
-	if ((cp = fdopen(fd, "a+")) == NULL) {
-		(void) close(fd);
-		return -1;
-	}
-
-	if ((off = ftell(fp)) == -1)
-		goto fail;
-	while ((ch = fgetc(fp)) != EOF) {
-		if (fputc(ch, cp) == EOF)
-			goto fail;
-	}
-	if (ferror(fp))
-		goto fail;
-	if (fseek(cp, 0, SEEK_SET) == -1)
-		goto fail;
-	if (fseek(fp, off, SEEK_SET) == -1)
-		goto fail;
-	if ((tfd = fileno(fp)) == -1)
-		goto fail;
-	if (ftruncate(tfd, off) == -1)
-		goto fail;
-
-	if (fputs(str, fp) == EOF)
-		goto fail;
-	while ((ch = fgetc(cp)) != EOF) {
-		if (fputc(ch, fp) == EOF)
-			goto fail;
-	}
-
-	rv = 0;
-	fail:
-	if (fclose(cp) == -1)
+	if (fclose(fp) == EOF)
 		rv = -1;
 	return rv;
-}
-
-/* descending order based on offset */
-static int
-mbox_letter_cmp(const void *one, const void *two)
-{
-	const struct letter *n1 = one, *n2 = two;
-	long v1, v2;
-
-	v1 = n1->ident.mbox.offset;
-	v2 = n2->ident.mbox.offset;
-
-	if (v1 < v2)
-		return 1;
-	else if (v1 == v2)
-		return 0;
-	else
-		return -1;
 }
 
 int
@@ -1351,9 +968,9 @@ from_test(void)
 int
 letter_test(void)
 {
+	//NOLINTBEGIN(clang-analyzer-unix.Malloc)
 	FILE *fp;
 	struct letter letter;
-	int seen;
 	struct getline gl;
 
 	if (pledge("stdio rpath", NULL) == -1)
@@ -1365,7 +982,7 @@ letter_test(void)
 
 	gl.line = NULL;
 	gl.n = 0;
-	if (letter_read(fp, &letter, MAILBOX_MBOX, &seen, &gl) == -1) {
+	if (letter_read(fp, &letter, &gl) == -1) {
 		free(gl.line);
 		fclose(fp);
 		return 1;
@@ -1377,8 +994,6 @@ letter_test(void)
 		return 1;
 	if (letter.date != 1718936773)
 		return 1;
-	if (seen)
-		return 1;
 
 	free(letter.subject);
 	free(letter.from);
@@ -1386,21 +1001,5 @@ letter_test(void)
 	free(gl.line);
 
 	return 0;
-}
-
-int
-mbox_test(void)
-{
-	struct mailbox mailbox;
-
-	if (pledge("stdio rpath wpath", NULL) == -1)
-		err(1, "pledge");
-	if (mailbox_setup("tests/mbox", &mailbox) == -1)
-		return 1;
-	if (pledge("stdio", NULL) == -1)
-		err(1, "pledge");
-	if (mailbox_read(&mailbox, 1) == -1)
-		return 1;
-	mailbox_free(&mailbox);
-	return 0;
+	//NOLINTEND(clang-analyzer-unix.Malloc)
 }

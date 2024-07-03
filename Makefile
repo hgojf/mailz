@@ -12,7 +12,7 @@ TIDYCHECKS = \
 OBJS_COMPAT = $(SRCS_COMPAT:.c=.o)
 DEPS_COMPAT = $(SRCS_COMPAT:.c=.d)
 
-SRCS = date.c lock.c mail.c mailbox.c sendmail.c
+SRCS = date.c mail.c mailbox.c sendmail.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
 

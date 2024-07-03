@@ -31,7 +31,6 @@
 #include <unistd.h>
 
 #include "config.h"
-#include "lock.h"
 #include "mail.h"
 #include "mailbox.h"
 #include "pathnames.h"
@@ -71,6 +70,7 @@ static int command_cmp(const void *, const void *);
 static int configure(struct options *);
 static const char *config_location(void);
 static void options_free(struct options *);
+static int unveilat(const char *, const char *, const char *);
 static void usage(void);
 
 static int ignore(struct options *, char *);
@@ -158,7 +158,7 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if (unveil(PATH_MAILZWRAPPER, "x") == -1)
 		err(1, "unveil");
-	if (pledge("stdio rpath cpath wpath proc exec flock unveil", NULL) == -1)
+	if (pledge("stdio rpath cpath wpath proc exec unveil", NULL) == -1)
 		err(1, "pledge");
 
 	if (subject != NULL) {
@@ -204,47 +204,17 @@ main(int argc, char *argv[])
 	}
 	/* else */
 
-	if (unveil(argv[0], "rwc") == -1)
+	if (unveil(argv[0], "rc") == -1)
 		err(1, "unveil");
 
 	if (mailbox_setup(argv[0], &mailbox) == -1)
 		err(1, "mailbox_setup");
 
-	/* only need 'cur' directory for maildir */
-	if (mailbox.type == MAILBOX_MAILDIR) {
-		char path[PATH_MAX];
-		int n;
-
-		n = snprintf(path, sizeof(path), "%s/cur", argv[0]);
-		if (n < 0)
-			err(1, "snprintf");
-		/* 
-		 * could happen because earlier accesses use *at functions 
-		 * instead of the entire path
-		 */
-		if ( (size_t) n >= sizeof(path))
-			errx(1, "snprintf truncation");
-		if (unveil(path, "crw") == -1)
-			err(1, "unveil");
-		if (unveil(argv[0], "") == -1)
-			err(1, "unveil");
-		if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
-			err(1, "pledge");
-	}
-
-	if (mailbox.type == MAILBOX_MBOX) {
-		int fd;
-
-		if ((fd = fileno(mailbox.val.mbox_file)) == -1)
-			err(1, "fileno");
-		/* dont need to reopen this ever */
-		if (unveil(argv[0], "") == -1)
-			err(1, "unveil");
-		if (lock_interactive(fd, 0, "mbox") == -1)
-			err(1, "flock_interactive");
-		if (pledge("stdio rpath cpath wpath proc exec flock", NULL) == -1)
-			err(1, "pledge");
-	}
+	/* only need 'cur' directory */
+	if (unveilat(argv[0], "cur", "cr") == -1)
+		err(1, "unveil");
+	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
+		err(1, "pledge");
 
 	if (mailbox_read(&mailbox, options.view_seen) == -1) {
 		warnx("mailbox_read");
@@ -313,36 +283,35 @@ main(int argc, char *argv[])
 	good:
 	rv = 0;
 	fail:
-	if (mailbox.type == MAILBOX_MBOX) {
-		int fd;
-
-		if ((fd = fileno(mailbox.val.mbox_file)) == -1)
-			err(1, "fileno");
-
-		/* drop our lock to avoid deadlock */
-		/* dont flush mbox changes if locking fails */
-		if (unlock(fd) == -1)
-			rv = 1;
-		else if (lock_interactive(fd, 1, "mbox") == -1)
-			rv = 1;
-		else if (mailbox_close(&mailbox) == -1)
-			rv = 1;
-		/* at least try to unlock, even if others failed */
-		if (unlock(fd) == -1)
-			rv = 1;
-	}
-	else if (mailbox_close(&mailbox) == -1)
-		rv = 1;
-	mailbox_free(&mailbox);
-	if (rmdir("/tmp/mail") == -1 && errno != ENOTEMPTY && errno != ENOENT) {
+	if (pledge("stdio cpath", NULL) == -1)
+		err(1, "pledge");
+	if (rmdir("/tmp/mail") == -1 && errno != ENOTEMPTY) {
 		warn("rmdir");
 		rv = 1;
 	}
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
+	mailbox_free(&mailbox);
 	free(line);
 	options_free(&options);
 	return rv;
+}
+
+static int
+unveilat(const char *dir, const char *path, const char *perm)
+{
+	char p[PATH_MAX];
+	int n;
+
+	n = snprintf(p, sizeof(p), "%s/%s", dir, path);
+	if (n < 0)
+		return -1;
+	if ((size_t)n >= sizeof(p)) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	return unveil(p, perm);
 }
 
 static void

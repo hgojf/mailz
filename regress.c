@@ -43,7 +43,6 @@ struct test tests[] =
 	{ "date", date_test },
 	{ "from", from_test },
 	{ "letter", letter_test },
-	{ "mbox", mbox_test },
 };
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))

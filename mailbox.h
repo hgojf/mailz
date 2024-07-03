@@ -20,27 +20,15 @@ struct letter {
 	char *subject;
 	char *from;
 	time_t date;
-	union {
-		char *maildir_path;
-		struct {
-			long offset;
-			int seen;
-		} mbox;
-	} ident;
+
+	char *path;
 };
 
 struct mailbox {
-	#define MAILBOX_MAILDIR 0
-	#define MAILBOX_MBOX 1
-	int type;
-
 	long long nletters;
 	struct letter *letters;
 
-	union {
-		DIR *maildir_cur;
-		FILE *mbox_file;
-	} val;
+	DIR *cur;
 };
 
 struct from {
@@ -50,14 +38,13 @@ struct from {
 	char *name;
 };
 
-int mailbox_close(struct mailbox *);
 void mailbox_free(struct mailbox *);
 int mailbox_setup(const char *, struct mailbox *);
 int mailbox_read(struct mailbox *, int);
 int mailbox_print(struct mailbox *, size_t, size_t);
 int mailbox_letter_print(size_t, struct letter *);
-int mailbox_letter_print_content(struct mailbox *, struct letter *,
-	FILE *);
+int mailbox_letter_print_content(struct mailbox *,
+	struct letter *, FILE *);
 int mailbox_letter_print_read(struct mailbox *, struct letter *,
 	const struct options *, FILE *);
 int mailbox_letter_mark_read(struct mailbox *, struct letter *);
@@ -68,6 +55,5 @@ int from_extract(char *, struct from *);
 #ifdef REGRESS
 int from_test(void);
 int letter_test(void);
-int mbox_test(void);
 #endif /* REGRESS */
 #endif /* MAILZ_MAILBOX_H */
