@@ -968,11 +968,12 @@ from_test(void)
 int
 letter_test(void)
 {
-	//NOLINTBEGIN(clang-analyzer-unix.Malloc)
 	FILE *fp;
 	struct letter letter;
 	struct getline gl;
+	int rv;
 
+	rv = 1;
 	if (pledge("stdio rpath", NULL) == -1)
 		err(1, "pledge");
 	if ((fp = fopen("tests/letter", "r")) == NULL)
@@ -989,17 +990,18 @@ letter_test(void)
 	}
 
 	if (strcmp(letter.from, "A friend <gary@nota.realdomain>") != 0)
-		return 1;
+		goto fail;
 	if (letter.subject == NULL || strcmp(letter.subject, "Test mail") != 0)
-		return 1;
+		goto fail;
 	if (letter.date != 1718936773)
-		return 1;
+		goto fail;
 
+	rv = 0;
+	fail:
 	free(letter.subject);
 	free(letter.from);
-	fclose(fp);
+	(void) fclose(fp);
 	free(gl.line);
 
-	return 0;
-	//NOLINTEND(clang-analyzer-unix.Malloc)
+	return rv;
 }
