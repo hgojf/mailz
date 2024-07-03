@@ -69,6 +69,7 @@ static int header_ignore(struct header *, const struct options *);
 static int header_push(struct header *, struct letter *);
 static int header_push2(struct header *, struct headers *);
 static int header_read(FILE *, struct getline *, struct header *);
+static int header_read1(FILE *, struct getline *, struct header *, int);
 
 static int letter_cmp(const void *, const void *);
 static void letter_free(int, struct letter *);
@@ -706,6 +707,12 @@ strip_trailing(char *p)
 static int
 header_read(FILE *fp, struct getline *gl, struct header *out)
 {
+	return header_read1(fp, gl, out, 1);
+}
+
+static int
+header_read1(FILE *fp, struct getline *gl, struct header *out, int tv)
+{
 	size_t vlen;
 
 	if ((out->val = strchr(gl->line, ':')) == NULL)
@@ -713,10 +720,11 @@ header_read(FILE *fp, struct getline *gl, struct header *out)
 	*out->val++ = '\0';
 	/* strip leading ws */
 	out->val += strspn(out->val, " \t");
-	(void) strip_trailing(out->val);
+	if (tv)
+		strip_trailing(out->val);
 
 	out->key = gl->line;
-	(void) strip_trailing(out->val);
+	strip_trailing(out->key);
 
 	for (size_t i = 0; out->key[i] != '\0'; i++) {
 		if (!isprint( (unsigned char) out->key[i]))
@@ -750,12 +758,17 @@ header_read(FILE *fp, struct getline *gl, struct header *out)
 
 		if ((len = getline(&gl->line, &gl->n, fp)) == -1)
 			goto val;
-		if (gl->line[len - 1] == '\n')
+		if (tv && gl->line[len - 1] == '\n')
 			gl->line[len - 1] = '\0';
 
-		line = gl->line + strspn(gl->line, " \t");
-		e = strip_trailing(line);
-		len = e - line;
+		if (tv) {
+			line = gl->line + strspn(gl->line, " \t");
+			e = strip_trailing(line);
+			len = e - line;
+		}
+		else
+			line = gl->line;
+		/* len is fine as is */
 
 		for (size_t i = 0; line[i] != '\0'; i++) {
 			if (!isascii( (unsigned char) line[i]))
@@ -859,7 +872,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 			gl.line[len - 1] = '\0';
 		if (*gl.line == '\0')
 			break;
-		if (header_read(fp, &gl, &header) == -1)
+		if (header_read1(fp, &gl, &header, 0) == -1)
 			goto headers;
 		if (header_push2(&header, &headers) == -1)
 			goto headers;
