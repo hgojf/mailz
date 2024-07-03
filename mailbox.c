@@ -168,13 +168,7 @@ mailbox_read(struct mailbox *out, int view_seen)
 	free(gl.line);
 	if (fp != NULL && fclose(fp) == EOF)
 		rv = -1;
-	if (rv == -1) {
-		for (long long i = 0; i < out->nletters; i++)
-			letter_free(&out->letters[i]);
-		free(out->letters);
-		(void) closedir(mdir);
-	}
-	else {
+	if (rv != -1) {
 		qsort(out->letters, out->nletters, sizeof(*out->letters),
 			letter_cmp);
 	}
