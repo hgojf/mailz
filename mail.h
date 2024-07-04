@@ -19,7 +19,6 @@
 struct options {
 	long long msg;
 	int view_seen;
-	unsigned int linewrap;
 	int edit_mode;
 
 	size_t nignore;

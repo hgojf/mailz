@@ -661,22 +661,6 @@ set(struct options *options, char *args)
 		free(options->address.str);
 		options->address = s;
 	}
-	else if (strcmp(var, "linewrap") == 0) {
-		unsigned int lr;
-		const char *errstr;
-
-		if (val != NULL) {
-			lr = strtonum(val, 0, UINT_MAX, &errstr);
-			if (errstr != NULL) {
-				if (fprintf(stderr, "linewrap was %s\n", errstr) < 0)
-					return COMMAND_FATAL;
-				return COMMAND_USAGE;
-			}
-		}
-		else
-			lr = 72;
-		options->linewrap = lr;
-	}
 	else if (strcmp(var, "edit") == 0) {
 		if (strcmp(val, "vi") == 0)
 			options->edit_mode = EDIT_VI;

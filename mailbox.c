@@ -620,7 +620,6 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	struct headers headers;
 	struct getline gl;
 	FILE *fp;
-	size_t lastnl;
 	ssize_t len;
 	struct header *h, *h2;
 	int dfd, c, rv;
@@ -674,7 +673,6 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	if (fputc('\n', out) == EOF)
 		goto headers;
 
-	lastnl = 0;
 	while ((c = fgetc(fp)) != EOF) {
 		if (c == '=' && (c = equal_escape(fp)) == EOF)
 			goto headers;
@@ -684,16 +682,6 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 		}
 		else if (fputc(c, out) == EOF)
 				goto headers;
-
-		if (c == '\n')
-			lastnl = 0;
-		else if (options->linewrap != 0 && lastnl == options->linewrap) {
-			if (fputc('\n', out) == EOF)
-				goto headers;
-			lastnl = 0;
-		}
-		else
-			lastnl++;
 	}
 
 	if (ferror(fp))
