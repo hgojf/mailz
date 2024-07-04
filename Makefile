@@ -12,7 +12,7 @@ TIDYCHECKS = \
 OBJS_COMPAT = $(SRCS_COMPAT:.c=.o)
 DEPS_COMPAT = $(SRCS_COMPAT:.c=.d)
 
-SRCS = date.c mail.c mailbox.c sendmail.c
+SRCS = address.c date.c mail.c mailbox.c sendmail.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
 
@@ -38,8 +38,8 @@ install:
 install-man:
 	$(INSTALL) -m 0644 mailz.1 ${PREFIX}/man/man1/
 
-regress: date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
-	$(CC) -o $@ ${LDFLAGS} date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
+regress: address.c date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
+	$(CC) -o $@ ${LDFLAGS} address.c date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
 
 tags: ${SRCS}
 	$(CTAGS) ${SRCS}

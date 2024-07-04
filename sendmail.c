@@ -24,6 +24,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "address.h"
 #include "config.h"
 #include "pathnames.h"
 #include "sendmail.h"
@@ -153,8 +154,7 @@ setup_mail(const struct sendmail *letter, char *path)
 
 	rv = -1;
 
-	assert(letter->from.addr != NULL);
-	assert(letter->from.name != NULL);
+	assert(letter->from.str != NULL);
 	assert(letter->to != NULL);
 	/* assert(letter->subject != NULL); */
 
@@ -185,7 +185,7 @@ setup_mail(const struct sendmail *letter, char *path)
 		return -1;
 	}
 
-	if (fprintf(fp, "From: %s <%s>\n", letter->from.name, letter->from.addr) < 0) {
+	if (fprintf(fp, "From: %s\n", letter->from.str) < 0) {
 		warn("fprintf");
 		goto fp;
 	}

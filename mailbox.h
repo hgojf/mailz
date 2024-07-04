@@ -18,7 +18,7 @@
 #define MAILZ_MAILBOX_H
 struct letter {
 	char *subject;
-	char *from;
+	struct from_safe from;
 	time_t date;
 
 	char *path;
@@ -29,13 +29,6 @@ struct mailbox {
 	struct letter *letters;
 
 	DIR *cur;
-};
-
-struct from {
-	int al; /* length of addr */
-	int nl; /* length of name */
-	char *addr;
-	char *name;
 };
 
 void mailbox_free(struct mailbox *);
@@ -50,10 +43,7 @@ int mailbox_letter_print_read(struct mailbox *, struct letter *,
 int mailbox_letter_mark_read(struct mailbox *, struct letter *);
 int mailbox_letter_mark_unread(struct mailbox *, struct letter *);
 
-int from_extract(char *, struct from *);
-
 #ifdef REGRESS
-int from_test(void);
 int letter_test(void);
 #endif /* REGRESS */
 #endif /* MAILZ_MAILBOX_H */

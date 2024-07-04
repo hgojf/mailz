@@ -31,7 +31,7 @@ struct options {
 	size_t nreorder;
 	char **reorder;
 
-	char *address;
-	char *name;
+	/* from.str possibly NULL */
+	struct from_safe address;
 };
 #endif /* MAILZ_MAIL_H */

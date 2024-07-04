@@ -30,6 +30,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "address.h"
 #include "config.h"
 #include "mail.h"
 #include "mailbox.h"
@@ -176,16 +177,14 @@ main(int argc, char *argv[])
 			return 1;
 		}
 
-		if (options.address == NULL || options.name == NULL) {
+		if (options.address.str == NULL) {
 			options_free(&options);
 			if (fputs("Must set an email address and real name\n", stderr) == EOF)
 				return 1;
 			return EX_USAGE;
 		}
 
-		letter.from.addr = options.address;
-		letter.from.name = options.name;
-
+		letter.from = options.address;
 		letter.subject = subject;
 		letter.to = argv[0];
 
@@ -317,8 +316,7 @@ unveilat(const char *dir, const char *path, const char *perm)
 static void
 options_free(struct options *options)
 {
-	free(options->address);
-	free(options->name);
+	free(options->address.str);
 	for (size_t i = 0; i < options->nreorder; i++) {
 		free(options->reorder[i]);
 	}
@@ -554,8 +552,8 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 
 	rv = -1;
 
-	if (options->address == NULL || options->name == NULL) {
-		if (fprintf(stderr, "must set an email address and real name\n") < 0)
+	if (options->address.str == NULL) {
+		if (fprintf(stderr, "must set an email address\n") < 0)
 			return COMMAND_FATAL;
 		return -1;
 	}
@@ -573,8 +571,7 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 		letter = &mailbox->letters[idx - 1];
 	}
 
-	if (from_extract(letter->from, &from) == -1)
-		return -1;
+	from_extract(&letter->from, &from);
 
 	if ((fd = mkstemp(path)) == -1)
 		return -1;
@@ -593,8 +590,7 @@ reply(struct mailbox *mailbox, struct options *options, char *args)
 
 	send.seed = fp;
 
-	send.from.addr = options->address;
-	send.from.name = options->name;
+	send.from = options->address;
 	send.tl = strlen(from.addr) - 1;
 	send.to = from.addr;
 
@@ -641,7 +637,6 @@ static int
 set(struct options *options, char *args)
 {
 	const char *var, *val;
-	char *orig;
 
 	if ((var = strsep(&args, " \t")) == NULL) {
 		return COMMAND_USAGE;
@@ -649,15 +644,22 @@ set(struct options *options, char *args)
 	val = args;
 
 	if (strcmp(var, "address") == 0) {
+		struct from_safe s;
+		char *v;
+
 		if (val == NULL) {
 			return COMMAND_USAGE;
 		}
-		orig = options->address;
-		if ((options->address = strdup(val)) == NULL) {
-			warn("strdup");
-			return -1;
+		if ((v = strdup(val)) == NULL)
+			return COMMAND_FATAL;
+		if (from_safe_new(v, &s) == -1) {
+			free(v);
+			if (fputs("invalid email address", stderr) == EOF)
+				return COMMAND_FATAL;
+			return COMMAND_USAGE;
 		}
-		free(orig);
+		free(options->address.str);
+		options->address = s;
 	}
 	else if (strcmp(var, "linewrap") == 0) {
 		unsigned int lr;
@@ -674,19 +676,6 @@ set(struct options *options, char *args)
 		else
 			lr = 72;
 		options->linewrap = lr;
-	}
-	else if (strcmp(var, "name") == 0) {
-		if (val == NULL) {
-			if (fputs("need a value\n", stderr) == EOF)
-				return COMMAND_FATAL;
-			return COMMAND_USAGE;
-		}
-		orig = options->name;
-		if ((options->name = strdup(val)) == NULL) {
-			warn("strdup");
-			return -1;
-		}
-		free(orig);
 	}
 	else if (strcmp(var, "edit") == 0) {
 		if (strcmp(val, "vi") == 0)
@@ -713,8 +702,8 @@ send(__unused struct mailbox *mailbox, struct options *options, char *args)
 {
 	struct sendmail letter;
 
-	if (options->address == NULL || options->name == NULL) {
-		if (fputs("must set an email address and real name\n", stderr) == EOF)
+	if (options->address.str == NULL) {
+		if (fputs("must set an email address\n", stderr) == EOF)
 			return COMMAND_FATAL;
 		return -1;
 	}
@@ -723,8 +712,7 @@ send(__unused struct mailbox *mailbox, struct options *options, char *args)
 		return COMMAND_USAGE;
 	}
 	letter.tl = strlen(letter.to);
-	letter.from.addr = options->address;
-	letter.from.name = options->name;
+	letter.from = options->address;
 	letter.subject = args;
 	letter.re = 0;
 	letter.seed = NULL;

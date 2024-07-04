@@ -17,10 +17,7 @@
 #ifndef MAILZ_SENDMAIL_H
 #define MAILZ_SENDMAIL_H
 struct sendmail {
-	struct {
-		const char *addr;
-		const char *name;
-	} from;
+	struct from_safe from;
 	const char *subject; /* maybe NULL */
 	int re;
 	int tl;

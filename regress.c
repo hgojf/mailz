@@ -26,6 +26,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "address.h"
 #include "config.h"
 #include "date.h"
 #include "mail.h"

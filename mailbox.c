@@ -37,6 +37,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "address.h"
 #include "date.h"
 #include "mail.h"
 #include "mailbox.h"
@@ -286,8 +287,7 @@ mailbox_letter_print(size_t nth, struct letter *letter)
 	char date[30];
 	struct from from;
 
-	if (from_extract(letter->from, &from) == -1)
-		return -1;
+	from_extract(&letter->from, &from);
 
 	if ((tm = localtime(&letter->date)) == NULL
 			|| strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
@@ -343,7 +343,7 @@ void
 letter_free(struct letter *letter)
 {
 	free(letter->subject);
-	free(letter->from);
+	free(letter->from.str);
 	free(letter->path);
 }
 
@@ -373,7 +373,7 @@ letter_read(FILE *fp, struct letter *letter, struct getline *gl)
 	ssize_t len;
 
 	letter->subject = NULL;
-	letter->from = NULL;
+	letter->from.str = NULL;
 	letter->date = -1;
 	for (;;) {
 		struct header header;
@@ -400,7 +400,7 @@ letter_read(FILE *fp, struct letter *letter, struct getline *gl)
 	if (ferror(fp))
 		goto letter;
 
-	if (letter->from == NULL || letter->date == -1) {
+	if (letter->from.str == NULL || letter->date == -1) {
 		warnx("letter missing From or Date headers");
 		goto letter;
 	}
@@ -409,46 +409,8 @@ letter_read(FILE *fp, struct letter *letter, struct getline *gl)
 
 	letter:
 	free(letter->subject);
-	free(letter->from);
+	free(letter->from.str);
 	return -1;
-}
-
-int
-from_extract(char *from, struct from *out)
-{
-	char *m;
-	size_t al, nl;
-
-	if ((m = strchr(from, '<')) != NULL) {
-		al = strlen(m) - 2;
-		if (al > INT_MAX)
-			return -1;
-		nl = (m - from);
-		if (m != from) /* addresses in the form '<addr>' */
-			nl -= 1;
-		if (nl > INT_MAX)
-			return -1;
-
-		if (m[al + 1] != '>')
-			return -1;
-
-		out->addr = m + 1;
-		out->al = al;
-		out->name = from;
-		out->nl = nl;
-	}
-	else {
-		al = strlen(from);
-		if (al > INT_MAX)
-			return -1;
-
-		out->addr = from;
-		out->al = al;
-		out->nl = 0;
-		out->name = NULL;
-	}
-
-	return 0;
 }
 
 static int
@@ -462,10 +424,11 @@ header_push(struct header *header, struct letter *letter)
 		return 0;
 	}
 	else if (!strcasecmp(header->key, "From")) {
-		if (letter->from != NULL)
+		if (letter->from.str != NULL)
 			return -1;
 		/* takes ownership of header->val on success */
-		letter->from = header->val;
+		if (from_safe_new(header->val, &letter->from) == -1)
+			return -1;
 		free(header->key);
 		return 0;
 	}
@@ -868,8 +831,7 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 		return -1;
 	if (strftime(date, sizeof(date), "%a, %b %e, %Y at %H:%M %z", tm) == 0)
 		return -1;
-	if (from_extract(letter->from, &from) == -1)
-		return -1;
+	from_extract(&letter->from, &from);
 
 	dfd = dirfd(mailbox->cur);
 	if ((fp = fopenat(dfd, letter->path)) == NULL)
@@ -883,7 +845,7 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 		goto fail;
 	}
 	free(tl.subject);
-	free(tl.from);
+	free(tl.from.str);
 	free(gl.line);
 
 	if (fprintf(out, "On %s, %.*s wrote:\n", date, from.nl, from.name) < 0)
@@ -916,50 +878,6 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 }
 
 int
-from_test(void)
-{
-	struct from from;
-	char *addr;
-
-	if (pledge("stdio", NULL) == -1)
-		err(1, "pledge");
-
-	addr = "Hello <user@invalid.gfy";
-	if (from_extract(addr, &from) != -1)
-		return 1;
-
-	memset(&from, 0, sizeof(from));
-
-	addr = "User <guy@valid.com>";
-	if (from_extract(addr, &from) == -1)
-		return 1;
-	if (from.al != 13
-		|| strncmp(from.addr, "guy@valid.com", 13) != 0
-		|| from.nl != 4
-		|| strncmp(from.name, "User", 4) != 0)
-		return 1;
-
-	memset(&from, 0, sizeof(from));
-
-	addr = "guy@valid.com";
-	if (from_extract(addr, &from) == -1)
-		return 1;
-	if (from.al != 13 
-		|| strncmp(from.addr, "guy@valid.com", 13) != 0
-		|| from.nl != 0)
-		return 1;
-
-	addr = "<odd@mail.com>";
-	if (from_extract(addr, &from) == -1)
-		return 1;
-	if (from.nl != 0
-		|| from.al != 12
-		|| strncmp(from.addr, "odd@mail.com", 12) != 0)
-		return 1;
-	return 0;
-}
-
-int
 letter_test(void)
 {
 	FILE *fp;
@@ -983,7 +901,7 @@ letter_test(void)
 		return 1;
 	}
 
-	if (strcmp(letter.from, "A friend <gary@nota.realdomain>") != 0)
+	if (strcmp(letter.from.str, "A friend <gary@nota.realdomain>") != 0)
 		goto fail;
 	if (letter.subject == NULL || strcmp(letter.subject, "Test mail") != 0)
 		goto fail;
@@ -993,7 +911,7 @@ letter_test(void)
 	rv = 0;
 	fail:
 	free(letter.subject);
-	free(letter.from);
+	free(letter.from.str);
 	(void) fclose(fp);
 	free(gl.line);
 

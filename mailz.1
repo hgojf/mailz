@@ -99,14 +99,13 @@ command, and are documented here.
 .Bl -tag -width linewrap
 .It Ic address
 sets the address to be used when sending mail.
+this address can be in the form "Real Name <addr>" or "addr".
 .It Ic linewrap
 sets the line length at which lines will be wrapped when outputting mail.
 if no argument is provided,
 .Sy linewrap
 will be set to 72.
 if set to 0 (the default), no line wrapping will be performed.
-.It Ic name
-sets the real name to be used when sending mail.
 .It Ic edit
 sets the editing mode to be used when sending mail.
 the argument can either be
