@@ -33,7 +33,6 @@
 #include <unistd.h>
 
 #include "address.h"
-#include "date.h"
 #include "mail.h"
 #include "mailbox.h"
 
@@ -74,7 +73,10 @@ static int maildir_letter_set_flag(DIR *, struct letter *, char);
 static int maildir_letter_unset_flag(DIR *, struct letter *, char);
 static int maildir_letter_seen(const char *);
 
+#define TZ_INVALIDSEC 1
+
 static char *dupstr(const char *, size_t);
+static time_t rfc5322_dateparse(const char *);
 static char *strip_trailing(char *);
 
 int
@@ -445,6 +447,31 @@ header_push(struct header *header, struct letter *letter)
 		free(header->val);
 		return 0;
 	}
+}
+
+static time_t
+rfc5322_dateparse(const char *s)
+{
+	const char *fmt;
+	struct tm tm;
+	time_t rv;
+	long off;
+
+	if (strchr(s, ',') != NULL)
+		fmt = "%a, %d %b %Y %H:%M:%S %z";
+	else
+		fmt = "%d %b %Y %H:%M:%S %z";
+
+	memset(&tm, 0, sizeof(tm));
+	if (strptime(s, fmt, &tm) == NULL)
+		return -1;
+
+	/* timegm mangles tm_gmtoff */
+	off = tm.tm_gmtoff;
+	if ((rv = timegm(&tm)) == -1)
+		return -1;
+
+	return rv - off;
 }
 
 static int

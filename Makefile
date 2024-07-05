@@ -7,7 +7,7 @@ CFLAGS += -O2 -g
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
-SRCS = address.c date.c mail.c mailbox.c sendmail.c
+SRCS = address.c mail.c mailbox.c sendmail.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
 
