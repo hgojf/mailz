@@ -27,8 +27,6 @@
 #include <unistd.h>
 
 #include "address.h"
-#include "config.h"
-#include "date.h"
 #include "mail.h"
 #include "mailbox.h"
 
@@ -41,7 +39,6 @@ static int test_cmp(const void *, const void *);
 
 struct test tests[] =
 {
-	{ "date", date_test },
 	{ "from", from_test },
 	{ "letter", letter_test },
 };

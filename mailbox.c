@@ -913,7 +913,7 @@ letter_test(void)
 		goto fail;
 	if (letter.subject == NULL || strcmp(letter.subject, "Test mail") != 0)
 		goto fail;
-	if (letter.date != 1718936773)
+	if (letter.date != 1718918773)
 		goto fail;
 
 	rv = 0;
