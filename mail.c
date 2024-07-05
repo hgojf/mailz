@@ -200,10 +200,15 @@ main(int argc, char *argv[])
 	/* only need 'cur' directory */
 	if (unveilat(argv[0], "cur", "cr") == -1)
 		err(1, "unveil");
+	if (unveilat(argv[0], ".mailzcache", "cwr") == -1)
+		err(1, "unveil");
 	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
 		err(1, "pledge");
 
-	if (mailbox_read(&mailbox, options.view_seen) == -1) {
+	if (configure(&options) == -1)
+		goto fail;
+
+	if (mailbox_read(&mailbox, options.view_seen, options.cache) == -1) {
 		warnx("mailbox_read");
 		goto fail;
 	}
@@ -213,9 +218,6 @@ main(int argc, char *argv[])
 			goto fail;
 		goto good;
 	}
-
-	if (configure(&options) == -1)
-		goto fail;
 
 	if (mailbox_print(&mailbox, 0, mailbox.nletters) == -1)
 		goto fail;
@@ -270,15 +272,15 @@ main(int argc, char *argv[])
 	good:
 	rv = 0;
 	fail:
-	if (pledge("stdio cpath", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
 	if (rmdir("/tmp/mail") == -1 && errno != ENOTEMPTY) {
 		warn("rmdir");
 		rv = 1;
 	}
+	mailbox_free(&mailbox);
 	if (pledge("stdio", NULL) == -1)
 		err(1, "pledge");
-	mailbox_free(&mailbox);
 	free(line);
 	options_free(&options);
 	return rv;
@@ -648,6 +650,11 @@ set(struct options *options, char *args)
 		}
 		free(options->address.str);
 		options->address = s;
+	}
+	else if (strcmp(var, "cache") == 0) {
+		if (val != NULL)
+			return COMMAND_USAGE;
+		options->cache = 1;
 	}
 	else if (strcmp(var, "edit") == 0) {
 		if (strcmp(val, "vi") == 0)

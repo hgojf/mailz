@@ -29,11 +29,16 @@ struct mailbox {
 	struct letter *letters;
 
 	DIR *cur;
+
+	/* cache stuff */
+	int do_cache;
+	int view_seen;
+	const char *root;
 };
 
 void mailbox_free(struct mailbox *);
 int mailbox_setup(const char *, struct mailbox *);
-int mailbox_read(struct mailbox *, int);
+int mailbox_read(struct mailbox *, int, int);
 int mailbox_print(struct mailbox *, size_t, size_t);
 int mailbox_letter_print(size_t, struct letter *);
 int mailbox_letter_print_content(struct mailbox *,

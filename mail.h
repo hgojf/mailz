@@ -20,6 +20,7 @@ struct options {
 	long long msg;
 	int view_seen;
 	int edit_mode;
+	int cache;
 
 	size_t nignore;
 	char **ignore;

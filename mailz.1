@@ -1,4 +1,4 @@
-.Dd $Mdocdate: Jun 30 2024$
+.Dd $Mdocdate: Jul 5 2024$
 .Dt mailz 1
 .Sh NAME
 .Nm mailz
@@ -100,6 +100,11 @@ command, and are documented here.
 .It Ic address
 sets the address to be used when sending mail.
 this address can be in the form "Real Name <addr>" or "addr".
+.It Ic cache
+if enabled, 
+.Nm
+will create an index file containing information on each letter inside
+the root of the mailbox specified. this option is disabled by default.
 .It Ic edit
 sets the editing mode to be used when sending mail.
 the argument can either be
@@ -115,7 +120,7 @@ this option defaults to
 .Em vi
 .El
 .Sh FILES
-.Bl -tag -width /tmp/mail/letter.* -compact
+.Bl -tag -width ${mailbox}/.mailzcache -compact
 .It Pa ~/.mailzrc
 file containing initial commands to be run;
 can be overridden by setting the
@@ -127,6 +132,8 @@ temporary files
 letters saved by the
 .Sy save
 command.
+.It Pa ${mailbox}/.mailzcache
+index files created for caching
 .El
 .Sh EXIT STATUS
 The

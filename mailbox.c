@@ -23,10 +23,12 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <err.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <strings.h>
 #include <time.h>
@@ -68,6 +70,31 @@ static void letter_free(struct letter *);
 static int letter_push(struct letter *, struct mailbox *);
 static int letter_read(FILE *, struct letter *, struct getline *);
 
+struct maildir_cache_letter {
+	char *path;
+	char *subject;
+	struct from_safe from;
+	time_t date;
+};
+
+struct maildir_cache {
+	time_t mtim;
+	int view_seen;
+
+	size_t nletters;
+	struct maildir_cache_letter *letters;
+};
+
+#define MAILDIR_CACHE_CHECK_MASK 	0xFFFFFF00
+#define MAILDIR_CACHE_VERSION_MASK 	0x000000FF
+#define MAILDIR_CACHE_MAGIC			0x48414D00
+#define MAILDIR_CACHE_VERSION		0
+
+static struct maildir_cache_letter 
+	*maildir_cache_find(struct maildir_cache *, const char *);
+static int maildir_cache_read(const char *, struct maildir_cache *);
+static int maildir_cache_write(struct mailbox *);
+
 static DIR *maildir_setup(int);
 static int maildir_letter_set_flag(DIR *, struct letter *, char);
 static int maildir_letter_unset_flag(DIR *, struct letter *, char);
@@ -99,33 +126,98 @@ mailbox_setup(const char *path, struct mailbox *out)
 		return -1;
 	}
 
+	out->root = path;
+	out->view_seen = 0;
+	out->do_cache = 0;
+
 	return 0;
 }
 
 int
-mailbox_read(struct mailbox *out, int view_seen)
+mailbox_read(struct mailbox *out, int view_seen, int do_cache)
 {
+	struct stat sb;
+	struct maildir_cache cache;
 	struct getline gl;
-	FILE *fp;
 	DIR *mdir;
-	int dfd, rv;
+	int have_cache, dfd, rv;
 
 	rv = -1;
 
 	mdir = out->cur;
 	dfd = dirfd(mdir);
-	fp = NULL;
 
 	out->letters = NULL;
 	out->nletters = 0;
 
+	out->view_seen = view_seen;
+	out->do_cache = do_cache;
+
 	gl.line = NULL;
 	gl.n = 0;
+
+	if (!do_cache || maildir_cache_read(out->root, &cache) == -1) {
+		have_cache = 0;
+	}
+	else
+		have_cache = 1;
+
+	if (fstat(dfd, &sb) == -1)
+		return -1;
+
+	/* no change since last cache, just take all letters */
+	if (have_cache 
+			&& (!view_seen || cache.view_seen)
+			&& fstat(dfd, &sb) != -1
+			&& sb.st_mtim.tv_sec <= cache.mtim) {
+		void *t;
+
+		out->letters = reallocarray(NULL, cache.nletters, sizeof(*out->letters));
+		if (out->letters == NULL) {
+			for (size_t i = 0; i < cache.nletters; i++) {
+				free(cache.letters[i].path);
+				free(cache.letters[i].subject);
+				free(cache.letters[i].from.str);
+			}
+			free(cache.letters);
+			return -1;
+		}
+
+		for (size_t i = 0; i < cache.nletters; i++) {
+			if (!view_seen && maildir_letter_seen(cache.letters[i].path)) {
+				free(cache.letters[i].path);
+				free(cache.letters[i].subject);
+				free(cache.letters[i].from.str);
+				continue;
+			}
+
+			out->letters[out->nletters].path = cache.letters[i].path;
+			out->letters[out->nletters].subject = cache.letters[i].subject;
+			out->letters[out->nletters].from = cache.letters[i].from;
+			out->letters[out->nletters].date = cache.letters[i].date;
+			out->nletters++;
+		}
+		free(cache.letters);
+
+		/* 
+		 * try to shrink in case some already seen letters were present
+		 * if we cant shrink thats fine
+		 */
+		t = reallocarray(out->letters, out->nletters, sizeof(*out->letters));
+		if (t != NULL)
+			out->letters = t;
+
+		qsort(out->letters, out->nletters, sizeof(*out->letters),
+			letter_cmp);
+
+		return 0;
+	}
 
 	for (;;) {
 		struct dirent *de;
 		int seen;
 		struct letter letter;
+		struct maildir_cache_letter *cached;
 
 		if ((de = readdir(mdir)) == NULL)
 			break;
@@ -135,22 +227,34 @@ mailbox_read(struct mailbox *out, int view_seen)
 			goto fail;
 		if (!view_seen && seen)
 			continue;
-		if ((fp = fopenat(dfd, de->d_name)) == NULL) {
-			warn("fopenat %s", de->d_name);
-			goto fail;
-		}
+		if (have_cache && (cached = maildir_cache_find(&cache, de->d_name)) != NULL) {
+			letter.path = cached->path;
+			letter.subject = cached->subject;
+			letter.from = cached->from;
+			letter.date = cached->date;
 
-		if (letter_read(fp, &letter, &gl) == -1)
-			goto fail;
-
-		if (fclose(fp) == EOF) {
-			fp = NULL;
-			goto fail;
+			cached->date = -1;
 		}
-		fp = NULL;
-		if ((letter.path = strdup(de->d_name)) == NULL) {
-			letter_free(&letter);
-			goto fail;
+		else {
+			FILE *fp;
+
+			if ((fp = fopenat(dfd, de->d_name)) == NULL) {
+				warn("fopenat %s", de->d_name);
+				goto fail;
+			}
+
+			if (letter_read(fp, &letter, &gl) == -1) {
+				(void) fclose(fp);
+				goto fail;
+			}
+
+			if (fclose(fp) == EOF) {
+				goto fail;
+			}
+			if ((letter.path = strdup(de->d_name)) == NULL) {
+				letter_free(&letter);
+				goto fail;
+			}
 		}
 
 		if (letter_push(&letter, out) == -1) {
@@ -162,8 +266,17 @@ mailbox_read(struct mailbox *out, int view_seen)
 	rv = 0;
 	fail:
 	free(gl.line);
-	if (fp != NULL && fclose(fp) == EOF)
-		rv = -1;
+	if (have_cache) {
+		for (size_t i = 0; i < cache.nletters; i++) {
+			/* has been taken */
+			if (cache.letters[i].date == -1)
+				continue;
+			free(cache.letters[i].path);
+			free(cache.letters[i].subject);
+			free(cache.letters[i].from.str);
+		}
+		free(cache.letters);
+	}
 	if (rv != -1) {
 		qsort(out->letters, out->nletters, sizeof(*out->letters),
 			letter_cmp);
@@ -174,6 +287,9 @@ mailbox_read(struct mailbox *out, int view_seen)
 void
 mailbox_free(struct mailbox *mailbox)
 {
+	if (mailbox->do_cache && maildir_cache_write(mailbox) == -1) {
+		warnx("maildir_cache");
+	}
 	for (long long i = 0; i < mailbox->nletters; i++)
 		letter_free(&mailbox->letters[i]);
 	free(mailbox->letters);
@@ -819,6 +935,221 @@ dupstr(const char *str, size_t n)
 		rv[n] = '\0';
 	}
 	return rv;
+}
+
+static int
+maildir_cache_cmp(const void *one, const void *two)
+{
+	const struct letter *n1 = one, *n2 = two;
+
+	return strcmp(n1->path, n2->path);
+}
+
+static int
+maildir_cached_cmp(const void *one, const void *two)
+{
+	const char *n1 = one;
+	const struct maildir_cache_letter *n2 = two;
+
+	return strcmp(n1, n2->path);
+}
+
+static int
+maildir_cache_write(struct mailbox *mailbox)
+{
+	char path[PATH_MAX];
+	FILE *fp;
+	uint32_t magic;
+	uint8_t view_seen;
+	int fd, n, rv;
+
+	rv = -1;
+
+	n = snprintf(path, sizeof(path), "%s/.mailzcache", mailbox->root);
+	if (n < 0 || n >= sizeof(path))
+		return -1;
+
+	if ((fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600)) == -1) {
+		/* thats fine */
+		if (errno == EACCES)
+			return 0;
+		return -1;
+	}
+	if ((fp = fdopen(fd, "w")) == NULL) {
+		(void) close(fd);
+		return -1;
+	}
+
+	magic = MAILDIR_CACHE_MAGIC | MAILDIR_CACHE_VERSION;
+	if (fwrite(&magic, sizeof(magic), 1, fp) != 1)
+		goto fail;
+	
+	view_seen = mailbox->view_seen;
+	if (fwrite(&view_seen, sizeof(view_seen), 1, fp) != 1)
+		goto fail;
+
+	qsort(mailbox->letters, mailbox->nletters, sizeof(*mailbox->letters),
+		maildir_cache_cmp);
+
+	for (size_t i = 0; i < mailbox->nletters; i++) {
+		uint64_t date;
+		const struct letter *letter = &mailbox->letters[i];
+
+		if (mailbox->letters[i].date > UINT64_MAX)
+			goto fail;
+		date = mailbox->letters[i].date;
+
+		if (fwrite(&date, sizeof(date), 1, fp) != 1)
+			goto fail;
+		if (fwrite(letter->path, strlen(letter->path) + 1, 1, fp) != 1)
+			goto fail;
+		if (letter->subject != NULL) {
+			if (fwrite(letter->subject, strlen(letter->subject) + 1, 1, fp) != 1)
+				goto fail;
+		}
+		else if (fputc('\0', fp) == EOF)
+			goto fail;
+		if (fwrite(letter->from.str, strlen(letter->from.str) + 1, 1, fp) != 1)
+			goto fail;
+	}
+
+	rv = 0;
+	fail:
+	if (fclose(fp) == EOF)
+		rv = -1;
+	return rv;
+}
+
+static int
+maildir_cache_read(const char *root, struct maildir_cache *out)
+{
+	char path[PATH_MAX];
+	struct stat sb;
+	struct getline gl;
+	FILE *fp;
+	struct maildir_cache_letter *letters;
+	size_t nletters;
+	uint32_t magic;
+	uint8_t view_seen;
+	int n, rv, version;
+
+	gl.line = NULL;
+	gl.n = 0;
+	rv = -1;
+
+	n = snprintf(path, sizeof(path), "%s/.mailzcache", root);
+	if (n < 0 || n >= sizeof(path))
+		return -1;
+
+	if ((fp = fopen(path, "r")) == NULL) {
+		return -1;
+	}
+
+	letters = NULL;
+	nletters = 0;
+
+	if (fstat(fileno(fp), &sb) == -1)
+		goto fail;
+
+	if (fread(&magic, sizeof(magic), 1, fp) != 1)
+		goto fail;
+	/* accidental corruption */
+	if ((magic & MAILDIR_CACHE_CHECK_MASK) != MAILDIR_CACHE_MAGIC)
+		goto fail;
+	version = (magic & MAILDIR_CACHE_VERSION_MASK);
+
+	if (version != MAILDIR_CACHE_VERSION)
+		goto fail;
+
+	if (fread(&view_seen, sizeof(view_seen), 1, fp) != 1)
+		goto fail;
+
+	for (;;) {
+		struct maildir_cache_letter letter, *t;
+		size_t sn;
+		uint64_t date;
+		char *from;
+
+		sn = fread(&date, 1, sizeof(date), fp);
+		if (sn == 0) /* EOF (maybe) */
+			break;
+		if (sn != sizeof(date))
+			goto fail;
+		letter.date = date;
+
+		if (getdelim(&gl.line, &gl.n, '\0', fp) == -1)
+			goto fail;
+		if ((letter.path = strdup(gl.line)) == NULL)
+			goto fail;
+
+		if (getdelim(&gl.line, &gl.n, '\0', fp) == -1) {
+			free(letter.path);
+			goto fail;
+		}
+		if (*gl.line == '\0') /* empty */
+			letter.subject = NULL;
+		else if ((letter.subject = strdup(gl.line)) == NULL) {
+			free(letter.path);
+			goto fail;
+		}
+
+		if (getdelim(&gl.line, &gl.n, '\0', fp) == -1) {
+			free(letter.path);
+			free(letter.subject);
+			goto fail;
+		}
+		if ((from = strdup(gl.line)) == NULL) {
+			free(letter.path);
+			free(letter.subject);
+			goto fail;
+		}
+		if (from_safe_new(from, &letter.from) == -1) {
+			free(letter.path);
+			free(letter.subject);
+			free(from);
+			goto fail;
+		}
+
+		t = reallocarray(letters, nletters + 1, sizeof(*letters));
+		if (t == NULL) {
+			free(letter.path);
+			free(letter.subject);
+			free(letter.from.str);
+			goto fail;
+		}
+		letters = t;
+		letters[nletters++] = letter;
+	}
+
+	if (ferror(fp))
+		goto fail;
+
+	rv = 0;
+	fail:
+	free(gl.line);
+	if (fclose(fp) == EOF)
+		rv = -1;
+	if (rv == -1) {
+		for (size_t i = 0; i < nletters; i++) {
+			free(letters[i].subject);
+			free(letters[i].from.str);
+		}
+		free(letters);
+	}
+	else {
+		out->letters = letters;
+		out->nletters = nletters;
+		out->mtim = sb.st_mtim.tv_sec;
+		out->view_seen = view_seen;
+	}
+	return rv;
+}
+
+static struct maildir_cache_letter *
+maildir_cache_find(struct maildir_cache *cache, const char *path)
+{
+	return bsearch(path, cache->letters, cache->nletters, sizeof(*cache->letters),
+		maildir_cached_cmp);
 }
 
 int
