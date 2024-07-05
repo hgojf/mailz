@@ -25,7 +25,6 @@
 #include <unistd.h>
 
 #include "address.h"
-#include "config.h"
 #include "pathnames.h"
 #include "sendmail.h"
 

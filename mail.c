@@ -31,22 +31,10 @@
 #include <unistd.h>
 
 #include "address.h"
-#include "config.h"
 #include "mail.h"
 #include "mailbox.h"
 #include "pathnames.h"
-#include "reallocarray.h"
 #include "sendmail.h"
-#include "strsep.h"
-#include "strtonum.h"
-
-#ifndef __unused
-#if defined(__GNUC__) || defined(__clang__)
-#define __unused __attribute__((unused))
-#else
-#define __unused /* delete */
-#endif /* __GNUC__ || __clang__ */
-#endif /* __unused */
 
 struct command {
 	const char *ident;

@@ -16,5 +16,5 @@
 
 #ifndef MAILZ_PATHNAMES_H
 #define MAILZ_PATHNAMES_H
-#define PATH_MAILZWRAPPER PREFIX "/libexec/mailzwrapper"
+#define PATH_MAILZWRAPPER "/usr/local/libexec/mailzwrapper"
 #endif /* MAILZ_PATHNAMES_H */

@@ -15,14 +15,9 @@
  */
 
 #define MAILBOX_INTERNALS
-#include "config.h"
 
 #include <sys/stat.h>
-#ifdef HAVE_SYS_TREE_H
 #include <sys/tree.h>
-#else
-#include "tree.h"
-#endif /* HAVE_SYS_TREE_H */
 
 #include <assert.h>
 #include <ctype.h>
@@ -41,8 +36,6 @@
 #include "date.h"
 #include "mail.h"
 #include "mailbox.h"
-#include "reallocarray.h"
-#include "strlcpy.h"
 
 struct getline {
 	char *line;

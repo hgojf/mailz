@@ -2,15 +2,10 @@
 
 .PHONY: all clean install install-man test tidy
 
-include config.mk
-
 PREFIX ?= /usr/local
-CFLAGS = -O2 -g ${CFLAGS_CONFIG}
+CFLAGS += -O2 -g
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
-
-OBJS_COMPAT = $(SRCS_COMPAT:.c=.o)
-DEPS_COMPAT = $(SRCS_COMPAT:.c=.d)
 
 SRCS = address.c date.c mail.c mailbox.c sendmail.c
 OBJS = $(SRCS:.c=.o)
@@ -21,8 +16,8 @@ INSTALL ?= install
 
 all: mail mailwrapper
 
-mail: ${OBJS} ${OBJS_COMPAT}
-	$(CC) -o $@ ${LDFLAGS} ${OBJS} ${OBJS_COMPAT}
+mail: ${OBJS}
+	$(CC) -o $@ ${LDFLAGS} ${OBJS}
 
 mailwrapper: mailwrapper.o
 	$(CC) -o $@ ${CFLAGS} ${LDFLAGS} mailwrapper.o
@@ -38,8 +33,8 @@ install:
 install-man:
 	$(INSTALL) -m 0644 mailz.1 ${PREFIX}/man/man1/
 
-regress: address.c date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
-	$(CC) -o $@ ${LDFLAGS} address.c date.o mailbox.o sendmail.o regress.o ${OBJS_COMPAT}
+regress: address.c date.o mailbox.o sendmail.o regress.o
+	$(CC) -o $@ ${LDFLAGS} address.c date.o mailbox.o sendmail.o regress.o
 
 tags: ${SRCS}
 	$(CTAGS) ${SRCS}
