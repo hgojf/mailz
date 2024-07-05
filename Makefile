@@ -3,7 +3,7 @@
 .PHONY: all clean install install-man test tidy
 
 PREFIX ?= /usr/local
-CFLAGS += -O2 -g
+CFLAGS = -O2 -pipe -g -MD -MP
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
