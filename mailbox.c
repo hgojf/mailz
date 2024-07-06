@@ -33,10 +33,18 @@
 #include <strings.h>
 #include <time.h>
 #include <unistd.h>
+#include <wchar.h>
 
 #include "address.h"
 #include "mail.h"
 #include "mailbox.h"
+
+struct content_type {
+	char *type;
+	char *subtype;
+
+	char *charset;
+};
 
 struct getline {
 	char *line;
@@ -102,6 +110,7 @@ static int maildir_letter_seen(const char *);
 
 #define TZ_INVALIDSEC 1
 
+static int content_type_parse(char *, struct content_type *);
 static char *dupstr(const char *, size_t);
 static time_t rfc5322_dateparse(const char *);
 static char *strip_trailing(char *);
@@ -754,11 +763,14 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	const struct options *options, FILE *out)
 {
 	struct headers headers;
+	mbstate_t mbs;
+	struct content_type ct;
 	struct getline gl;
 	FILE *fp;
 	ssize_t len;
 	struct header *h, *h2, f;
-	int dfd, c, qp, rv;
+	char u8b[5];
+	int dfd, c, qp, rv, utf8;
 
 	rv = -1;
 
@@ -813,15 +825,74 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	qp = (h = RB_FIND(headers, &headers, &f)) != NULL 
 		&& !strcasecmp(h->val, "quoted-printable");
 
+	f.key = "Content-Type";
+	utf8 = (h = RB_FIND(headers, &headers, &f)) != NULL
+		&& content_type_parse(h->val, &ct) != -1
+		&& ct.charset != NULL
+		&& !strcasecmp(ct.charset, "utf-8");
+
+	if (utf8) {
+		memset(&mbs, 0, sizeof(mbs));
+		u8b[0] = '\0';
+	}
+
 	while ((c = fgetc(fp)) != EOF) {
 		if (c == '=' && (c = equal_escape(fp, qp)) == EOF)
 			goto headers;
-		if (!isprint(c) && !isspace(c)) {
+
+		if (utf8) {
+			char cc;
+			size_t len;
+
+			cc = c;
+
+			/* 
+			 * prevent ESC type bytes from getting through...
+			 */
+			if (isascii(c) && !isprint(c) && !isspace(c))
+				goto invalid;
+
+			switch (mbrtowc(NULL, &cc, 1, &mbs)) {
+			default:
+				len = strlen(u8b);
+				if (len == 4)
+					goto invalid;
+				u8b[len] = cc;
+
+				if (fwrite(u8b, len + 1, 1, out) != len + 1)
+					goto invalid;
+				u8b[0] = '\0';
+				break;
+			case 0:
+				goto invalid;
+			case -1:
+				goto invalid;
+			case -2:
+				len = strlen(u8b);
+				if (len == 4)
+					goto invalid;
+				u8b[len] = cc;
+				u8b[len + 1] = '\0';
+				break;
+			case -3:
+				goto invalid;
+			}
+
+			continue;
+
+			invalid:
 			if (fputs("__[invalid]__", out) == EOF)
 				goto headers;
+			memset(&mbs, 0, sizeof(mbs));
 		}
-		else if (fputc(c, out) == EOF)
-				goto headers;
+		else {
+			if (!isprint(c) && !isspace(c)) {
+				if (fputs("__[invalid]__", out) == EOF)
+					goto headers;
+			}
+			else if (fputc(c, out) == EOF)
+					goto headers;
+		}
 	}
 
 	if (ferror(fp))
@@ -1246,6 +1317,51 @@ mailbox_letter_print_content(struct mailbox *mailbox,
 	if (fclose(fp) == EOF)
 		rv = -1;
 	return rv;
+}
+
+static int
+content_type_parse(char *s, struct content_type *out)
+{
+	char *charset, *param, *subtype, *type, *tst;
+
+	if ((tst = strsep(&s, ";")) == NULL)
+		return -1;
+
+	if ((type = strsep(&tst, "/")) == NULL)
+		return -1;
+	if ((subtype = tst) == NULL)
+		return -1;
+
+	charset = NULL;
+	while ((param = strsep(&s, ";")) != NULL) {
+		char *key, *val;
+		size_t len;
+
+		if ((key = strsep(&param, "=")) == NULL)
+			return -1;
+
+		if (*key++ != ' ')
+			return -1;
+
+		if ((val = param) == NULL)
+			return -1;
+
+		len = strlen(val);
+		if (val[0] == '\"' && val[len - 1] == '\"') {
+			val++;
+			val[len - 1] = '\0';
+		}
+		if (!strcasecmp(key, "charset"))
+			charset = val;
+	}
+
+	if (out != NULL) {
+		out->charset = charset;
+		out->subtype = subtype;
+		out->type = type;
+	}
+
+	return 0;
 }
 
 int
