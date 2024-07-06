@@ -54,7 +54,7 @@ RB_HEAD(headers, header);
 RB_PROTOTYPE(headers, header, entry, header_cmp);
 RB_GENERATE(headers, header, entry, header_cmp);
 
-static int equal_escape(FILE *);
+static int equal_escape(FILE *, int);
 
 static FILE *fopenat(int, const char *);
 static DIR *opendirat(int, const char *);
@@ -757,8 +757,8 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	struct getline gl;
 	FILE *fp;
 	ssize_t len;
-	struct header *h, *h2;
-	int dfd, c, rv;
+	struct header *h, *h2, f;
+	int dfd, c, qp, rv;
 
 	rv = -1;
 
@@ -786,7 +786,7 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	}
 
 	for (size_t i = 0; i < options->nreorder; i++) {
-		struct header *v, f;
+		struct header *v;
 
 		f.key = options->reorder[i];
 		if ((v = RB_FIND(headers, &headers, &f)) == NULL)
@@ -809,8 +809,12 @@ mailbox_letter_print_read(struct mailbox *mailbox, struct letter *letter,
 	if (fputc('\n', out) == EOF)
 		goto headers;
 
+	f.key = "Content-Transfer-Encoding";
+	qp = (h = RB_FIND(headers, &headers, &f)) != NULL 
+		&& !strcasecmp(h->val, "quoted-printable");
+
 	while ((c = fgetc(fp)) != EOF) {
-		if (c == '=' && (c = equal_escape(fp)) == EOF)
+		if (c == '=' && (c = equal_escape(fp, qp)) == EOF)
 			goto headers;
 		if (!isprint(c) && !isspace(c)) {
 			if (fputs("__[invalid]__", out) == EOF)
@@ -911,7 +915,17 @@ header_push2(struct header *header, struct headers *headers)
 }
 
 static int
-equal_escape(FILE *fp)
+hexdigcaps(int c)
+{
+	if (isdigit(c))
+		return c - '0';
+	if (isxdigit(c) && isupper(c))
+		return (c - 'A') + 10;
+	return -1;
+}
+
+static int
+equal_escape(FILE *fp, int qp)
 {
 	int t;
 
@@ -919,9 +933,27 @@ equal_escape(FILE *fp)
 		return '=';
 	if (t == '\n')
 		return '\n';
-	if (fseek(fp, -1, SEEK_CUR) == -1)
-		return EOF;
-	return '=';
+
+	if (qp) {
+		int d;
+
+		if ((d = fgetc(fp)) == EOF) {
+			(void) fseek(fp, -1, SEEK_CUR);
+			return EOF;
+		}
+
+		if ((t = hexdigcaps(t)) == -1 || (d = hexdigcaps(d)) == -1) {
+			(void) fseek(fp, -1, SEEK_CUR);
+			return EOF;
+		}
+
+		return (t << 4) | d;
+	}
+	else {
+		if (fseek(fp, -1, SEEK_CUR) == -1)
+			return EOF;
+		return '=';
+	}
 }
 
 static char *
