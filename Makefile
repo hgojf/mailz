@@ -33,8 +33,8 @@ install:
 install-man:
 	$(INSTALL) -m 0644 mailz.1 ${PREFIX}/man/man1/
 
-regress: address.c date.o mailbox.o sendmail.o regress.o
-	$(CC) -o $@ ${LDFLAGS} address.c date.o mailbox.o sendmail.o regress.o
+regress: address.c mailbox.o sendmail.o regress.o
+	$(CC) -o $@ ${LDFLAGS} address.c mailbox.o sendmail.o regress.o
 
 tags: ${SRCS}
 	$(CTAGS) ${SRCS}
