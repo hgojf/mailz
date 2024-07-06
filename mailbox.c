@@ -1348,8 +1348,8 @@ content_type_parse(char *s, struct content_type *out)
 
 		len = strlen(val);
 		if (val[0] == '\"' && val[len - 1] == '\"') {
-			val++;
 			val[len - 1] = '\0';
+			val++;
 		}
 		if (!strcasecmp(key, "charset"))
 			charset = val;
