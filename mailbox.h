@@ -31,6 +31,8 @@ struct mailbox {
 	DIR *cur;
 
 	/* cache stuff */
+	#define MAILBOX_CACHE_READ 1 /* read the cache */
+	#define MAILBOX_CACHE_UPDATE 2 /* read and update the cache */
 	int do_cache;
 	int view_seen;
 	const char *root;

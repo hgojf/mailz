@@ -160,7 +160,6 @@ mailbox_read(struct mailbox *out, int view_seen, int do_cache)
 	out->nletters = 0;
 
 	out->view_seen = view_seen;
-	out->do_cache = do_cache;
 
 	gl.line = NULL;
 	gl.n = 0;
@@ -175,7 +174,7 @@ mailbox_read(struct mailbox *out, int view_seen, int do_cache)
 		return -1;
 
 	/* no change since last cache, just take all letters */
-	if (have_cache 
+	if (have_cache
 			&& (!view_seen || cache.view_seen)
 			&& fstat(dfd, &sb) != -1
 			&& sb.st_mtim.tv_sec <= cache.mtim) {
@@ -219,8 +218,15 @@ mailbox_read(struct mailbox *out, int view_seen, int do_cache)
 		qsort(out->letters, out->nletters, sizeof(*out->letters),
 			letter_cmp);
 
+		out->do_cache = MAILBOX_CACHE_READ;
+
 		return 0;
 	}
+	else if (do_cache)
+		/* something has changed, so the cache needs to be updated */
+		out->do_cache = MAILBOX_CACHE_UPDATE;
+	else
+		out->do_cache = 0;
 
 	for (;;) {
 		struct dirent *de;
@@ -296,7 +302,8 @@ mailbox_read(struct mailbox *out, int view_seen, int do_cache)
 void
 mailbox_free(struct mailbox *mailbox)
 {
-	if (mailbox->do_cache && maildir_cache_write(mailbox) == -1) {
+	if (mailbox->do_cache == MAILBOX_CACHE_UPDATE 
+			&& maildir_cache_write(mailbox) == -1) {
 		warnx("maildir_cache");
 	}
 	for (long long i = 0; i < mailbox->nletters; i++)
