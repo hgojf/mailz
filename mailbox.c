@@ -1085,6 +1085,12 @@ maildir_cache_write(struct mailbox *mailbox)
 			return 0;
 		return -1;
 	}
+
+	if (flock(fd, LOCK_EX) == -1) {
+		(void) close(fd);
+		return -1;
+	}
+
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		(void) close(fd);
 		return -1;
@@ -1125,6 +1131,8 @@ maildir_cache_write(struct mailbox *mailbox)
 
 	rv = 0;
 	fail:
+	if (flock(fileno(fp), LOCK_UN) == -1)
+		rv = -1;
 	if (fclose(fp) == EOF)
 		rv = -1;
 	return rv;
@@ -1152,6 +1160,11 @@ maildir_cache_read(const char *root, struct maildir_cache *out)
 		return -1;
 
 	if ((fp = fopen(path, "r")) == NULL) {
+		return -1;
+	}
+
+	if (flock(fileno(fp), LOCK_SH) == -1) {
+		(void) fclose(fp);
 		return -1;
 	}
 
@@ -1237,6 +1250,8 @@ maildir_cache_read(const char *root, struct maildir_cache *out)
 	rv = 0;
 	fail:
 	free(gl.line);
+	if (flock(fileno(fp), LOCK_UN) == -1)
+		rv = -1;
 	if (fclose(fp) == EOF)
 		rv = -1;
 	if (rv == -1) {

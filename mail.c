@@ -147,7 +147,7 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if (unveil(PATH_MAILZWRAPPER, "x") == -1)
 		err(1, "unveil");
-	if (pledge("stdio rpath cpath wpath proc exec unveil", NULL) == -1)
+	if (pledge("stdio rpath cpath wpath proc exec flock unveil", NULL) == -1)
 		err(1, "pledge");
 
 	if (subject != NULL) {
@@ -202,7 +202,7 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if (unveilat(argv[0], ".mailzcache", "cwr") == -1)
 		err(1, "unveil");
-	if (pledge("stdio rpath cpath wpath proc exec", NULL) == -1)
+	if (pledge("stdio rpath cpath wpath proc exec flock", NULL) == -1)
 		err(1, "pledge");
 
 	if (configure(&options) == -1)
@@ -272,7 +272,7 @@ main(int argc, char *argv[])
 	good:
 	rv = 0;
 	fail:
-	if (pledge("stdio rpath wpath cpath", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock", NULL) == -1)
 		err(1, "pledge");
 	if (rmdir("/tmp/mail") == -1 && errno != ENOTEMPTY) {
 		warn("rmdir");
