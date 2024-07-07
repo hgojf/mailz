@@ -1256,6 +1256,7 @@ maildir_cache_read(const char *root, struct maildir_cache *out)
 		rv = -1;
 	if (rv == -1) {
 		for (size_t i = 0; i < nletters; i++) {
+			free(letters[i].path);
 			free(letters[i].subject);
 			free(letters[i].from.str);
 		}
