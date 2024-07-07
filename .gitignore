@@ -11,3 +11,4 @@ lesswrapper/*.[od]
 lesswrapper/lesswrapper
 tags
 regress
+build/

@@ -1,0 +1,19 @@
+#ifndef MAILZ_CONFIG_H
+#define MAILZ_CONFIG_H
+#cmakedefine HAVE_FLOCK_SYS_FILE_H
+#cmakedefine HAVE_SYS_TREE_H
+#cmakedefine HAVE_PLEDGE
+#cmakedefine HAVE_UNVEIL
+
+#ifndef HAVE_PLEDGE
+#define pledge(a, b) 0
+#endif /* HAVE_PLEDGE */
+
+#ifndef HAVE_UNVEIL
+#define unveil(a, b) 0
+#endif /* HAVE_UNVEIL */
+
+#ifndef __unused
+#define __unused __attribute__((unused))
+#endif /* __unused */
+#endif /* MAILZ_CONFIG_H */
