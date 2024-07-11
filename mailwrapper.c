@@ -34,7 +34,7 @@ main(int argc, char *argv[])
 	else if (strcmp(argv[0], "sendmail") == 0) {
 		if (argc != 2)
 			errx(1, "invalid usage");
-		execl("/usr/sbin/sendmail", "sendmail", "-t", "--", argv[1], NULL);
+		execl("/usr/sbin/sendmail", "sendmail", "-t", "--", NULL);
 		err(1, "execl");
 	}
 	else if (strcmp(argv[0], "less") == 0) {
