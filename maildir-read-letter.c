@@ -229,6 +229,14 @@ main(int argc, char *argv[])
 	}
 
 	RB_FOREACH(i, headers, &headers) {
+		/* 
+		 * this gets smuggled past the earlier check because it is needed later
+		 * to determine whether utf8 encoding should be assumed.
+		 * that cant be done before because content_type_parse mangles the string
+		 * that it parses
+		 */
+		if (strcasecmp(i->header.key, "content-type") == 0 && header_ignore(&ignore, "content-type"))
+			continue;
 		if (printf("%s: %s\n", i->header.key, i->header.val) < 0) {
 			save_errno = errno;
 			rv = MAILDIR_READ_LETTER_PRINTF;
