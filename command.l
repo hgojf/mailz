@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../argv.h"
 #include "../config.h"
 #include "command.h"
 

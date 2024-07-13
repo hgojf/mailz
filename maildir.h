@@ -34,5 +34,6 @@ struct maildir_read_letter {
 };
 
 struct maildir_read_letter
-maildir_read_letter(const char *, const char *, int, FILE *);
+maildir_read_letter(const char *, const char *, int, FILE *, int, 
+struct argv_shm *, struct argv_shm *);
 #endif /* MAILZ_MAILDIR_H */

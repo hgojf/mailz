@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "address.h"
+#include "argv.h"
 #include "letter.h"
 #include "config.h"
 #include "command.h"
@@ -165,13 +166,17 @@ config_free(struct config *cfg)
 	free(cfg->address.addr);
 	free(cfg->address.name);
 
-	for (size_t i = 0; i < cfg->reorder.argc; i++)
-		free(cfg->reorder.argv[i]);
-	free(cfg->reorder.argv);
+	for (size_t i = 0; i < cfg->reorder.argv.argc; i++)
+		free(cfg->reorder.argv.argv[i]);
+	free(cfg->reorder.argv.argv);
+	if (cfg->reorder.shm.fd != -1)
+		(void) close(cfg->reorder.shm.fd);
 
 	for (size_t i= 0; i < cfg->ignore.argv.argc; i++)
 		free(cfg->ignore.argv.argv[i]);
 	free(cfg->ignore.argv.argv);
+	if (cfg->ignore.shm.fd != -1)
+		(void) close(cfg->ignore.shm.fd);
 }
 
 static int

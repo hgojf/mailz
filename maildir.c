@@ -11,6 +11,7 @@
 #include <wchar.h>
 
 #include "address.h"
+#include "argv.h"
 #include "getline.h"
 #include "letter.h"
 #include "maildir.h"
@@ -28,15 +29,15 @@ static int maildir_letter_read(FILE *, struct getline *, struct letter *);
 
 struct maildir_read_letter
 maildir_read_letter(const char *root, const char *letter, int dev_null,
-	FILE *out)
+	FILE *out, int retain, struct argv_shm *ignore, struct argv_shm *reorder)
 {
-	char path[PATH_MAX];
+	char *argv[6], path[PATH_MAX], i[20], r[20];
 	struct maildir_read_letter rv;
 	struct utf8_decode u8;
 	FILE *fp;
 	pid_t pid;
 	ssize_t nr;
-	int n, pe[2], po[2], status;
+	int argc, n, pe[2], po[2], status;
 
 	n = snprintf(path, sizeof(path), "%s/cur/%s", root, letter);
 	if (n < 0) {
@@ -50,6 +51,26 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 		return rv;
 	}
 
+	if (ignore->fd != -1) {
+		if (retain)
+			n = snprintf(i, sizeof(i), "-u%lld", ignore->sz);
+		else
+			n = snprintf(i, sizeof(i), "-i%lld", ignore->sz);
+		if (n < 0 || n >= sizeof(i)) {
+			rv.save_errno = errno;
+			rv.status = MAILDIR_READ_LETTER_SNPRINTF;
+			return rv;
+		}
+	}
+	if (reorder->fd != -1) {
+		n = snprintf(r, sizeof(r), "-r%lld", reorder->sz);
+		if (n < 0 || n >= sizeof(r)) {
+			rv.save_errno = errno;
+			rv.status = MAILDIR_READ_LETTER_SNPRINTF;
+			return rv;
+		}
+	}
+
 	if (pipe(pe) == -1) {
 		rv.save_errno = errno;
 		rv.status = MAILDIR_READ_LETTER_PIPE;
@@ -60,6 +81,18 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 		rv.status = MAILDIR_READ_LETTER_PIPE;
 		return rv;
 	}
+
+	argc = 0;
+	argv[argc++] = "maildir-read-letter";
+	if (ignore->fd != -1) {
+		argv[argc++] = i;
+	}
+	if (reorder->fd != -1) {
+		argv[argc++] = r;
+	}
+	argv[argc++] = "--";
+	argv[argc++] = path;
+	argv[argc++] = NULL;
 
 	switch (pid = fork()) {
 	case -1:
@@ -73,7 +106,11 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 			exit(MAILDIR_READ_LETTER_DUP);
 		if (dup2(pe[1], STDERR_FILENO) == -1)
 			exit(MAILDIR_READ_LETTER_DUP);
-		execl(PATH_MAILDIR_READ_LETTER, "maildir-read-letter", path, NULL);
+		if (ignore->fd != -1 && dup2(ignore->fd, 4) == -1)
+			exit(MAILDIR_READ_LETTER_DUP);
+		if (reorder->fd != -1 && dup2(reorder->fd, 5) == -1)
+			exit(MAILDIR_READ_LETTER_DUP);
+		execv(PATH_MAILDIR_READ_LETTER, argv);
 		exit(MAILDIR_READ_LETTER_EXEC);
 	default:
 		break;

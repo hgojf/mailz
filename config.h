@@ -1,13 +1,13 @@
 #ifndef MAILZ_CONFIG_H
 #define MAILZ_CONFIG_H
-struct argv {
-	size_t argc;
-	char **argv;
-};
-
 enum edit_mode {
 	EDIT_MODE_MANUAL,
 	EDIT_MODE_VI,
+};
+
+struct reorder {
+	struct argv argv;
+	struct argv_shm shm;
 };
 
 struct ignore {
@@ -15,6 +15,7 @@ struct ignore {
 		IGNORE_IGNORE, IGNORE_RETAIN,
 	} type;
 
+	struct argv_shm shm;
 	struct argv argv;
 };
 
@@ -30,7 +31,7 @@ struct config {
 
 	int cache;
 
-	struct argv reorder;
+	struct reorder reorder;
 	struct ignore ignore;
 };
 #endif /* MAILZ_CONFIG_H */

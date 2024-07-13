@@ -1,7 +1,9 @@
+#include <sys/mman.h>
 #include <sys/tree.h>
 
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,10 +11,23 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#include "argv.h"
 #include "getline.h"
 #include "header.h"
 #include "maildir-read-letter.h"
 #include "utf8.h"
+
+static int argv_map(struct argv_shm *, struct argv_mapped *);
+static int argv_find(struct argv_mapped *, const char *);
+
+struct ignore {
+	enum {
+		IGNORE_NONE,
+		IGNORE_IGNORE,
+		IGNORE_RETAIN,
+	} type;
+	struct argv_mapped mapped;
+};
 
 struct header_rb {
 	struct header header;
@@ -22,6 +37,7 @@ struct header_rb {
 static int header_rb_cmp(struct header_rb *, struct header_rb *);
 RB_HEAD(headers, header_rb);
 RB_PROTOTYPE_STATIC(headers, header_rb, entries, header_rb_cmp);
+static int header_ignore(struct ignore *, const char *);
 
 struct content_type {
 	const char *type;
@@ -43,24 +59,93 @@ main(int argc, char *argv[])
 	struct headers headers;
 	struct header_rb f, *h, *i, *tv;
 	struct getline gl;
+	struct ignore ignore;
+	struct argv_mapped reorder;
 	struct utf8_decode u8;
+	const char *errstr;
 	FILE *fp;
 	ssize_t nw;
-	int rv, save_errno, qp, utf8;
+	int ch, rv, save_errno, qp, utf8;
 
-	if (argc != 2) {
+	reorder.sz = 0;
+	ignore.type = IGNORE_NONE;
+	while ((ch = getopt(argc, argv, "i:r:u:")) != -1) {
+		switch (ch) {
+		case 'i':
+			ignore.type = IGNORE_IGNORE;
+			ignore.mapped.sz = strtonum(optarg, 0, LLONG_MAX, &errstr);
+			if (errstr != NULL) {
+				save_errno = 0;
+				rv = MAILDIR_READ_LETTER_USAGE;
+				goto fail;
+			}
+			break;
+		case 'r':
+			reorder.sz = strtonum(optarg, 0, LLONG_MAX, &errstr);
+			if (errstr != NULL) {
+				save_errno = 0;
+				rv = MAILDIR_READ_LETTER_USAGE;
+				goto fail;
+			}
+			break;
+		case 'u':
+			ignore.type = IGNORE_RETAIN;
+			ignore.mapped.sz = strtonum(optarg, 0, LLONG_MAX, &errstr);
+			if (errstr != NULL) {
+				save_errno = 0;
+				rv = MAILDIR_READ_LETTER_USAGE;
+				goto fail;
+			}
+			break;
+		default:
+			save_errno = 0;
+			rv = MAILDIR_READ_LETTER_USAGE;
+			goto fail;
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1) {
 		save_errno = 0;
 		rv = MAILDIR_READ_LETTER_USAGE;
 		goto fail;
 	}
 
+	if (ignore.type != IGNORE_NONE) {
+		struct argv_shm shm;
+
+		shm.fd = 4;
+		shm.sz = ignore.mapped.sz;
+
+		if (argv_map(&shm, &ignore.mapped) == -1) {
+			save_errno = errno;
+			rv = MAILDIR_READ_LETTER_SHM;
+			goto fail;
+		}
+	}
+
+	if (reorder.sz != 0) {
+		struct argv_shm shm;
+
+		shm.fd = 5;
+		shm.sz = ignore.mapped.sz;
+
+		if (argv_map(&shm, &reorder) == -1) {
+			save_errno = errno;
+			rv = MAILDIR_READ_LETTER_SHM;
+			goto ignore;
+		}
+	}
+
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL) {
 		save_errno = 0;
 		rv = MAILDIR_READ_LETTER_SETLOCALE;
-		goto headers;
+		goto reorder;
 	}
 
-	if ((fp = fopen(argv[1], "r")) == NULL) {
+	if ((fp = fopen(argv[0], "r")) == NULL) {
 		save_errno = errno;
 		rv = MAILDIR_READ_LETTER_FOPEN;
 		goto fail;
@@ -93,6 +178,14 @@ main(int argc, char *argv[])
 			break;
 		}
 
+		if (strcasecmp(header->header.key, "content-type") != 0 &&
+				header_ignore(&ignore, header->header.key)) {
+			free(header->header.key);
+			free(header->header.val);
+			free(header);
+			continue;
+		}
+
 		/* header of the same key already encountered, concatenate */
 		if ((f = RB_INSERT(headers, &headers, header)) != NULL) {
 			char *t;
@@ -120,6 +213,20 @@ main(int argc, char *argv[])
 		}
 	}
 	done:
+
+	RB_FOREACH_SAFE(i, headers, &headers, tv) {
+		if (!argv_find(&reorder, i->header.key))
+			continue;
+		if (printf("%s: %s\n", i->header.key, i->header.val) < 0) {
+			save_errno = errno;
+			rv = MAILDIR_READ_LETTER_PRINTF;
+			goto headers;
+		}
+		RB_REMOVE(headers, &headers, i);
+		free(i->header.key);
+		free(i->header.val);
+		free(i);
+	}
 
 	RB_FOREACH(i, headers, &headers) {
 		if (printf("%s: %s\n", i->header.key, i->header.val) < 0) {
@@ -241,6 +348,12 @@ main(int argc, char *argv[])
 		save_errno = errno;
 		rv = MAILDIR_READ_LETTER_CLOSE;
 	}
+	reorder:
+	if (reorder.sz != 0)
+		(void) munmap(reorder.p, reorder.sz);
+	ignore:
+	if (ignore.type != IGNORE_IGNORE)
+		(void) munmap(ignore.mapped.p, ignore.mapped.sz);
 	fail:
 	nw = write(STDERR_FILENO, &save_errno, sizeof(save_errno));
 	if (nw == -1 && rv == MAILDIR_READ_LETTER_OK) {
@@ -346,4 +459,48 @@ equal_escape(FILE *fp, int qp)
 			return EOF;
 		return '=';
 	}
+}
+
+static int
+header_ignore(struct ignore *ignore, const char *key)
+{
+	if (ignore->type == IGNORE_IGNORE) {
+		return argv_find(&ignore->mapped, key);
+	}
+	else if (ignore->type == IGNORE_RETAIN)
+		return !argv_find(&ignore->mapped, key);
+	else
+		return 0;
+}
+
+static int
+argv_map(struct argv_shm *shm, struct argv_mapped *mapped)
+{
+	void *p;
+
+	p = mmap(NULL, shm->sz, PROT_READ, MAP_PRIVATE, shm->fd, 0);
+	if (p == MAP_FAILED)
+		return -1;
+	mapped->p = p;
+	mapped->sz = shm->sz;
+	return 0;
+}
+
+static int
+argv_find(struct argv_mapped *mapped, const char *key)
+{
+	void *h;
+	size_t ll;
+
+	if (mapped->sz == 0)
+		return 0;
+
+	ll = strlen(key);
+
+	h = mapped->p;
+	while ((h = memmem(h, mapped->sz - (h - mapped->p), key, ll)) != NULL) {
+		if ((h == mapped->p || ((char *)h)[-1] == '\0') && ((char *)h)[ll] == '\0')
+			return 1;
+	}
+	return 0;
 }

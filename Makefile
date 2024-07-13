@@ -22,7 +22,8 @@ INSTALL ?= install
 all: ${PROGS}
 
 mail: address.o command.o command-lex.o errstr.o mail.o maildir.o utf8.o
-	$(CC) -o $@ ${LDFLAGS} address.o command.o command-lex.o errstr.o mail.o maildir.o utf8.o
+	$(CC) -o $@ ${LDFLAGS} address.o command.o command-lex.o errstr.o \
+							mail.o maildir.o utf8.o
 
 maildir-cache-read: maildir-cache-read.o
 	$(CC) -o $@ ${LDFLAGS} maildir-cache-read.o

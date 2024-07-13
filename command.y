@@ -1,14 +1,17 @@
 %{
+#include <sys/mman.h>
 #include <sys/wait.h>
 
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
 
 #include "../address.h"
+#include "../argv.h"
 #include "../config.h"
 #include "../letter.h"
 #include "../maildir.h"
@@ -33,6 +36,8 @@ enum {
 
 static int config_location(char [static PATH_MAX]);
 int letter_print(size_t, struct letter *);
+
+static int argv_shm(struct argv *, struct argv_shm *);
 
 extern int yylex_destroy(void);
 extern int yylex(void);
@@ -78,7 +83,10 @@ command: ignore
 
 		mdrl = maildir_read_letter(interactive->root,
 			interactive->letters[$1].path, 
-			interactive->dev_null, stdout);
+			interactive->dev_null, stdout,
+			config->ignore.type == IGNORE_RETAIN,
+			&config->ignore.shm,
+			&config->reorder.shm);
 		if (mdrl.status != 0)
 			warnc(mdrl.save_errno, "maildir_read_letter %d", mdrl.status);
 	}
@@ -136,7 +144,10 @@ more: MORE message_number {
 		}
 
 		mdrl = maildir_read_letter(interactive->root,
-			interactive->letters[$2].path, interactive->dev_null, fp);
+			interactive->letters[$2].path, interactive->dev_null, fp,
+			config->ignore.type == IGNORE_RETAIN,
+			&config->ignore.shm,
+			&config->reorder.shm);
 		if (mdrl.status != 0 && mdrl.status != MAILDIR_READ_LETTER_PRINTF) {
 			/* 
 			 * maildir_read_letter will get a broken pipe if the pager
@@ -185,7 +196,10 @@ save: SAVE message_number {
 		}
 
 		mdrl = maildir_read_letter(interactive->root,
-			interactive->letters[$2].path, interactive->dev_null, fp);
+			interactive->letters[$2].path, interactive->dev_null, fp,
+			config->ignore.type == IGNORE_RETAIN,
+			&config->ignore.shm,
+			&config->reorder.shm);
 
 		if (mdrl.status != 0 && mdrl.status != MAILDIR_READ_LETTER_PIPE) {
 			warnx("maildir_read_letter");
@@ -228,15 +242,25 @@ print: PRINT message_number {
 	;
 
 reorder: REORDER argument_list {
-		for (size_t i = 0; i < config->reorder.argc; i++)
-			free(config->reorder.argv[i]);
-		free(config->reorder.argv);
+		struct argv_shm shm;
 
-		config->reorder = $2;
+		if (argv_shm(&$2, &shm) == -1) {
+			warn("shm_argv");
+			YYERROR;
+		}
+
+		for (size_t i = 0; i < config->reorder.argv.argc; i++)
+			free(config->reorder.argv.argv[i]);
+		free(config->reorder.argv.argv);
+		if (config->reorder.shm.fd != -1)
+			(void) close(config->reorder.shm.fd);
+
+		config->reorder.argv = $2;
+		config->reorder.shm = shm;
 	}
 	| REORDER {
-		for (size_t i = 0; i < config->reorder.argc; i++)
-			printf("%s, ", config->reorder.argv[i]);
+		for (size_t i = 0; i < config->reorder.argv.argc; i++)
+			printf("%s, ", config->reorder.argv.argv[i]);
 		printf("\n");
 	}
 	;
@@ -298,12 +322,22 @@ thread: THREAD message_number {
 	;
 
 ignore: IGNORE argument_list {
+		struct argv_shm shm;
+
+		if (argv_shm(&$2, &shm) == -1) {
+			warn("argv_shm");
+			YYERROR;
+		}
+
 		for (size_t i = 0; i < config->ignore.argv.argc; i++)
 			free(config->ignore.argv.argv[i]);
 		free(config->ignore.argv.argv);
+		if (config->ignore.shm.fd != -1)
+			(void) close(config->ignore.shm.fd);
 
 		config->ignore.type = IGNORE_IGNORE;
 		config->ignore.argv = $2;
+		config->ignore.shm = shm;
 	}
 	| IGNORE {
 		if (config->ignore.type != IGNORE_IGNORE) {
@@ -318,12 +352,21 @@ ignore: IGNORE argument_list {
 	}
 
 unignore: UNIGNORE argument_list {
+		struct argv_shm shm;
+		if (argv_shm(&$2, &shm) == -1) {
+			warn("argv_shm");
+			YYERROR;
+		}
+
 		for (size_t i = 0; i < config->ignore.argv.argc; i++)
 			free(config->ignore.argv.argv[i]);
 		free(config->ignore.argv.argv);
+		if (config->ignore.shm.fd != -1)
+			(void) close(config->ignore.shm.fd);
 
 		config->ignore.type = IGNORE_RETAIN;
 		config->ignore.argv = $2;
+		config->ignore.shm = shm;
 	}
 	| UNIGNORE {
 		if (config->ignore.type != IGNORE_RETAIN) {
@@ -355,7 +398,7 @@ argument_list: STRING {
 				free($1.argv[i]);
 			free($1.argv);
 			free($2);
-			warn("reallocarray %zu * %zu", $$.argc + 1, sizeof(*$1.argv));
+			warn("reallocarray %lld * %zu", $$.argc + 1, sizeof(*$1.argv));
 			YYERROR;
 		}
 		$$.argc = $1.argc;
@@ -452,6 +495,10 @@ configure(struct config *out)
 	FILE *fp;
 
 	memset(out, 0, sizeof(*out));
+	out->ignore.shm.fd = -1;
+	out->ignore.shm.sz = 0;
+	out->reorder.shm.fd = -1;
+	out->reorder.shm.sz = 0;
 
 	switch (config_location(path)) {
 	case 0:
@@ -525,4 +572,57 @@ letter_print(size_t nth, struct letter *letter)
 				from.al, from.addr, subject) < 0)
 			return -1;
 	return 0;
+}
+
+static int
+argv_shm(struct argv *in, struct argv_shm *out)
+{
+	char path[] = PATH_TMPDIR "shm.XXXXXX";
+	size_t len;
+	void *p;
+	int shm;
+
+	if ((shm = shm_mkstemp(path)) == -1)
+		return -1;
+
+	len = 0;
+	for (size_t i = 0; i < in->argc; i++)
+		len += strlen(in->argv[i]) + 1;
+
+	if (ftruncate(shm, len) == -1)
+		goto shm;
+
+	p = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, shm, 0);
+	if (p == MAP_FAILED)
+		goto shm;
+
+	for (size_t i = 0, off = 0; i < in->argc; i++) {
+		off += strlcpy(&p[off], in->argv[i], len - off) + 1;
+	}
+
+	if (munmap(p, len) == -1)
+		goto shm;
+	if (close(shm) == -1) {
+		(void) unlink(path);
+		return -1;
+	}
+
+	if ((shm = shm_open(path, O_RDONLY, 0400)) == -1) {
+		(void) unlink(path);
+		return -1;
+	}
+	if (shm_unlink(path) == -1) {
+		(void) close(shm);
+		return -1;
+	}
+
+	out->fd = shm;
+	out->sz = len;
+
+	return 0;
+
+	shm:
+	(void) close(shm);
+	(void) unlink(path);
+	return -1;
 }
