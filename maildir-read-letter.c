@@ -1,0 +1,349 @@
+#include <sys/tree.h>
+
+#include <ctype.h>
+#include <errno.h>
+#include <locale.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <wchar.h>
+
+#include "getline.h"
+#include "header.h"
+#include "maildir-read-letter.h"
+#include "utf8.h"
+
+struct header_rb {
+	struct header header;
+	RB_ENTRY(header_rb) entries;
+};
+
+static int header_rb_cmp(struct header_rb *, struct header_rb *);
+RB_HEAD(headers, header_rb);
+RB_PROTOTYPE_STATIC(headers, header_rb, entries, header_rb_cmp);
+
+struct content_type {
+	const char *type;
+	const char *subtype;
+
+	const char *charset;
+};
+
+static int content_type_parse(char *, struct content_type *);
+
+static int is_allowed_ascii(int);
+
+static int equal_escape(FILE *, int);
+
+int
+main(int argc, char *argv[])
+{
+	struct content_type ct;
+	struct headers headers;
+	struct header_rb f, *h, *i, *tv;
+	struct getline gl;
+	struct utf8_decode u8;
+	FILE *fp;
+	ssize_t nw;
+	int rv, save_errno, qp, utf8;
+
+	if (argc != 2) {
+		save_errno = 0;
+		rv = MAILDIR_READ_LETTER_USAGE;
+		goto fail;
+	}
+
+	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL) {
+		save_errno = 0;
+		rv = MAILDIR_READ_LETTER_SETLOCALE;
+		goto headers;
+	}
+
+	if ((fp = fopen(argv[1], "r")) == NULL) {
+		save_errno = errno;
+		rv = MAILDIR_READ_LETTER_FOPEN;
+		goto fail;
+	}
+
+	if (pledge("stdio", NULL) == -1) {
+		save_errno = errno;
+		rv = MAILDIR_READ_LETTER_PLEDGE;
+		goto fp;
+	}
+
+	RB_INIT(&headers);
+	memset(&gl, 0, sizeof(gl));
+	for (;;) {
+		struct header_rb *f, *header;
+
+		if ((header = malloc(sizeof(*header))) == NULL) {
+			save_errno = errno;
+			rv = MAILDIR_READ_LETTER_MALLOC;
+			goto headers;
+		}
+		switch (header_read(fp, &gl, &header->header, 0)) {
+		case HEADER_ERR:
+			free(header);
+			goto headers;
+		case HEADER_EOF:
+			free(header);
+			goto done;
+		default:
+			break;
+		}
+
+		/* header of the same key already encountered, concatenate */
+		if ((f = RB_INSERT(headers, &headers, header)) != NULL) {
+			char *t;
+			size_t clen, nlen, olen;
+
+			olen = strlen(f->header.val);
+			clen = strlen(header->header.val);
+			nlen = olen + clen;
+
+			if ((t = realloc(f->header.val, nlen + 1)) == NULL) {
+				save_errno = errno;
+				rv = MAILDIR_READ_LETTER_MALLOC;
+				free(header->header.key);
+				free(header->header.val);
+				free(header);
+				goto headers;
+			}
+			f->header.val = t;
+			memcpy(&f->header.val[olen], header->header.val, clen);
+			f->header.val[nlen] = '\0';
+
+			free(header->header.key);
+			free(header->header.val);
+			free(header);
+		}
+	}
+	done:
+
+	RB_FOREACH(i, headers, &headers) {
+		if (printf("%s: %s\n", i->header.key, i->header.val) < 0) {
+			save_errno = errno;
+			rv = MAILDIR_READ_LETTER_PRINTF;
+			goto headers;
+		}
+	}
+
+	if (fputc('\n', stdout) == EOF) {
+		save_errno = errno;
+		rv = MAILDIR_READ_LETTER_PRINTF;
+		goto headers;
+	}
+
+	f.header.key = "content-type";
+	utf8 = (h = RB_FIND(headers, &headers, &f)) != NULL
+		&& content_type_parse(h->header.val, &ct) != -1
+		&& ct.charset != NULL
+		&& strcasecmp(ct.charset, "utf-8") == 0;
+
+	f.header.key = "content-transfer-encoding";
+	qp = (h = RB_FIND(headers, &headers, &f)) != NULL
+		&& strcmp(h->header.val, "quoted-printable") == 0;
+
+	if (utf8) {
+		memset(&u8, 0, sizeof(u8));
+	}
+
+
+	for (;;) {
+		int c;
+
+		if ((c = fgetc(fp)) == EOF) {
+			if (utf8 && u8.n != 0) {
+				/* EOF in the middle of decoding a utf-8 codepoint */
+				save_errno = 0;
+				rv = MAILDIR_READ_LETTER_UTF8;
+				goto headers;
+			}
+
+			break;
+		}
+
+		if (c == '=') {
+			switch (c = equal_escape(fp, qp)) {
+			case EOF:
+				save_errno = 0;
+				rv = MAILDIR_READ_LETTER_ASCII;
+				goto headers;
+			case -2:
+				/* soft break */
+				continue;
+			default:
+				break;
+			}
+		}
+
+		if (utf8) {
+			switch (utf8_decode(&u8, c)) {
+			case UTF8_DECODE_DONE:
+				if (u8.n == 1 
+						&& !is_allowed_ascii((unsigned char)u8.buf[0])) {
+					u8.n = 0;
+					goto invalid;
+				}
+				if (fwrite(u8.buf, u8.n, 1, stdout) != 1) {
+					save_errno = errno;
+					rv = MAILDIR_READ_LETTER_PRINTF;
+					goto headers;
+				}
+				u8.n = 0;
+				break;
+			case UTF8_DECODE_MORE:
+				continue;
+			case UTF8_DECODE_INVALID:
+				save_errno = 0;
+				rv = MAILDIR_READ_LETTER_ASCII;
+				goto headers;
+			}
+		}
+		else {
+			if (!is_allowed_ascii((unsigned char)c)) {
+				goto invalid;
+			}
+			if (fputc(c, stdout) == EOF) {
+				save_errno = errno;
+				rv = MAILDIR_READ_LETTER_PRINTF;
+				goto headers;
+			}
+		}
+
+		continue;
+
+		invalid:
+
+		/* unicode replacement character */
+		if (fwrite("\xEF\xBF\xBD", 3, 1, stdout) != 1) {
+			save_errno = errno;
+			rv = MAILDIR_READ_LETTER_PRINTF;
+			goto headers;
+		}
+		if (utf8)
+			memset(&u8, 0, sizeof(u8));
+	}
+
+	save_errno = 0;
+	rv = MAILDIR_READ_LETTER_OK;
+	headers:
+	RB_FOREACH_SAFE(i, headers, &headers, tv) {
+		RB_REMOVE(headers, &headers, i);
+		free(i->header.key);
+		free(i->header.val);
+		free(i);
+	}
+	free(gl.line);
+	fp:
+	if (fclose(fp) == EOF && rv == MAILDIR_READ_LETTER_OK) {
+		save_errno = errno;
+		rv = MAILDIR_READ_LETTER_CLOSE;
+	}
+	fail:
+	nw = write(STDERR_FILENO, &save_errno, sizeof(save_errno));
+	if (nw == -1 && rv == MAILDIR_READ_LETTER_OK) {
+		save_errno = errno;
+		rv = MAILDIR_READ_LETTER_WRITE;
+	}
+	else if (nw != sizeof(save_errno) && rv == MAILDIR_READ_LETTER_OK)
+		rv = MAILDIR_READ_LETTER_SWRITE;
+	return rv;
+}
+
+RB_GENERATE_STATIC(headers, header_rb, entries, header_rb_cmp);
+
+static int
+header_rb_cmp(struct header_rb *one, struct header_rb *two)
+{
+	return strcasecmp(one->header.key, two->header.key);
+}
+
+static int
+content_type_parse(char *s, struct content_type *out)
+{
+	char *charset, *tst, *param, *subtype, *type;
+
+	if ((tst = strsep(&s, ";")) == NULL)
+		return -1;
+	if ((type = strsep(&tst, "/")) == NULL)
+		return -1;
+	if ((subtype = tst) == NULL)
+		return -1;
+
+	charset = NULL;
+	while ((param = strsep(&s, ";")) != NULL) {
+		char *key, *val;
+		size_t len;
+
+		if ((key = strsep(&param, "=")) == NULL)
+			return -1;
+		if ((val = param) == NULL)
+			return -1;
+
+		if (*key == ' ')
+			key++;
+
+		len = strlen(val);
+		if (val[0] == '\"' && val[len - 1] == '\"') {
+			val[len - 1] = '\0';
+			val++;
+		}
+		if (!strcasecmp(key, "charset"))
+			charset = val;
+	}
+
+	out->charset = charset;
+	out->subtype = subtype;
+	out->type = type;
+	return 0;
+}
+
+static int
+is_allowed_ascii(int c)
+{
+	return isprint(c) || isspace(c);
+}
+
+static int
+hexdigcaps(int c)
+{
+	if (isdigit(c))
+		return c - '0';
+	if (isxdigit(c) && isupper(c))
+		return (c - 'A') + 10;
+	return -1;
+}
+
+static int
+equal_escape(FILE *fp, int qp)
+{
+	int t;
+
+	if ((t = fgetc(fp)) == EOF)
+		return '=';
+	if (t == '\n')
+		return -2;
+
+	if (qp) {
+		int d;
+
+		if ((d = fgetc(fp)) == EOF) {
+			(void) fseek(fp, -1, SEEK_CUR);
+			return EOF;
+		}
+
+		if ((t = hexdigcaps(t)) == -1 || (d = hexdigcaps(d)) == -1) {
+			(void) fseek(fp, -1, SEEK_CUR);
+			return EOF;
+		}
+
+		return (t << 4) | d;
+	}
+	else {
+		if (fseek(fp, -1, SEEK_CUR) == -1)
+			return EOF;
+		return '=';
+	}
+}

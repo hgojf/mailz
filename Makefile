@@ -3,32 +3,48 @@
 .PHONY: all clean install install-man test tidy
 
 PREFIX ?= /usr/local
-CFLAGS = -O2 -pipe -g -MD -MP
+CFLAGS = -O0 -pipe -g -MD -MP
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
-SRCS = address.c mail.c mailbox.c sendmail.c
+SRCS = 	errstr.c header.c mail.c maildir.c maildir-cache-read.c \
+		maildir-read-letter.c maildir-read.c maildir-send.c \
+		maildir-setup.c utf8.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
 
 CTAGS ?= ctags
 INSTALL ?= install
 
-all: mail mailwrapper
+all: mail maildir-cache-read maildir-read-letter maildir-read maildir-send maildir-setup
 
-mail: ${OBJS}
-	$(CC) -o $@ ${LDFLAGS} ${OBJS}
+mail: errstr.o mail.o maildir.o utf8.o
+	$(CC) -o $@ ${LDFLAGS} errstr.o mail.o maildir.o utf8.o
 
-mailwrapper: mailwrapper.o
-	$(CC) -o $@ ${CFLAGS} ${LDFLAGS} mailwrapper.o
+maildir-cache-read: maildir-cache-read.o
+	$(CC) -o $@ ${LDFLAGS} maildir-cache-read.o
+
+maildir-read-letter: header.o maildir-read-letter.o utf8.o
+	$(CC) -o $@ ${LDFLAGS} header.o maildir-read-letter.o utf8.o
+
+maildir-read: header.o maildir-read.o
+	$(CC) -o $@ ${LDFLAGS} header.o maildir-read.o
+
+maildir-send: maildir-send.o
+	$(CC) -o $@ ${LDFLAGS} maildir-send.o
+
+maildir-setup: maildir-setup.o
+	$(CC) -o $@ ${LDFLAGS} maildir-setup.o
 
 clean:
-	rm -f ${DEPS} ${OBJS} ${DEPS_COMPAT} ${OBJS_COMPAT} mail \
-	mailwrapper mailwrapper.o mailwrapper.d regress.o regress
+	rm -f ${DEPS} ${OBJS} mail maildir-read maildir-send maildir-setup
 
 install:
 	$(INSTALL) -m 0755 mail ${PREFIX}/bin/mailz
-	$(INSTALL) -m 0755 mailwrapper ${PREFIX}/libexec/mailzwrapper
+	$(INSTALL) -m 0755 maildir-read-letter ${PREFIX}/libexec/mailz-maildir-read-letter
+	$(INSTALL) -m 0755 maildir-read ${PREFIX}/libexec/mailz-maildir-read
+	$(INSTALL) -m 0755 maildir-send ${PREFIX}/libexec/mailz-maildir-send
+	$(INSTALL) -m 0755 maildir-setup ${PREFIX}/libexec/mailz-maildir-setup
 
 install-man:
 	$(INSTALL) -m 0644 mailz.1 ${PREFIX}/man/man1/

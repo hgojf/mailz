@@ -1,13 +1,2 @@
-*.[od]
-obj/*.[od]
-obj/mail
-obj/mailwrapper
-mail
-mailwrapper
-config.mk
-config.h
-ktrace.out
-lesswrapper/*.[od]
-lesswrapper/lesswrapper
+obj/
 tags
-regress
