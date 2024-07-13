@@ -343,9 +343,9 @@ maildir_send(const char *from, const char *to, const char *subject,
 }
 
 struct maildir_read
-maildir_read(const char *root, int dev_null)
+maildir_read(const char *root, int dev_null, int view_all)
 {
-	char path[PATH_MAX];
+	char *argv[5], path[PATH_MAX];
 	struct maildir_read rv;
 	struct letter *letters;
 	struct getline gl;
@@ -353,7 +353,7 @@ maildir_read(const char *root, int dev_null)
 	size_t nletters;
 	ssize_t nr;
 	pid_t pid;
-	int n, po[2], pe[2], status;
+	int argc, n, po[2], pe[2], status;
 
 	n = snprintf(path, sizeof(path), "%s/cur", root);
 	if (n < 0) {
@@ -388,6 +388,14 @@ maildir_read(const char *root, int dev_null)
 		return rv;
 	}
 
+	argc = 0;
+	argv[argc++] = "maildir-read";
+	if (view_all)
+		argv[argc++] = "-a";
+	argv[argc++] = "--";
+	argv[argc++] = path;
+	argv[argc++] = NULL;
+
 	switch (pid = fork()) {
 	case -1:
 		rv.val.save_errno = errno;
@@ -400,7 +408,7 @@ maildir_read(const char *root, int dev_null)
 			exit(MAILDIR_READ_DUP);
 		if (dup2(pe[1], STDERR_FILENO) == -1)
 			exit(MAILDIR_READ_DUP);
-		execl(PATH_MAILDIR_READ, "maildir-read", path, NULL);
+		execv(PATH_MAILDIR_READ, argv);
 		exit(MAILDIR_READ_EXEC);
 	default:
 		break;

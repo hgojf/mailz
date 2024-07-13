@@ -30,15 +30,31 @@ main(int argc, char *argv[])
 	DIR *dp;
 	struct getline gl;
 	ssize_t nw;
-	int dfd, rv, save_errno;
+	int ch, dfd, rv, save_errno, view_all;
 
-	if (argc != 2) {
+	view_all = 0;
+	while ((ch = getopt(argc, argv, "a")) != -1) {
+		switch (ch) {
+		case 'a':
+			view_all = 1;
+			break;
+		default:
+			save_errno = 0;
+			rv = MAILDIR_READ_USAGE;
+			goto fail;
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc != 1) {
 		save_errno = 0;
 		rv = MAILDIR_READ_USAGE;
 		goto fail;
 	}
 
-	if (unveil(argv[1], "r") == -1) {
+	if (unveil(argv[0], "r") == -1) {
 		save_errno = errno;
 		rv = MAILDIR_READ_UNVEIL;
 		goto fail;
@@ -50,7 +66,7 @@ main(int argc, char *argv[])
 		goto fail;
 	}
 
-	if ((dp = opendir(argv[1])) == NULL) {
+	if ((dp = opendir(argv[0])) == NULL) {
 		save_errno = errno;
 		rv = MAILDIR_READ_OPENDIR;
 		goto fail;
@@ -62,6 +78,7 @@ main(int argc, char *argv[])
 	for (;;) {
 		struct letter letter;
 		struct dirent *de;
+		const char *flags;
 		FILE *fp;
 		int r;
 
@@ -77,6 +94,11 @@ main(int argc, char *argv[])
 
 		if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
 			continue;
+		if (!view_all 
+					&& (flags = strstr(de->d_name, ":2,")) != NULL
+					&& strchr(flags, 'S') != NULL) {
+			continue;
+		}
 
 		if ((fp = fopenat(dfd, de->d_name)) == NULL) {
 			save_errno = errno;

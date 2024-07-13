@@ -26,7 +26,7 @@ struct maildir_read {
 	} val;
 };
 
-struct maildir_read maildir_read(const char *, int);
+struct maildir_read maildir_read(const char *, int, int);
 
 struct maildir_read_letter {
 	int status;

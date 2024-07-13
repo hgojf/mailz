@@ -190,7 +190,7 @@ read_maildir(const char *path, int show_all, int dev_null, struct mailbox *out)
 {
 	struct maildir_read mdr;
 
-	mdr = maildir_read(path, dev_null);
+	mdr = maildir_read(path, dev_null, show_all);
 	if (mdr.status != 0) {
 		warnx("maildir_read");
 		return -1;
