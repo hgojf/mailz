@@ -25,6 +25,7 @@
 #define MAILDIR_LETTER_READ_ERR -2
 #define MAILDIR_LETTER_READ_EOF -1
 
+static int letter_date_cmp(const void *, const void *);
 static int maildir_letter_read(FILE *, struct getline *, struct letter *);
 
 struct maildir_read_letter
@@ -465,6 +466,8 @@ maildir_read(char *path, int dev_null, int view_all)
 		goto fail;
 	}
 
+	qsort(letters, nletters, sizeof(*letters), letter_date_cmp);
+
 	free(gl.line);
 	rv.val.good.letters = letters;
 	rv.val.good.nletters = nletters;
@@ -479,6 +482,19 @@ maildir_read(char *path, int dev_null, int view_all)
 	free(letters);
 	free(gl.line);
 	return rv;
+}
+
+static int
+letter_date_cmp(const void *one, const void *two)
+{
+	const struct letter *n1 = one, *n2 = two;
+
+	if (n1->date > n2->date)
+		return 1;
+	else if (n1->date == n2->date)
+		return 0;
+	else
+		return -1;
 }
 
 static int
