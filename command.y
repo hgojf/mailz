@@ -264,6 +264,14 @@ print: PRINT message_number {
 			YYERROR;
 		}
 	}
+	| PRINT /* nothing */ {
+		for (size_t i = 0; i < interactive->nletters; i++) {
+			if (letter_print(i + 1, &interactive->letters[i]) == -1) {
+				warnx("print_letter");
+				YYERROR;
+			}
+		}
+	}
 	;
 
 read: READ message_number {
