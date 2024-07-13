@@ -15,10 +15,14 @@
 "ignore" { return IGNORE; }
 "manual" { return MANUAL; }
 "more" { return MORE; }
+"p" { return PRINT; }
+"print" { return PRINT; }
 "reorder" { return REORDER; }
 "s" { return SAVE; }
 "save" { return SAVE; }
 "set" { return SET; }
+"t" { return THREAD; }
+"thread" { return THREAD; }
 "unignore" { return UNIGNORE; }
 "vi" { return VI; }
 

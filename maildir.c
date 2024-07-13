@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#include "address.h"
 #include "getline.h"
 #include "letter.h"
 #include "maildir.h"
@@ -390,7 +391,7 @@ maildir_read(const char *root, int dev_null)
 
 		t = reallocarray(letters, nletters + 1, sizeof(*letters));
 		if (t == NULL) {
-			free(letter.from);
+			free(letter.from.str);
 			free(letter.path);
 			free(letter.subject);
 			goto fail;
@@ -442,7 +443,8 @@ maildir_read(const char *root, int dev_null)
 static int
 maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 {
-	char *from, *path, *subject;
+	char *f, *path, *subject;
+	struct from_safe from;
 	size_t n;
 	ssize_t len;
 	time_t date;
@@ -460,8 +462,12 @@ maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 
 	if (getdelim(&gl->line, &gl->n, '\0', fp) == -1)
 		goto path;
-	if ((from = strdup(gl->line)) == NULL)
+	if ((f = strdup(gl->line)) == NULL)
 		goto path;
+	if (from_safe_new(f, &from) == -1) {
+		free(f);
+		goto path;
+	}
 
 	if ((len = getdelim(&gl->line, &gl->n, '\0', fp)) == -1)
 		goto from;
@@ -479,7 +485,7 @@ maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 	return 0;
 
 	from:
-	free(from);
+	free(from.str);
 	path:
 	free(path);
 	return MAILDIR_LETTER_READ_ERR;

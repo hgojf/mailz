@@ -7,13 +7,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "address.h"
 #include "getline.h"
 #include "header.h"
 #include "maildir-read.h"
 
 struct letter {
 	time_t date;
-	char *from;
+	struct from_safe from;
 	char *subject;
 };
 
@@ -91,7 +92,7 @@ main(int argc, char *argv[])
 		if (fclose(fp) == EOF) {
 			save_errno = errno;
 			rv = MAILDIR_READ_FCLOSE;
-			free(letter.from);
+			free(letter.from.str);
 			free(letter.subject);
 			goto gl;
 		}
@@ -99,11 +100,11 @@ main(int argc, char *argv[])
 		if (letter_write(stdout, de->d_name, &letter) == -1) {
 			save_errno = errno;
 			rv = MAILDIR_READ_WRITE;
-			free(letter.from);
+			free(letter.from.str);
 			free(letter.subject);
 			goto gl;
 		}
-		free(letter.from);
+		free(letter.from.str);
 		free(letter.subject);
 	}
 
@@ -132,7 +133,7 @@ letter_write(FILE *out, const char *path, struct letter *letter)
 		return -1;
 	if (fwrite(path, strlen(path) + 1, 1, out) != 1)
 		return -1;
-	if (fwrite(letter->from, strlen(letter->from) + 1, 1, out) != 1)
+	if (fwrite(letter->from.str, strlen(letter->from.str) + 1, 1, out) != 1)
 		return -1;
 	if (letter->subject != NULL) {
 		if (fwrite(letter->subject, strlen(letter->subject) + 1, 1, out) != 1)
@@ -163,10 +164,12 @@ fopenat(int at, const char *name)
 static int
 letter_read(FILE *fp, struct getline *gl, struct letter *out)
 {
-	char *from, *subject;
+	struct from_safe from;
+	char *subject;
 	time_t date;
 
-	from = subject = NULL;
+	from.str = NULL;
+	subject = NULL;
 	date = -1;
 	for (;;) {
 		struct header header;
@@ -194,12 +197,16 @@ letter_read(FILE *fp, struct getline *gl, struct letter *out)
 				goto fail;
 		}
 		else if (!strcasecmp(header.key, "from")) {
-			if (from != NULL) {
+			if (from.str != NULL) {
 				free(header.key);
 				free(header.val);
 				goto fail;
 			}
-			from = header.val;
+			if (from_safe_new(header.val, &from) == -1) {
+				free(header.key);
+				free(header.val);
+				goto fail;
+			}
 			free(header.key);
 		}
 		else if (!strcasecmp(header.key, "subject")) {
@@ -218,7 +225,7 @@ letter_read(FILE *fp, struct getline *gl, struct letter *out)
 		}
 	}
 
-	if (date == -1 || from == NULL)
+	if (date == -1 || from.str == NULL)
 		goto fail;
 
 	done:
@@ -228,7 +235,7 @@ letter_read(FILE *fp, struct getline *gl, struct letter *out)
 	return 0;
 
 	fail:
-	free(from);
+	free(from.str);
 	free(subject);
 	return -1;
 }

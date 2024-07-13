@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "address.h"
 #include "letter.h"
 #include "config.h"
 #include "command.h"

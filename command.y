@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "../address.h"
 #include "../config.h"
 #include "../letter.h"
 #include "../maildir.h"
@@ -31,6 +32,7 @@ enum {
 };
 
 static int config_location(char [static PATH_MAX]);
+int letter_print(size_t, struct letter *);
 
 extern int yylex_destroy(void);
 extern int yylex(void);
@@ -46,7 +48,8 @@ static struct interactive *interactive;
 
 %}
 
-%token ADDRESS CACHE EDIT IGNORE MANUAL MORE NUMBER REORDER SAVE SET STRING UNIGNORE VI
+%token ADDRESS CACHE EDIT IGNORE MANUAL PRINT MORE NUMBER REORDER SAVE 
+%token SET STRING THREAD UNIGNORE VI
 
 %union {
 	struct address address;
@@ -79,9 +82,11 @@ command: ignore
 		if (mdrl.status != 0)
 			warnc(mdrl.save_errno, "maildir_read_letter %d", mdrl.status);
 	}
+	| print
 	| reorder
 	| save 
 	| set
+	| thread
 	| unignore
 	;
 
@@ -214,6 +219,14 @@ message_number: NUMBER {
 	}
 	;
 
+print: PRINT message_number {
+		if (letter_print($2 + 1, &interactive->letters[$2]) == -1) {
+			warnx("print_letter");
+			YYERROR;
+		}
+	}
+	;
+
 reorder: REORDER argument_list {
 		for (size_t i = 0; i < config->reorder.argc; i++)
 			free(config->reorder.argv[i]);
@@ -225,6 +238,62 @@ reorder: REORDER argument_list {
 		for (size_t i = 0; i < config->reorder.argc; i++)
 			printf("%s, ", config->reorder.argv[i]);
 		printf("\n");
+	}
+	;
+
+thread: THREAD message_number {
+		struct letter *letter;
+		const char *subject;
+		size_t start;
+		int re;
+
+		letter = &interactive->letters[$2];
+
+		/* cant find a thread without a subject */
+		if (letter->subject == NULL) {
+			if (letter_print($2 + 1, letter) == -1) {
+				warnx("letter_print");
+				YYERROR;
+			}
+			YYACCEPT;
+		}
+
+		if (!strncmp(letter->subject, "Re: ", strlen("Re: "))) {
+			subject = letter->subject + strlen("Re: ");
+			re = 1;
+		}
+		else {
+			subject = letter->subject;
+			re = 0;
+		}
+
+		/*
+		 * if this is the first message in a thread, dont search mails
+		 * before it
+		 */
+		if (!re) {
+			start = $2 + 1;
+			/* wont be printed in loop */
+			if (letter_print($2 + 1, letter) == -1) {
+				warnx("letter_print");
+				YYERROR;
+			}
+		}
+		else
+			start = 0;
+
+		for (size_t i = start; i < interactive->nletters; i++) {
+			struct letter *l = &interactive->letters[i];
+
+			if ((!strncmp(l->subject, "Re: ", strlen("Re: ")) &&
+					!strcmp(l->subject + strlen("Re: "), subject))
+					|| (re && !strcmp(l->subject, subject))) {
+				if (letter_print(i + 1, l) == -1) {
+					warnx("letter_print");
+					YYERROR;
+				}
+			}
+		}
 	}
 	;
 
@@ -359,6 +428,10 @@ command(struct config *cfg, struct letter *letters, size_t nletters,
 
 	yyin = stdin;
 
+	for (size_t i = 0; i < nletters; i++)
+		if (letter_print(i + 1, &letters[i]) == -1)
+			return -1;
+
 	while (!feof(stdin) && !ferror(stdin)) {
 		yyparse();
 		yylex_destroy();
@@ -431,4 +504,25 @@ config_location(char out[static PATH_MAX])
 		return CONFIG_ERRORED;
 
 	return CONFIG_FOUND;
+}
+
+int
+letter_print(size_t nth, struct letter *letter)
+{
+	struct tm *tm;
+	const char *subject;
+	char date[30];
+	struct from from;
+
+	from_extract(&letter->from, &from);
+
+	if ((tm = localtime(&letter->date)) == NULL
+				|| strftime(date, sizeof(date), "%a %b %d %H:%M", tm) == 0)
+			return -1;
+	subject = letter->subject == NULL ? "No Subject" : letter->subject;
+
+	if (printf("%4zu %-20s %-32.*s %-30s\n", nth, date,
+				from.al, from.addr, subject) < 0)
+			return -1;
+	return 0;
 }
