@@ -55,8 +55,7 @@ adds a list of headers to be ignored when printing mail.
 displays a letter inside of a pager. If no letter is specified, the
 last letter interacted with will be used.
 .It Ic print (p)
-prints a letter to the standard output. If no letter is specified, the
-last letter interacted with will be used.
+prints the specified letter to the standard output.
 .It Ic read (r)
 marks the specified letter as having been read.
 .It Ic reorder
@@ -82,13 +81,13 @@ displays a list of emails which are a part of the same thread
 as the email specified. mails are considered to be part of the same
 thread if they one has the subject "Same thing", and the other has the
 subject "Re: Same thing", or if both mails have the subject 
-"Re: Same thing". If no letter is specified, the last letter 
-interacted with will be used.
+"Re: Same thing".
 .It Ic unignore
 adds a list of headers to be displayed when printing mail. if specified,
 no other headers will be displayed.
 .It Ic x
-marks the last letter interacted with as being unread.
+marks the specified letter as being unread. if no letter is specified,
+the last letter interacted with will be used.
 .El
 .Sh VARIABLES
 Several variables affect the operation of

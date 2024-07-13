@@ -2,6 +2,7 @@
 #include <sys/mman.h>
 #include <sys/wait.h>
 
+#include <assert.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -72,6 +73,7 @@ static struct interactive *interactive;
 %type<argv> argument_list
 %type<edit_mode> edit_mode
 %type<number> message_number
+%type<number> optional_message_number
 %type<number> NUMBER
 %type<string> STRING
 
@@ -107,7 +109,7 @@ command: ignore
 	| unread
 	;
 
-more: MORE message_number {
+more: MORE optional_message_number {
 		FILE *fp;
 		struct maildir_read_letter mdrl;
 		pid_t pid;
@@ -191,7 +193,7 @@ more: MORE message_number {
 	}
 	;
 
-save: SAVE message_number {
+save: SAVE optional_message_number {
 		char path[] = PATH_TMPDIR "save.XXXXXX";
 		struct maildir_read_letter mdrl;
 		int fd;
@@ -228,6 +230,16 @@ save: SAVE message_number {
 	}
 	;
 
+optional_message_number: message_number { $$ = $1; }
+	| /* empty */ {
+		if (interactive == NULL) {
+			yyerror("not interactive");
+			YYERROR;
+		}
+		$$ = interactive->letter;
+	}
+	;
+
 message_number: NUMBER {
 		if (interactive == NULL) {
 			yyerror("not interactive");
@@ -241,6 +253,7 @@ message_number: NUMBER {
 			yyerror("message number was too small");
 			YYERROR;
 		}
+		interactive->letter = $1 - 1;
 		$$ = $1 - 1;
 	}
 	;
@@ -493,6 +506,10 @@ command(struct config *cfg, struct letter *letters, size_t nletters,
 	in.root = root;
 	in.dev_null = dev_null;
 	in.cur = cur;
+
+	assert(nletters > 0);
+	in.letter = 0;
+
 	interactive = &in;
 
 	yyin = stdin;

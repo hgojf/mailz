@@ -104,10 +104,16 @@ main(int argc, char *argv[])
 	if (read_maildir(argv[0], view_all, dev_null, &mailbox) == -1)
 		goto config;
 
+	if (mailbox.nletters == 0) {
+		puts("No mail.");
+		goto good;
+	}
+
 	if (command(&config, mailbox.letters, mailbox.nletters, argv[0], dev_null,
 			mailbox.cur) == -1)
 		goto config;
 
+	good:
 	rv = 0;
 	if (rmdir(PATH_TMPDIR) == -1 && errno != ENOTEMPTY) {
 		warn("rmdir %s", PATH_TMPDIR);
