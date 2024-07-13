@@ -46,7 +46,7 @@ command-lex.c: $(.CURDIR)/command.l
 	lex -o command-lex.c $(.CURDIR)/command.l
 
 clean:
-	rm -f ${DEPS} ${OBJS} ${PROGS} command-lex.c command.c
+	rm -f ${DEPS} ${OBJS} ${PROGS} command-lex.c command.c command.h
 
 install:
 	$(INSTALL) -m 0755 mail ${PREFIX}/bin/mailz
