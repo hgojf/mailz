@@ -350,6 +350,7 @@ ignore: IGNORE argument_list {
 			printf("\n");
 		}
 	}
+	;
 
 unignore: UNIGNORE argument_list {
 		struct argv_shm shm;
