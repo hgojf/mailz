@@ -3,6 +3,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
@@ -21,6 +22,7 @@
 struct mailbox {
 	size_t nletters;
 	struct letter *letters;
+	int cur;
 };
 
 static void config_free(struct config *);
@@ -90,6 +92,8 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if (unveil(PATH_TMPDIR, "crw") == -1)
 		err(1, "unveil");
+	if (unveil(argv[0], "rc") == -1)
+		err(1, "unveil");
 	if (pledge("stdio proc exec rpath cpath wpath", NULL) == -1)
 		err(1, "pledge");
 
@@ -100,7 +104,8 @@ main(int argc, char *argv[])
 	if (read_maildir(argv[0], view_all, dev_null, &mailbox) == -1)
 		goto config;
 
-	if (command(&config, mailbox.letters, mailbox.nletters, argv[0], dev_null) == -1)
+	if (command(&config, mailbox.letters, mailbox.nletters, argv[0], dev_null,
+			mailbox.cur) == -1)
 		goto config;
 
 	rv = 0;
@@ -114,6 +119,10 @@ main(int argc, char *argv[])
 		free(mailbox.letters[i].subject);
 	}
 	free(mailbox.letters);
+	if (close(mailbox.cur) == -1) {
+		warn("close");
+		rv = 1;
+	}
 	config:
 	config_free(&config);
 	dev_null:
@@ -186,12 +195,30 @@ config_free(struct config *cfg)
 }
 
 static int
-read_maildir(const char *path, int show_all, int dev_null, struct mailbox *out)
+read_maildir(const char *root, int show_all, int dev_null, struct mailbox *out)
 {
+	char path[PATH_MAX];
 	struct maildir_read mdr;
+	int n;
+
+	n = snprintf(path, sizeof(path), "%s/cur", root);
+	if (n < 0) {
+		warn("snprintf");
+		return -1;
+	}
+	else if (n >= sizeof(path)) {
+		warnc(ENAMETOOLONG, "%s/cur", root);
+		return -1;
+	}
+
+	if ((out->cur = open(path, O_RDONLY | O_DIRECTORY)) == -1) {
+		warn("%s", path);
+		return -1;
+	}
 
 	mdr = maildir_read(path, dev_null, show_all);
 	if (mdr.status != 0) {
+		(void) close(out->cur);
 		warnx("maildir_read");
 		return -1;
 	}

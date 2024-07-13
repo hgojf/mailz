@@ -18,6 +18,8 @@
 "more" { return MORE; }
 "p" { return PRINT; }
 "print" { return PRINT; }
+"r" { return READ; }
+"read" { return READ; }
 "reorder" { return REORDER; }
 "s" { return SAVE; }
 "save" { return SAVE; }
@@ -26,6 +28,7 @@
 "thread" { return THREAD; }
 "unignore" { return UNIGNORE; }
 "vi" { return VI; }
+"x" { return UNREAD; }
 
 [a-zA-Z_@\.-]+[a-zA-Z0-9_@\.-]* { 
 	yylval.string = strdup(yytext); 

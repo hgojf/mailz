@@ -22,6 +22,7 @@ struct interactive {
 	const char *root;
 	struct letter *letters;
 	size_t nletters;
+	int cur;
 
 	size_t letter;
 
@@ -39,6 +40,9 @@ int letter_print(size_t, struct letter *);
 
 static int argv_shm(struct argv *, struct argv_shm *);
 
+static int letter_mark_read(int, struct letter *);
+static int letter_mark_unread(int, struct letter *);
+
 extern int yylex_destroy(void);
 extern int yylex(void);
 extern int yylineno;
@@ -53,8 +57,8 @@ static struct interactive *interactive;
 
 %}
 
-%token ADDRESS CACHE EDIT IGNORE MANUAL PRINT MORE NUMBER REORDER SAVE 
-%token SET STRING THREAD UNIGNORE VI
+%token ADDRESS CACHE EDIT IGNORE MANUAL PRINT MORE NUMBER READ REORDER SAVE
+%token SET STRING THREAD UNIGNORE UNREAD VI
 
 %union {
 	struct address address;
@@ -89,13 +93,18 @@ command: ignore
 			&config->reorder.shm);
 		if (mdrl.status != 0)
 			warnc(mdrl.save_errno, "maildir_read_letter %d", mdrl.status);
+
+		if (letter_mark_read(interactive->cur, &interactive->letters[$1]) == -1)
+			YYERROR;
 	}
 	| print
+	| read
 	| reorder
 	| save 
 	| set
 	| thread
 	| unignore
+	| unread
 	;
 
 more: MORE message_number {
@@ -176,6 +185,9 @@ more: MORE message_number {
 			warnx("pager failed: exit status %d", WEXITSTATUS(status));
 			YYERROR;
 		}
+
+		if (letter_mark_read(interactive->cur, &interactive->letters[$2]) == -1)
+			YYERROR;
 	}
 	;
 
@@ -238,6 +250,12 @@ print: PRINT message_number {
 			warnx("print_letter");
 			YYERROR;
 		}
+	}
+	;
+
+read: READ message_number {
+		if (letter_mark_read(interactive->cur, &interactive->letters[$2]) == -1)
+			YYERROR;
 	}
 	;
 
@@ -382,6 +400,12 @@ unignore: UNIGNORE argument_list {
 	}
 	;
 
+unread: UNREAD message_number {
+		if (letter_mark_unread(interactive->cur, &interactive->letters[$2]) == -1)
+			YYERROR;
+	}
+	;
+
 argument_list: STRING {
 		$$.argv = reallocarray(NULL, 1, sizeof(*$$.argv));
 		if ($$.argv == NULL) {
@@ -457,7 +481,7 @@ yyerror(const char *s)
 
 int
 command(struct config *cfg, struct letter *letters, size_t nletters, 
-	const char *root, int dev_null)
+	const char *root, int dev_null, int cur)
 {
 	struct interactive in;
 
@@ -468,6 +492,7 @@ command(struct config *cfg, struct letter *letters, size_t nletters,
 	in.nletters = nletters;
 	in.root = root;
 	in.dev_null = dev_null;
+	in.cur = cur;
 	interactive = &in;
 
 	yyin = stdin;
@@ -626,4 +651,62 @@ argv_shm(struct argv *in, struct argv_shm *out)
 	(void) close(shm);
 	(void) unlink(path);
 	return -1;
+}
+
+int
+letter_mark_read(int root, struct letter *letter)
+{
+	const char *flags;
+	char *new;
+	int n;
+
+	if ((flags = strstr(letter->path, ":2,")) != NULL) {
+		if (strchr(flags, 'S') != NULL)
+			return 0;
+	}
+
+	if (flags != NULL) {
+		n = asprintf(&new, "%sS", letter->path);
+	}
+	else
+		n = asprintf(&new, "%s:2,S", letter->path);
+	if (n == -1)
+		return -1;
+
+	if (renameat(root, letter->path, root, new) == -1) {
+		warn("renameat %s", letter->path);
+		free(new);
+		return -1;
+	}
+
+	free(letter->path);
+	letter->path = new;
+	return 0;
+}
+
+static int
+letter_mark_unread(int root, struct letter *letter)
+{
+	const char *f, *flags;
+	size_t idx;
+	char new[NAME_MAX];
+
+	if ((flags = strstr(letter->path, ":2,")) == NULL 
+			|| (f = strchr(flags, 'S')) == NULL)
+		return 0;
+
+	/* path is returned by readdir, so it will never be longer than NAME_MAX */
+	(void) strlcpy(new, letter->path, sizeof(new));
+
+	idx = f - letter->path;
+	memmove(&new[idx], &new[idx+1], strlen(&new[idx]) + 1);
+
+	if (renameat(root, letter->path, root, new) == -1) {
+		warn("renameat %s", letter->path);
+		return -1;
+	}
+
+	(void) strlcpy(letter->path, new, strlen(letter->path) + 1);
+
+	return 0;
 }

@@ -343,9 +343,9 @@ maildir_send(const char *from, const char *to, const char *subject,
 }
 
 struct maildir_read
-maildir_read(const char *root, int dev_null, int view_all)
+maildir_read(char *path, int dev_null, int view_all)
 {
-	char *argv[5], path[PATH_MAX];
+	char *argv[5];
 	struct maildir_read rv;
 	struct letter *letters;
 	struct getline gl;
@@ -353,19 +353,7 @@ maildir_read(const char *root, int dev_null, int view_all)
 	size_t nletters;
 	ssize_t nr;
 	pid_t pid;
-	int argc, n, po[2], pe[2], status;
-
-	n = snprintf(path, sizeof(path), "%s/cur", root);
-	if (n < 0) {
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_SNPRINTF;
-		return rv;
-	}
-	if (n >= sizeof(path)) {
-		rv.val.save_errno = 0;
-		rv.status = MAILDIR_READ_TOOLONG;
-		return rv;
-	}
+	int argc, po[2], pe[2], status;
 
 	if (pipe(po) == -1) {
 		rv.val.save_errno = errno;
@@ -508,7 +496,10 @@ maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 	else if (n != sizeof(date))
 		return MAILDIR_LETTER_READ_ERR;
 
-	if (getdelim(&gl->line, &gl->n, '\0', fp) == -1)
+	if ((len = getdelim(&gl->line, &gl->n, '\0', fp)) == -1)
+		return MAILDIR_LETTER_READ_ERR;
+	/* not >= because len includes the NUL terminator */
+	if (len > NAME_MAX)
 		return MAILDIR_LETTER_READ_ERR;
 	if ((path = strdup(gl->line)) == NULL)
 		return MAILDIR_LETTER_READ_ERR;
