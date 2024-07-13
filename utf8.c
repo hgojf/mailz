@@ -1,11 +1,10 @@
 #include <wchar.h>
-#include <uchar.h>
 
 #include "utf8.h"
 
 /* 
  * decodes a single utf-8 codepoint, except for NUL
- * setlocale(LC_CTYPE, "UTF-8") *must* have been called
+ * setlocale(LC_CTYPE, "C.UTF-8") *must* have been called
  */
 int
 utf8_decode(struct utf8_decode *state, char byte)
