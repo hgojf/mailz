@@ -469,11 +469,19 @@ maildir_read(const char *root, int dev_null)
 		goto fail;
 	}
 
+	free(gl.line);
 	rv.val.good.letters = letters;
 	rv.val.good.nletters = nletters;
 	return rv;
 
 	fail:
+	for (size_t i = 0; i < nletters; i++) {
+		free(letters[i].from.str);
+		free(letters[i].path);
+		free(letters[i].subject);
+	}
+	free(letters);
+	free(gl.line);
 	return rv;
 }
 

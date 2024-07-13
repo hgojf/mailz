@@ -108,6 +108,12 @@ main(int argc, char *argv[])
 		warn("rmdir %s", PATH_TMPDIR);
 		rv = 1;
 	}
+	for (size_t i = 0; i < mailbox.nletters; i++) {
+		free(mailbox.letters[i].from.str);
+		free(mailbox.letters[i].path);
+		free(mailbox.letters[i].subject);
+	}
+	free(mailbox.letters);
 	config:
 	config_free(&config);
 	dev_null:
