@@ -47,6 +47,7 @@ main(int argc, char *argv[])
 	if (pipe(p) == -1) {
 		save_errno = errno;
 		rv = MAILDIR_SEND_PIPE;
+		abort();
 		goto fail;
 	}
 
@@ -133,6 +134,7 @@ main(int argc, char *argv[])
 		rv = MAILDIR_SEND_WAITPID;
 		goto fp;
 	}
+	pid = -1;
 
 	if (status != 0) {
 		save_errno = 0;

@@ -7,19 +7,22 @@ CFLAGS = -O0 -pipe -g -MD -MP
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
-SRCS = 	errstr.c header.c mail.c maildir.c maildir-cache-read.c \
-		maildir-read-letter.c maildir-read.c maildir-send.c \
-		maildir-setup.c utf8.c
+SRCS = 	command.c command-lex.c errstr.c header.c mail.c maildir.c \
+		maildir-cache-read.c maildir-read.c maildir-read-letter.c \
+		maildir-send.c maildir-setup.c utf8.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
+
+PROGS = mail maildir-cache-read maildir-read-letter maildir-read \
+	maildir-send maildir-setup
 
 CTAGS ?= ctags
 INSTALL ?= install
 
-all: mail maildir-cache-read maildir-read-letter maildir-read maildir-send maildir-setup
+all: ${PROGS}
 
-mail: errstr.o mail.o maildir.o utf8.o
-	$(CC) -o $@ ${LDFLAGS} errstr.o mail.o maildir.o utf8.o
+mail: command.o command-lex.o errstr.o mail.o maildir.o utf8.o
+	$(CC) -o $@ ${LDFLAGS} command.o command-lex.o errstr.o mail.o maildir.o utf8.o
 
 maildir-cache-read: maildir-cache-read.o
 	$(CC) -o $@ ${LDFLAGS} maildir-cache-read.o
@@ -36,8 +39,14 @@ maildir-send: maildir-send.o
 maildir-setup: maildir-setup.o
 	$(CC) -o $@ ${LDFLAGS} maildir-setup.o
 
+command.c: $(.CURDIR)/command.y
+	yacc -do command.c $(.CURDIR)/command.y
+
+command-lex.c: $(.CURDIR)/command.l
+	lex -o command-lex.c $(.CURDIR)/command.l
+
 clean:
-	rm -f ${DEPS} ${OBJS} mail maildir-read maildir-send maildir-setup
+	rm -f ${DEPS} ${OBJS} ${PROGS} command-lex.c command.c
 
 install:
 	$(INSTALL) -m 0755 mail ${PREFIX}/bin/mailz
