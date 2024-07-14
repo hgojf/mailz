@@ -519,6 +519,8 @@ maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 		return MAILDIR_LETTER_READ_EOF;
 	else if (n != sizeof(date))
 		return MAILDIR_LETTER_READ_ERR;
+	if (localtime(&date) == NULL)
+		return MAILDIR_LETTER_READ_ERR;
 
 	if ((len = getdelim(&gl->line, &gl->n, '\0', fp)) == -1)
 		return MAILDIR_LETTER_READ_ERR;
