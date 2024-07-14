@@ -421,7 +421,7 @@ unignore: UNIGNORE argument_list {
 	}
 	;
 
-unread: UNREAD message_number {
+unread: UNREAD optional_message_number {
 		if (letter_mark_unread(interactive->cur, &interactive->letters[$2]) == -1)
 			YYERROR;
 	}
