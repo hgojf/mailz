@@ -78,7 +78,10 @@ static struct interactive *interactive;
 %type<string> STRING
 
 %%
-toplevel: command '\n'
+toplevel: command '\n' {
+		if (interactive != NULL)
+			return 0;
+	}
 	| toplevel command '\n'
 	;
 
@@ -527,6 +530,7 @@ command(struct config *cfg, struct letter *letters, size_t nletters,
 			return -1;
 
 	while (!feof(stdin) && !ferror(stdin)) {
+		printf("> ");
 		yyparse();
 		yylex_destroy();
 	}
