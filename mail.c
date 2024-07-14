@@ -216,7 +216,7 @@ write_cache(struct mailbox *mailbox, int view_all)
 	int fd, rv;
 	FILE *fp;
 
-	fd = openat(mailbox->cur, "../.mailzcache", O_WRONLY | O_CREAT, 0600);
+	fd = openat(mailbox->cur, "../.mailzcache", O_WRONLY | O_CREAT | O_TRUNC, 0600);
 	if (fd == -1)
 		return -1;
 	if ((fp = fdopen(fd, "w")) == NULL) {
