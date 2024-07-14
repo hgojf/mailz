@@ -37,16 +37,19 @@ maildir_cache_read(FILE *fp, struct maildir_cache *out)
 	if (fstat(fd, &sb) == -1)
 		return -1;
 
-	if (fread(&magic, sizeof(magic), 1, fp) != 1)
+	if (flock(fd, LOCK_SH) == -1)
 		return -1;
+
+	if (fread(&magic, sizeof(magic), 1, fp) != 1)
+		goto lock;
 
 	if ((magic & MAILDIR_CACHE_MAGIC_MASK) != MAILDIR_CACHE_MAGIC)
-		return -1;
+		goto lock;
 	if ((magic & MAILDIR_CACHE_VERSION_MASK) != MAILDIR_CACHE_VERSION)
-		return -1;
+		goto lock;
 
 	if (fread(&view_seen, sizeof(view_seen), 1, fp) != 1)
-		return -1;
+		goto lock;
 
 	letters = NULL;
 	nletters = 0;
@@ -92,6 +95,9 @@ maildir_cache_read(FILE *fp, struct maildir_cache *out)
 		out->mtime = sb.st_mtim;
 	}
 	free(gl.line);
+	lock:
+	if (flock(fd, LOCK_UN) == -1)
+		rv = -1;
 	return rv;
 }
 

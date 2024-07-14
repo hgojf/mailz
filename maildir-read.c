@@ -70,7 +70,7 @@ main(int argc, char *argv[])
 		goto fail;
 	}
 
-	if (pledge("stdio rpath", NULL) == -1) {
+	if (pledge("stdio rpath flock", NULL) == -1) {
 		save_errno = errno;
 		rv = MAILDIR_READ_PLEDGE;
 		goto fail;
@@ -95,13 +95,19 @@ main(int argc, char *argv[])
 		goto root;
 	}
 
+	if (pledge("stdio rpath", NULL) == -1) {
+		save_errno = errno;
+		rv = MAILDIR_READ_PLEDGE;
+		goto root;
+	}
+
 	if (cache.nletters != 0) {
 		struct stat sb;
 
 		if (fstat(dfd, &sb) == -1) {
 			save_errno = errno;
 			rv = MAILDIR_READ_OPENDIR;
-			goto root;
+			goto cache;
 		}
 
 		if (timespeccmp(&cache.mtime, &sb.st_mtim, >=)) {
