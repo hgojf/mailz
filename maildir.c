@@ -412,7 +412,9 @@ maildir_read(char *path, int dev_null, int view_all)
 	if (fread(&need_recache, sizeof(need_recache), 1, fp) != 1) {
 		rv.val.save_errno = errno;
 		rv.status = MAILDIR_READ_READ;
-		goto fail;
+		(void) fclose(fp);
+		(void) close(pe[0]);
+		return rv;
 	}
 
 	nletters = 0;
