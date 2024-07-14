@@ -508,6 +508,7 @@ letter_date_cmp(const void *one, const void *two)
 static int
 maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 {
+	mbstate_t mbs;
 	char *f, *path, *subject;
 	struct from_safe from;
 	size_t n;
@@ -530,6 +531,8 @@ maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 
 	if (getdelim(&gl->line, &gl->n, '\0', fp) == -1)
 		goto path;
+	if (mbrtowc(NULL, gl->line, len, &mbs) < 0)
+		return MAILDIR_LETTER_READ_ERR;
 	if ((f = strdup(gl->line)) == NULL)
 		goto path;
 	if (from_safe_new(f, &from) == -1) {
@@ -539,6 +542,8 @@ maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 
 	if ((len = getdelim(&gl->line, &gl->n, '\0', fp)) == -1)
 		goto from;
+	if (mbrtowc(NULL, gl->line, len, &mbs) < 0)
+		return MAILDIR_LETTER_READ_ERR;
 	if (len == 0)
 		subject = NULL;
 	else {
