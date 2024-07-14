@@ -21,6 +21,7 @@ struct maildir_read {
 		struct {
 			size_t nletters;
 			struct letter *letters;
+			int need_recache;
 		} good;
 		int save_errno; /* bad */
 	} val;

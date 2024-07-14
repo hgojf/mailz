@@ -354,6 +354,7 @@ maildir_read(char *path, int dev_null, int view_all)
 	size_t nletters;
 	ssize_t nr;
 	pid_t pid;
+	uint8_t need_recache;
 	int argc, po[2], pe[2], status;
 
 	if (pipe(po) == -1) {
@@ -406,6 +407,12 @@ maildir_read(char *path, int dev_null, int view_all)
 		rv.val.save_errno = errno;
 		rv.status = MAILDIR_READ_CLOSE;
 		return rv;
+	}
+
+	if (fread(&need_recache, sizeof(need_recache), 1, fp) != 1) {
+		rv.val.save_errno = errno;
+		rv.status = MAILDIR_READ_READ;
+		goto fail;
 	}
 
 	nletters = 0;
@@ -471,6 +478,7 @@ maildir_read(char *path, int dev_null, int view_all)
 	free(gl.line);
 	rv.val.good.letters = letters;
 	rv.val.good.nletters = nletters;
+	rv.val.good.need_recache = need_recache;
 	return rv;
 
 	fail:

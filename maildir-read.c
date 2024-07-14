@@ -1,3 +1,6 @@
+#include <sys/stat.h>
+#include <sys/time.h>
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -10,6 +13,7 @@
 #include "address.h"
 #include "getline.h"
 #include "header.h"
+#include "maildir-cache-read.h"
 #include "maildir-read.h"
 
 struct letter {
@@ -18,19 +22,25 @@ struct letter {
 	char *subject;
 };
 
+static struct maildir_cache_entry *cache_find(struct maildir_cache *, const char *);
+static int cache_path_cmp(const void *, const void *);
 static FILE *fopenat(int, const char *);
 static int letter_read(FILE *, struct getline *, struct letter *);
 static int letter_write(FILE *, const char *, struct letter *);
+static DIR *opendirat(int, const char *);
+static int read_cache(int, struct maildir_cache *);
 static time_t rfc5322_dateparse(char *);
 
 /* argument is the cur directory of the maildir */
 int
 main(int argc, char *argv[])
 {
+	struct maildir_cache cache;
 	DIR *dp;
 	struct getline gl;
 	ssize_t nw;
-	int ch, dfd, rv, save_errno, view_all;
+	int ch, dfd, root, rv, save_errno, view_all;
+	uint8_t need_recache;
 
 	view_all = 0;
 	while ((ch = getopt(argc, argv, "a")) != -1) {
@@ -66,17 +76,80 @@ main(int argc, char *argv[])
 		goto fail;
 	}
 
-	if ((dp = opendir(argv[0])) == NULL) {
+	if ((root = open(argv[0], O_RDONLY | O_DIRECTORY)) == -1) {
 		save_errno = errno;
 		rv = MAILDIR_READ_OPENDIR;
 		goto fail;
 	}
+
+	if ((dp = opendirat(root, "cur")) == NULL) {
+		save_errno = errno;
+		rv = MAILDIR_READ_OPENDIR;
+		goto root;
+	}
 	dfd = dirfd(dp);
 
+	if (read_cache(root, &cache) == -1) {
+		save_errno = 0;
+		rv = MAILDIR_READ_CACHE;
+		goto root;
+	}
+
+	if (cache.nletters != 0) {
+		struct stat sb;
+
+		if (fstat(dfd, &sb) == -1) {
+			save_errno = errno;
+			rv = MAILDIR_READ_OPENDIR;
+			goto root;
+		}
+
+		if (timespeccmp(&cache.mtime, &sb.st_mtim, >=)) {
+			need_recache = 0;
+			if (fwrite(&need_recache, sizeof(need_recache), 1, stdout) != 1) {
+				save_errno = errno;
+				rv = MAILDIR_READ_WRITE;
+				goto cache;
+			}
+
+			for (size_t i = 0; i < cache.nletters; i++) {
+				struct letter letter;
+
+				letter.date = cache.letters[i].date;
+				letter.from = cache.letters[i].from;
+				letter.subject = cache.letters[i].subject;
+
+				if (letter_write(stdout, cache.letters[i].path, &letter) == -1) {
+					save_errno = 0;
+					rv = MAILDIR_READ_WRITE;
+					goto cache;
+				}
+			}
+
+			save_errno = 0;
+			rv = MAILDIR_READ_OK;
+			goto cache;
+		}
+		/*
+		 * even if the cache is out of date, most of the entries can still
+		 * be used. (assuming that the contents of a letter with a given
+		 * name will never change).
+		 * this assumes that the cache was sorted within the file.
+		 */
+	}
+	/* otherwise bsearch will just return NULL at each check */
+	need_recache = 1;
+
+	if (fwrite(&need_recache, sizeof(need_recache), 1, stdout) != 1) {
+		save_errno = errno;
+		rv = MAILDIR_READ_WRITE;
+		goto cache;
+	}
 
 	memset(&gl, 0, sizeof(gl));
 	for (;;) {
 		struct letter letter;
+		struct maildir_cache_entry *cached;
 		struct dirent *de;
 		const char *flags;
 		FILE *fp;
@@ -97,6 +170,23 @@ main(int argc, char *argv[])
 		if (!view_all 
 					&& (flags = strstr(de->d_name, ":2,")) != NULL
 					&& strchr(flags, 'S') != NULL) {
+			continue;
+		}
+
+		cached = bsearch(de->d_name, cache.letters, cache.nletters, 
+			sizeof(*cache.letters), cache_path_cmp);
+		if (cached != NULL) {
+			struct letter letter;
+
+			letter.date = cached->date;
+			letter.from = cached->from;
+			letter.subject = cached->subject;
+
+			if (letter_write(stdout, cached->path, &letter) == -1) {
+				save_errno = errno;
+				rv = MAILDIR_READ_WRITE;
+				goto gl;
+			}
 			continue;
 		}
 
@@ -134,8 +224,20 @@ main(int argc, char *argv[])
 	rv = MAILDIR_READ_OK;
 	gl:
 	free(gl.line);
+	cache:
+	for (size_t i = 0; i < cache.nletters; i++) {
+		free(cache.letters[i].from.str);
+		free(cache.letters[i].path);
+		free(cache.letters[i].subject);
+	}
+	free(cache.letters);
 	dir:
 	if (closedir(dp) == -1 && rv == MAILDIR_READ_OK) {
+		save_errno = errno;
+		rv = MAILDIR_READ_CLOSEDIR;
+	}
+	root:
+	if (close(root) == -1 && rv == MAILDIR_READ_OK) {
 		save_errno = errno;
 		rv = MAILDIR_READ_CLOSEDIR;
 	}
@@ -289,4 +391,56 @@ rfc5322_dateparse(char *s)
 		return -1;
 
 	return rv - off;
+}
+
+static DIR *
+opendirat(int at, const char *path)
+{
+	int fd;
+	DIR *dp;
+
+	if ((fd = openat(at, path, O_RDONLY | O_DIRECTORY)) == -1)
+		return NULL;
+	if ((dp = fdopendir(fd)) == NULL)
+		(void) close(fd);
+	return dp;
+}
+
+static int
+read_cache(int root, struct maildir_cache *out)
+{
+	FILE *fp;
+	int fd, rv;
+
+	if ((fd = openat(root, ".mailzcache", O_RDONLY)) == -1) {
+		if (errno != ENOENT)
+			return -1;
+		out->nletters = 0;
+		out->letters = NULL;
+		return 0;
+	}
+
+	if ((fp = fdopen(fd, "r")) == NULL) {
+		(void) close(fd);
+		return -1;
+	}
+
+	rv = maildir_cache_read(fp, out);
+	fclose(fp);
+	if (rv == -1) {
+		out->nletters = 0;
+		out->letters = NULL;
+		return 0;
+	}
+	/* otherwise maildir_cache_read has set them */
+	return 0;
+}
+
+static int
+cache_path_cmp(const void *one, const void *two)
+{
+	const char *n1 = one;
+	const struct maildir_cache_entry *n2 = two;
+
+	return strcmp(one, n2->path);
 }

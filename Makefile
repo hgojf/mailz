@@ -8,31 +8,28 @@ TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
 SRCS = 	address.c command.c command-lex.c errstr.c header.c mail.c \
-		maildir.c maildir-cache-read.c maildir-read.c \
+		maildir.c maildir-cache-read.c maildir-cache-write.c maildir-read.c \
 		maildir-read-letter.c maildir-send.c maildir-setup.c utf8.c
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
 
-PROGS = mail maildir-cache-read maildir-read-letter maildir-read \
-	maildir-send maildir-setup
+PROGS = mail maildir-read-letter maildir-read maildir-send maildir-setup
 
 CTAGS ?= ctags
 INSTALL ?= install
 
 all: ${PROGS}
 
-mail: address.o command.o command-lex.o errstr.o mail.o maildir.o utf8.o
+mail: address.o command.o command-lex.o errstr.o mail.o maildir.o maildir-cache-write.o \
+	utf8.o
 	$(CC) -o $@ ${LDFLAGS} address.o command.o command-lex.o errstr.o \
-							mail.o maildir.o utf8.o
-
-maildir-cache-read: maildir-cache-read.o
-	$(CC) -o $@ ${LDFLAGS} maildir-cache-read.o
+							mail.o maildir.o maildir-cache-write.o utf8.o
 
 maildir-read-letter: header.o maildir-read-letter.o utf8.o
 	$(CC) -o $@ ${LDFLAGS} header.o maildir-read-letter.o utf8.o
 
-maildir-read: address.o header.o maildir-read.o
-	$(CC) -o $@ ${LDFLAGS} address.o header.o maildir-read.o
+maildir-read: address.o header.o maildir-cache-read.o maildir-read.o
+	$(CC) -o $@ ${LDFLAGS} address.o header.o maildir-cache-read.o maildir-read.o
 
 maildir-send: maildir-send.o
 	$(CC) -o $@ ${LDFLAGS} maildir-send.o

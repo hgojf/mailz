@@ -1,20 +1,18 @@
 #ifndef MAILZ_MAILDIR_CACHE_READ_H
 #define MAILZ_MAILDIR_CACHE_READ_H
-enum maildir_cache_status {
-	MAILDIR_CACHE_READ_OK,
-	MAILDIR_CACHE_READ_USAGE,
-	MAILDIR_CACHE_READ_OPEN,
-	MAILDIR_CACHE_READ_STAT,
-	MAILDIR_CACHE_READ_PLEDGE,
-	MAILDIR_CACHE_READ_FWRITE,
-	MAILDIR_CACHE_READ_FOPEN,
-	MAILDIR_CACHE_READ_FREAD,
-	MAILDIR_CACHE_READ_MAGIC,
-	MAILDIR_CACHE_READ_VERSION,
-	MAILDIR_CACHE_READ_CLOSE,
-	MAILDIR_CACHE_READ_WRITE,
-	MAILDIR_CACHE_READ_SWRITE,
-	MAILDIR_CACHE_READ_ENTRY,
-	MAILDIR_CACHE_READ_MALLOC,
+struct maildir_cache_entry {
+	struct from_safe from;
+	char *path;
+	char *subject;
+	time_t date;
 };
+
+struct maildir_cache {
+	struct timespec mtime;
+
+	struct maildir_cache_entry *letters;
+	size_t nletters;
+};
+
+int maildir_cache_read(FILE *fp, struct maildir_cache *);
 #endif /* MAILZ_MAILDIR_CACHE_READ_H */

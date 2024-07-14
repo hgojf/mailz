@@ -9,169 +9,129 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "address.h"
 #include "getline.h"
+#include "letter.h"
 #include "maildir-cache.h"
 #include "maildir-cache-read.h"
 
-struct cache_entry {
-	char *path;
-	char *subject;
-	char *from;
-	time_t date;
-};
-
-#define CACHE_ENTRY_STRDUP -3
-#define CACHE_ENTRY_FERR -2
+#define CACHE_ENTRY_ERR -2
 #define CACHE_ENTRY_EOF -1
 
-static int cache_entry_read(FILE *, struct getline *, struct cache_entry *);
+static int cache_entry_read(FILE *, struct getline *, struct maildir_cache_entry *);
 
 int
-main(int argc, char *argv[])
+maildir_cache_read(FILE *fp, struct maildir_cache *out)
 {
 	struct stat sb;
 	struct getline gl;
-	FILE *fp;
-	ssize_t nw;
+	struct maildir_cache_entry *letters;
+	size_t nletters;
 	uint32_t magic;
-	int fd, rv, save_errno;
+	int fd, rv;
 	uint8_t view_seen;
 
-	if (argc != 2) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_USAGE;
-		goto fail;
-	}
-	if ((fd = open(argv[1], O_RDONLY)) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_OPEN;
-		goto fail;
-	}
-	if (fstat(fd, &sb) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_STAT;
-		(void) close(fd);
-		goto fail;
-	}
-	if ((fp = fdopen(fd, "r")) == NULL) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_FOPEN;
-		(void) close(fd);
-		goto fail;
-	}
+	if ((fd = fileno(fp)) == -1)
+		return -1;
 
-	if (pledge("stdio", NULL) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_PLEDGE;
-		goto fp;
-	}
+	if (fstat(fd, &sb) == -1)
+		return -1;
 
-	if (fwrite(&sb.st_mtime, sizeof(sb.st_mtime), 1, stdout) != 1) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_FWRITE;
-		goto fp;
-	}
+	if (fread(&magic, sizeof(magic), 1, fp) != 1)
+		return -1;
 
-	if (fread(&magic, sizeof(magic), 1, fp) != 1) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_FREAD;
-		goto fp;
-	}
+	if ((magic & MAILDIR_CACHE_MAGIC_MASK) != MAILDIR_CACHE_MAGIC)
+		return -1;
+	if ((magic & MAILDIR_CACHE_VERSION_MASK) != MAILDIR_CACHE_VERSION)
+		return -1;
 
-	if ((magic & MAILDIR_CACHE_MAGIC_MASK) != MAILDIR_CACHE_MAGIC) {
-		save_errno = 0;
-		rv = MAILDIR_CACHE_READ_MAGIC;
-		goto fp;
-	}
-	if ((magic & MAILDIR_CACHE_VERSION_MASK) != MAILDIR_CACHE_VERSION) {
-		save_errno = 0;
-		rv = MAILDIR_CACHE_READ_VERSION;
-		goto fp;
-	}
+	if (fread(&view_seen, sizeof(view_seen), 1, fp) != 1)
+		return -1;
 
-	if (fread(&view_seen, sizeof(view_seen), 1, fp) != 1) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_FREAD;
-		goto fp;
-	}
-
+	letters = NULL;
+	nletters = 0;
 	memset(&gl, 0, sizeof(gl));
 	for (;;) {
-		struct cache_entry entry;
+		struct maildir_cache_entry entry, *t;
 
 		switch (cache_entry_read(fp, &gl, &entry)) {
-		case CACHE_ENTRY_FERR:
-			save_errno = errno;
-			rv = MAILDIR_CACHE_READ_ENTRY;
-			goto fp;
-		case CACHE_ENTRY_STRDUP:
-			save_errno = errno;
-			rv = MAILDIR_CACHE_READ_MALLOC;
-			goto fp;
+		case CACHE_ENTRY_ERR:
+			goto letters;
 		case CACHE_ENTRY_EOF:
 			goto done;
 		default:
 			break;
 		}
+
+		t = reallocarray(letters, nletters + 1, sizeof(*letters));
+		if (t == NULL) {
+			free(entry.from.str);
+			free(entry.path);
+			free(entry.subject);
+			goto letters;
+		}
+
+		letters = t;
+		letters[nletters++] = entry;
 	}
 	done:
 
-	save_errno = 0;
-	rv = MAILDIR_CACHE_READ_OK;
-	fp:
-	if (fclose(fp) == EOF && rv == MAILDIR_CACHE_READ_OK) {
-		save_errno = errno;
-		rv = MAILDIR_CACHE_READ_CLOSE;
+	rv = 0;
+	letters:
+	if (rv == -1) {
+		for (size_t i = 0; i < nletters; i++) {
+			free(letters[i].from.str);
+			free(letters[i].path);
+			free(letters[i].subject);
+		}
+		free(letters);
 	}
-	fail:
-	nw = write(STDERR_FILENO, &save_errno, sizeof(save_errno));
-	if (nw == -1)
-		rv = MAILDIR_CACHE_READ_WRITE;
-	else if (nw != sizeof(save_errno))
-		rv = MAILDIR_CACHE_READ_SWRITE;
+	else {
+		out->letters = letters;
+		out->nletters = nletters;
+		out->mtime = sb.st_mtim;
+	}
+	free(gl.line);
 	return rv;
 }
 
 static int
-cache_entry_read(FILE *fp, struct getline *gl, struct cache_entry *out)
+cache_entry_read(FILE *fp, struct getline *gl, struct maildir_cache_entry *out)
 {
 	size_t n;
 	ssize_t len;
-	char *from, *path, *subject;
+	struct from_safe from;
+	char *f, *path, *subject;
 	uint64_t date;
 	int rv;
 
 	n = fread(&date, 1, sizeof(date), fp);
 	if (n == 0) {
 		if (ferror(fp))
-			return CACHE_ENTRY_FERR;
+			goto fail;
 		return CACHE_ENTRY_EOF;
 	}
 
 	if (getdelim(&gl->line, &gl->n, '\0', fp) == -1)
-		return CACHE_ENTRY_FERR;
+		goto fail;
 	if ((path = strdup(gl->line)) == NULL)
-		return CACHE_ENTRY_STRDUP;
+		goto fail;
 
-	if ((len = getdelim(&gl->line, &gl->n, '\0', fp)) == -1) {
-		rv = CACHE_ENTRY_FERR;
+	if ((len = getdelim(&gl->line, &gl->n, '\0', fp)) == -1)
 		goto path;
-	}
 	if (len == 0)
 		subject = NULL;
 	else {
-		if ((subject = strdup(gl->line)) == NULL) {
-			rv = CACHE_ENTRY_STRDUP;
+		if ((subject = strdup(gl->line)) == NULL)
 			goto path;
-		}
 	}
 
-	if (getdelim(&gl->line, &gl->n, '\0', fp) == -1) {
-		rv = CACHE_ENTRY_FERR;
+	if (getdelim(&gl->line, &gl->n, '\0', fp) == -1)
 		goto subject;
-	}
-	if ((from = strdup(gl->line)) == NULL) {
-		rv = CACHE_ENTRY_STRDUP;
+	if ((f = strdup(gl->line)) == NULL)
+		goto subject;
+	if (from_safe_new(f, &from) == -1) {
+		free(f);
 		goto subject;
 	}
 
@@ -185,5 +145,6 @@ cache_entry_read(FILE *fp, struct getline *gl, struct cache_entry *out)
 	free(subject);
 	path:
 	free(path);
-	return rv;
+	fail:
+	return CACHE_ENTRY_ERR;
 }

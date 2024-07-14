@@ -17,6 +17,7 @@
 #include "command.h"
 #include "errstr.h"
 #include "maildir.h"
+#include "maildir-cache-write.h"
 #include "pathnames.h"
 
 struct mailbox {
@@ -26,17 +27,18 @@ struct mailbox {
 };
 
 static void config_free(struct config *);
-static int read_maildir(const char *, int, int, struct mailbox *);
+static int read_maildir(char *, int, int, int *, struct mailbox *);
 static int send_mail(const char *, const char *);
 static int setup_maildir(const char *, int);
 static __dead void usage(void);
+static int write_cache(struct mailbox *, int);
 
 int
 main(int argc, char *argv[])
 {
 	struct mailbox mailbox;
 	struct config config;
-	int ch, dev_null, rv, view_all;
+	int ch, dev_null, need_recache, rv, view_all;
 	const char *subject;
 
 	subject = NULL;
@@ -92,16 +94,16 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if (unveil(PATH_TMPDIR, "crw") == -1)
 		err(1, "unveil");
-	if (unveil(argv[0], "rc") == -1)
+	if (unveil(argv[0], "rwc") == -1)
 		err(1, "unveil");
-	if (pledge("stdio proc exec rpath cpath wpath", NULL) == -1)
+	if (pledge("stdio proc exec rpath cpath wpath flock", NULL) == -1)
 		err(1, "pledge");
 
 	signal(SIGPIPE, SIG_IGN);
 
 	if (setup_maildir(argv[0], dev_null) == -1)
 		goto config;
-	if (read_maildir(argv[0], view_all, dev_null, &mailbox) == -1)
+	if (read_maildir(argv[0], view_all, dev_null, &need_recache, &mailbox) == -1)
 		goto config;
 
 	if (mailbox.nletters == 0) {
@@ -113,12 +115,20 @@ main(int argc, char *argv[])
 			mailbox.cur) == -1)
 		goto config;
 
+	if (need_recache) {
+		if (write_cache(&mailbox, view_all) == -1) {
+			warnx("failed to write cache");
+			goto mailbox;
+		}
+	}
+
 	good:
 	rv = 0;
 	if (rmdir(PATH_TMPDIR) == -1 && errno != ENOTEMPTY) {
 		warn("rmdir %s", PATH_TMPDIR);
 		rv = 1;
 	}
+	mailbox:
 	for (size_t i = 0; i < mailbox.nletters; i++) {
 		free(mailbox.letters[i].from.str);
 		free(mailbox.letters[i].path);
@@ -201,7 +211,39 @@ config_free(struct config *cfg)
 }
 
 static int
-read_maildir(const char *root, int show_all, int dev_null, struct mailbox *out)
+write_cache(struct mailbox *mailbox, int view_all)
+{
+	int fd, rv;
+	FILE *fp;
+
+	fd = openat(mailbox->cur, "../.mailzcache", O_WRONLY | O_CREAT, 0600);
+	if (fd == -1)
+		return -1;
+	if ((fp = fdopen(fd, "w")) == NULL) {
+		(void) close(fd);
+		return -1;
+	}
+
+	if (flock(fd, LOCK_EX) == -1) {
+		(void) fclose(fp);
+		return -1;
+	}
+
+	rv = maildir_cache_write(fp, mailbox->letters, mailbox->nletters, view_all);
+
+	if (flock(fd, LOCK_UN) == -1) {
+		(void) fclose(fp);
+		return -1;
+	}
+	if (fclose(fp) == EOF)
+		return -1;
+
+	return rv;
+}
+
+static int
+read_maildir(char *root, int show_all, int dev_null, int *need_recache,
+	struct mailbox *out)
 {
 	char path[PATH_MAX];
 	struct maildir_read mdr;
@@ -222,7 +264,7 @@ read_maildir(const char *root, int show_all, int dev_null, struct mailbox *out)
 		return -1;
 	}
 
-	mdr = maildir_read(path, dev_null, show_all);
+	mdr = maildir_read(root, dev_null, show_all);
 	if (mdr.status != 0) {
 		(void) close(out->cur);
 		warnx("maildir_read");
@@ -231,6 +273,7 @@ read_maildir(const char *root, int show_all, int dev_null, struct mailbox *out)
 
 	out->nletters = mdr.val.good.nletters;
 	out->letters = mdr.val.good.letters;
+	*need_recache = mdr.val.good.need_recache;
 	return 0;
 }
 
