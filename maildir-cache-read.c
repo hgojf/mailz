@@ -93,6 +93,7 @@ maildir_cache_read(FILE *fp, struct maildir_cache *out)
 		out->letters = letters;
 		out->nletters = nletters;
 		out->mtime = sb.st_mtim;
+		out->view_seen = view_seen;
 	}
 	free(gl.line);
 	lock:

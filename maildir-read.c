@@ -27,6 +27,7 @@ static int cache_path_cmp(const void *, const void *);
 static FILE *fopenat(int, const char *);
 static int letter_read(FILE *, struct getline *, struct letter *);
 static int letter_write(FILE *, const char *, struct letter *);
+static int maildir_letter_seen(const char *);
 static DIR *opendirat(int, const char *);
 static int read_cache(int, struct maildir_cache *);
 static time_t rfc5322_dateparse(char *);
@@ -110,7 +111,7 @@ main(int argc, char *argv[])
 			goto cache;
 		}
 
-		if (timespeccmp(&cache.mtime, &sb.st_mtim, >=)) {
+		if ((!view_all || cache.view_seen) && timespeccmp(&cache.mtime, &sb.st_mtim, >=)) {
 			need_recache = 0;
 			if (fwrite(&need_recache, sizeof(need_recache), 1, stdout) != 1) {
 				save_errno = errno;
@@ -120,6 +121,9 @@ main(int argc, char *argv[])
 
 			for (size_t i = 0; i < cache.nletters; i++) {
 				struct letter letter;
+
+				if (!view_all && maildir_letter_seen(cache.letters[i].path))
+					continue;
 
 				letter.date = cache.letters[i].date;
 				letter.from = cache.letters[i].from;
@@ -157,7 +161,6 @@ main(int argc, char *argv[])
 		struct letter letter;
 		struct maildir_cache_entry *cached;
 		struct dirent *de;
-		const char *flags;
 		FILE *fp;
 		int r;
 
@@ -173,11 +176,8 @@ main(int argc, char *argv[])
 
 		if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
 			continue;
-		if (!view_all 
-					&& (flags = strstr(de->d_name, ":2,")) != NULL
-					&& strchr(flags, 'S') != NULL) {
+		if (!view_all && maildir_letter_seen(de->d_name))
 			continue;
-		}
 
 		cached = bsearch(de->d_name, cache.letters, cache.nletters, 
 			sizeof(*cache.letters), cache_path_cmp);
@@ -449,4 +449,12 @@ cache_path_cmp(const void *one, const void *two)
 	const struct maildir_cache_entry *n2 = two;
 
 	return strcmp(one, n2->path);
+}
+
+static int
+maildir_letter_seen(const char *path)
+{
+	const char *flags;
+
+	return (flags = strstr(path, ":2,")) != NULL && strchr(flags, 'S') != NULL;
 }

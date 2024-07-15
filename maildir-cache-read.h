@@ -12,6 +12,8 @@ struct maildir_cache {
 
 	struct maildir_cache_entry *letters;
 	size_t nletters;
+
+	int view_seen;
 };
 
 int maildir_cache_read(FILE *fp, struct maildir_cache *);
