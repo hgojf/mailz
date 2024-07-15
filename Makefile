@@ -13,7 +13,7 @@ SRCS = 	address.c command.c command-lex.c errstr.c header.c mail.c \
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
 
-PROGS = mail maildir-read-letter maildir-read maildir-send maildir-setup
+PROGS = mail maildir-read-letter maildir-read maildir-setup
 
 CTAGS ?= ctags
 INSTALL ?= install
@@ -21,18 +21,16 @@ INSTALL ?= install
 all: ${PROGS}
 
 mail: address.o command.o command-lex.o errstr.o mail.o maildir.o maildir-cache-write.o \
-	utf8.o
+	maildir-send.o utf8.o
 	$(CC) -o $@ ${LDFLAGS} address.o command.o command-lex.o errstr.o \
-							mail.o maildir.o maildir-cache-write.o utf8.o
+							mail.o maildir.o maildir-cache-write.o maildir-send.o \
+							utf8.o
 
 maildir-read-letter: header.o maildir-read-letter.o utf8.o
 	$(CC) -o $@ ${LDFLAGS} header.o maildir-read-letter.o utf8.o
 
 maildir-read: address.o header.o maildir-cache-read.o maildir-read.o
 	$(CC) -o $@ ${LDFLAGS} address.o header.o maildir-cache-read.o maildir-read.o
-
-maildir-send: maildir-send.o
-	$(CC) -o $@ ${LDFLAGS} maildir-send.o
 
 maildir-setup: maildir-setup.o
 	$(CC) -o $@ ${LDFLAGS} maildir-setup.o
@@ -50,7 +48,6 @@ install:
 	$(INSTALL) -m 0755 mail ${PREFIX}/bin/mailz
 	$(INSTALL) -m 0755 maildir-read-letter ${PREFIX}/libexec/mailz-maildir-read-letter
 	$(INSTALL) -m 0755 maildir-read ${PREFIX}/libexec/mailz-maildir-read
-	$(INSTALL) -m 0755 maildir-send ${PREFIX}/libexec/mailz-maildir-send
 	$(INSTALL) -m 0755 maildir-setup ${PREFIX}/libexec/mailz-maildir-setup
 
 install-man:

@@ -13,10 +13,12 @@
 
 #include "../address.h"
 #include "../argv.h"
+#include "../edit.h"
 #include "../config.h"
 #include "../letter.h"
 #include "../maildir.h"
 #include "../maildir-read-letter.h"
+#include "../maildir-send.h"
 #include "../pathnames.h"
 
 struct interactive {
@@ -59,7 +61,7 @@ static struct interactive *interactive;
 %}
 
 %token ADDRESS CACHE EDIT IGNORE MANUAL PRINT MORE NUMBER READ REORDER SAVE
-%token SET STRING THREAD UNIGNORE UNREAD VI
+%token SEND SET STRING THREAD UNIGNORE UNREAD VI
 
 %union {
 	struct address address;
@@ -106,6 +108,7 @@ command: ignore
 	| read
 	| reorder
 	| save 
+	| send
 	| set
 	| thread
 	| unignore
@@ -230,6 +233,31 @@ save: SAVE optional_message_number {
 		}
 
 		printf("message saved to %s\n", path);
+	}
+	;
+
+send: SEND STRING address {
+		int err;
+		if (interactive == NULL) {
+			yyerror("no interactive");
+			YYERROR;
+		}
+
+		if (config->address.addr == NULL) {
+			warnx("must set an address");
+			YYERROR;
+		}
+
+		err = maildir_send(config->edit_mode, config->address.addr,
+				$2, $3.addr);
+
+		free($3.addr);
+		free($3.name);
+		free($2);
+		if (err == -1) {
+			warnx("maildir_send");
+			YYERROR;
+		}
 	}
 	;
 

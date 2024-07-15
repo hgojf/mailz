@@ -7,14 +7,6 @@ struct maildir_setup {
 
 struct maildir_setup maildir_setup(const char *, int);
 
-struct maildir_send {
-	int status;
-	int save_errno;
-};
-
-struct maildir_send maildir_send(const char *, const char *, const char *, 
-	int, int);
-
 struct maildir_read {
 	int status;
 	union {

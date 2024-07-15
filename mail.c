@@ -12,12 +12,14 @@
 
 #include "address.h"
 #include "argv.h"
+#include "edit.h"
 #include "letter.h"
 #include "config.h"
 #include "command.h"
 #include "errstr.h"
 #include "maildir.h"
 #include "maildir-cache-write.h"
+#include "maildir-send.h"
 #include "pathnames.h"
 
 struct mailbox {
@@ -90,9 +92,11 @@ main(int argc, char *argv[])
 		err(1, "unveil");
 	if (unveil(PATH_MAILDIR_SETUP, "x") == -1)
 		err(1, "unveil");
-	if (unveil(PATH_MAILDIR_SEND, "x") == -1)
+	if (unveil(PATH_SENDMAIL, "x") == -1)
 		err(1, "unveil");
 	if (unveil(PATH_TMPDIR, "crw") == -1)
+		err(1, "unveil");
+	if (unveil(PATH_VI, "x") == -1)
 		err(1, "unveil");
 	if (unveil(argv[0], "rwc") == -1)
 		err(1, "unveil");
@@ -151,7 +155,6 @@ static int
 send_mail(const char *subject, const char *to)
 {
 	struct config config;
-	struct maildir_send mdse;
 	int dev_null, rv;
 
 	rv = 1;
@@ -161,26 +164,29 @@ send_mail(const char *subject, const char *to)
 	if (configure(&config) == -1)
 		goto dev_null; /* error message done by function itself */
 
-	if (unveil(PATH_MAILDIR_SEND, "x") == -1)
+	if (mkdir(PATH_TMPDIR, 0700) == -1 && errno != EEXIST)
+		goto config;
+	if (unveil(PATH_SENDMAIL, "x") == -1)
 		err(1, "unveil");
-	if (pledge("stdio proc exec", NULL) == -1)
+	if (unveil(PATH_TMPDIR, "rwc") == -1)
+		err(1, "unveil");
+	if (pledge("stdio proc exec rpath wpath cpath", NULL) == -1)
 		err(1, "pledge");
 
 	if (config.address.addr == NULL) {
 		warnx("must set an email address");
-		goto config;
+		goto tmp;
 	}
 
-	mdse = maildir_send(config.address.addr, to, subject, STDIN_FILENO, dev_null);
-	if (mdse.status != 0) {
-		if (mdse.save_errno != 0)
-			warnc(mdse.save_errno, "%s", maildir_send_errstr(mdse.status));
-		else
-			warnx("%s", maildir_send_errstr(mdse.status));
-		goto config;
-	}
+	if (maildir_send(EDIT_MODE_CAT, config.address.addr, subject, to) == -1)
+		goto tmp;
 
 	rv = 0;
+	tmp:
+	if (rmdir(PATH_TMPDIR) == -1 && errno != ENOTEMPTY) {
+		warn("rmdir %s", PATH_TMPDIR);
+		rv = 1;
+	}
 	config:
 	config_free(&config);
 	dev_null:

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../argv.h"
+#include "../edit.h"
 #include "../config.h"
 #include "command.h"
 
@@ -23,6 +24,7 @@
 "reorder" { return REORDER; }
 "s" { return SAVE; }
 "save" { return SAVE; }
+"send" { return SEND; }
 "set" { return SET; }
 "t" { return THREAD; }
 "thread" { return THREAD; }

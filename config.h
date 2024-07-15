@@ -1,10 +1,5 @@
 #ifndef MAILZ_CONFIG_H
 #define MAILZ_CONFIG_H
-enum edit_mode {
-	EDIT_MODE_MANUAL,
-	EDIT_MODE_VI,
-};
-
 struct reorder {
 	struct argv argv;
 	struct argv_shm shm;

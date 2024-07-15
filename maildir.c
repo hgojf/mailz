@@ -17,7 +17,6 @@
 #include "maildir.h"
 #include "maildir-read.h"
 #include "maildir-read-letter.h"
-#include "maildir-send.h"
 #include "maildir-setup.h"
 #include "pathnames.h"
 #include "utf8.h"
@@ -267,78 +266,6 @@ maildir_setup(const char *path, int dev_null)
 	if (close(p[0]) == -1 && rv.status == MAILDIR_SETUP_OK) {
 		rv.save_errno = errno;
 		rv.status = MAILDIR_SETUP_CLOSE;
-	}
-	return rv;
-}
-
-struct maildir_send
-maildir_send(const char *from, const char *to, const char *subject, 
-	int seed, int dev_null)
-{
-	struct maildir_send rv;
-	ssize_t nr;
-	pid_t pid;
-	int p[2], status;
-
-	if (pipe(p) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SEND_PIPE;
-		return rv;
-	}
-
-	switch (pid = fork()) {
-	case -1:
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SEND_FORK;
-		return rv;
-	case 0:
-		if (dup2(seed, STDIN_FILENO) == -1)
-			exit(MAILDIR_SEND_DUP);
-		if (dup2(p[1], STDOUT_FILENO) == -1)
-			exit(MAILDIR_SEND_DUP);
-		if (dup2(dev_null, STDERR_FILENO) == -1)
-			exit(MAILDIR_SEND_DUP);
-		/* if subject is NULL it will just act as the sentinel */
-		execl(PATH_MAILDIR_SEND, "maildir-send", from, to, subject, NULL);
-		exit(MAILDIR_SEND_EXEC);
-	default:
-		break;
-	}
-
-	if (close(p[1]) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SEND_CLOSE;
-		(void) close(p[0]);
-		/* 
-		 * dont want to SIGKILL here because this process has children
-		 * of its own
-		 */
-		(void) waitpid(pid, NULL, 0);
-		return rv;
-	}
-
-	if (waitpid(pid, &status, 0) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SEND_WAITPID;
-		return rv;
-	}
-
-	nr = read(p[0], &rv.save_errno, sizeof(rv.save_errno));
-	if (nr == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SEND_READ;
-	}
-	else if (nr != sizeof(rv.save_errno)) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SEND_SREAD;
-	}
-	else
-		rv.status = WEXITSTATUS(status);
-		/* rv.save_errno set fully be read */
-
-	if (close(p[0] == -1 && rv.status == MAILDIR_SEND_OK)) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SEND_CLOSE;
 	}
 	return rv;
 }
