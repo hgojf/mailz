@@ -20,6 +20,10 @@
 static int argv_map(struct argv_shm *, struct argv_mapped *);
 static int argv_find(struct argv_mapped *, const char *);
 
+#define ARGV_FOREACH(var, argv) for (char *(var) = (argv)->p; \
+					((var) - (char *)(argv)->p) != (argv)->sz; \
+					(var) += strlen((var)) + 1)
+
 struct ignore {
 	enum {
 		IGNORE_NONE,
@@ -252,18 +256,20 @@ main(int argc, char *argv[])
 		free(cts);
 	}
 
-	RB_FOREACH_SAFE(i, headers, &headers, tv) {
-		if (!argv_find(&reorder, i->header.key))
-			continue;
-		if (printf("%s: %s\n", i->header.key, i->header.val) < 0) {
-			save_errno = errno;
-			rv = MAILDIR_READ_LETTER_PRINTF;
-			goto headers;
+	ARGV_FOREACH(s, &reorder) {
+		f.header.key = s;
+
+		if ((h = RB_FIND(headers, &headers, &f)) != NULL) {
+			if (printf("%s: %s\n", h->header.key, h->header.val) < 0) {
+				save_errno = errno;
+				rv = MAILDIR_READ_LETTER_PRINTF;
+				goto headers;
+			}
+			RB_REMOVE(headers, &headers, h);
+			free(h->header.key);
+			free(h->header.val);
+			free(h);
 		}
-		RB_REMOVE(headers, &headers, i);
-		free(i->header.key);
-		free(i->header.val);
-		free(i);
 	}
 
 	RB_FOREACH(i, headers, &headers) {
