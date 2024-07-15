@@ -55,7 +55,6 @@ static int equal_escape(FILE *, int);
 int
 main(int argc, char *argv[])
 {
-	struct content_type ct;
 	struct headers headers;
 	struct header_rb f, *h, *i, *tv;
 	struct getline gl;
@@ -178,8 +177,9 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (strcasecmp(header->header.key, "content-type") != 0 &&
-				header_ignore(&ignore, header->header.key)) {
+		if (strcasecmp(header->header.key, "content-type") != 0
+				&& strcasecmp(header->header.key, "content-transfer-encoding") != 0
+				&& header_ignore(&ignore, header->header.key)) {
 			free(header->header.key);
 			free(header->header.val);
 			free(header);
@@ -214,6 +214,44 @@ main(int argc, char *argv[])
 	}
 	done:
 
+	qp = 0;
+
+	f.header.key = "content-transfer-encoding";
+	if ((h = RB_FIND(headers, &headers, &f)) != NULL) {
+		if (strcmp(h->header.val, "quoted-printable") == 0)
+			qp = 1;
+		if (header_ignore(&ignore, h->header.key)) {
+			RB_REMOVE(headers, &headers, h);
+			free(h->header.key);
+			free(h->header.val);
+			free(h);
+		}
+	}
+
+	utf8 = 0;
+
+	f.header.key = "content-type";
+	if ((h = RB_FIND(headers, &headers, &f)) != NULL) {
+		struct content_type ct;
+		char *cts;
+
+		if (header_ignore(&ignore, h->header.key)) {
+			RB_REMOVE(headers, &headers, h);
+			free(h->header.key);
+			cts = h->header.val;
+			free(h);
+		}
+		else {
+			if ((cts = strdup(h->header.val)) == NULL)
+				goto headers;
+		}
+		if (content_type_parse(cts, &ct) != -1
+				&& ct.charset != NULL
+				&& strcasecmp(ct.charset, "utf-8") == 0)
+			utf8 = 1;
+		free(cts);
+	}
+
 	RB_FOREACH_SAFE(i, headers, &headers, tv) {
 		if (!argv_find(&reorder, i->header.key))
 			continue;
@@ -229,14 +267,6 @@ main(int argc, char *argv[])
 	}
 
 	RB_FOREACH(i, headers, &headers) {
-		/* 
-		 * this gets smuggled past the earlier check because it is needed later
-		 * to determine whether utf8 encoding should be assumed.
-		 * that cant be done before because content_type_parse mangles the string
-		 * that it parses
-		 */
-		if (strcasecmp(i->header.key, "content-type") == 0 && header_ignore(&ignore, "content-type"))
-			continue;
 		if (printf("%s: %s\n", i->header.key, i->header.val) < 0) {
 			save_errno = errno;
 			rv = MAILDIR_READ_LETTER_PRINTF;
@@ -250,20 +280,10 @@ main(int argc, char *argv[])
 		goto headers;
 	}
 
-	f.header.key = "content-type";
-	utf8 = (h = RB_FIND(headers, &headers, &f)) != NULL
-		&& content_type_parse(h->header.val, &ct) != -1
-		&& ct.charset != NULL
-		&& strcasecmp(ct.charset, "utf-8") == 0;
-
-	f.header.key = "content-transfer-encoding";
-	qp = (h = RB_FIND(headers, &headers, &f)) != NULL
-		&& strcmp(h->header.val, "quoted-printable") == 0;
 
 	if (utf8) {
 		memset(&u8, 0, sizeof(u8));
 	}
-
 
 	for (;;) {
 		int c;
