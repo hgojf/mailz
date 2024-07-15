@@ -133,7 +133,7 @@ main(int argc, char *argv[])
 		struct argv_shm shm;
 
 		shm.fd = 5;
-		shm.sz = ignore.mapped.sz;
+		shm.sz = reorder.sz;
 
 		if (argv_map(&shm, &reorder) == -1) {
 			save_errno = errno;
