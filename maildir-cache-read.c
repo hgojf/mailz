@@ -118,6 +118,8 @@ cache_entry_read(FILE *fp, struct getline *gl, struct maildir_cache_entry *out)
 			goto fail;
 		return CACHE_ENTRY_EOF;
 	}
+	else if (n != sizeof(date))
+		return CACHE_ENTRY_ERR;
 
 	if (getdelim(&gl->line, &gl->n, '\0', fp) == -1)
 		goto fail;
