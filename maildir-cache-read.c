@@ -115,16 +115,16 @@ cache_entry_read(FILE *fp, struct getline *gl, struct maildir_cache_entry *out)
 	n = fread(&date, 1, sizeof(date), fp);
 	if (n == 0) {
 		if (ferror(fp))
-			goto fail;
+			return CACHE_ENTRY_ERR;
 		return CACHE_ENTRY_EOF;
 	}
 	else if (n != sizeof(date))
 		return CACHE_ENTRY_ERR;
 
 	if (getdelim(&gl->line, &gl->n, '\0', fp) == -1)
-		goto fail;
+		return CACHE_ENTRY_ERR;
 	if ((path = strdup(gl->line)) == NULL)
-		goto fail;
+		return CACHE_ENTRY_ERR;
 
 	if ((len = getdelim(&gl->line, &gl->n, '\0', fp)) == -1)
 		goto path;
@@ -154,6 +154,5 @@ cache_entry_read(FILE *fp, struct getline *gl, struct maildir_cache_entry *out)
 	free(subject);
 	path:
 	free(path);
-	fail:
 	return CACHE_ENTRY_ERR;
 }
