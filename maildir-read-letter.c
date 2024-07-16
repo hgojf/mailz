@@ -311,9 +311,6 @@ main(int argc, char *argv[])
 				save_errno = 0;
 				rv = MAILDIR_READ_LETTER_ASCII;
 				goto headers;
-			case -2:
-				/* soft break */
-				continue;
 			default:
 				break;
 			}
@@ -471,7 +468,7 @@ equal_escape(FILE *fp, int qp)
 	if ((t = fgetc(fp)) == EOF)
 		return '=';
 	if (t == '\n')
-		return -2;
+		return '\n';
 
 	if (qp) {
 		int d;
