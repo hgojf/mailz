@@ -119,7 +119,7 @@ main(int argc, char *argv[])
 	if (ignore.type != IGNORE_NONE) {
 		struct argv_shm shm;
 
-		shm.fd = 4;
+		shm.fd = 3;
 		shm.sz = ignore.mapped.sz;
 
 		if (argv_map(&shm, &ignore.mapped) == -1) {
@@ -132,7 +132,7 @@ main(int argc, char *argv[])
 	if (reorder.sz != 0) {
 		struct argv_shm shm;
 
-		shm.fd = 5;
+		shm.fd = 4;
 		shm.sz = reorder.sz;
 
 		if (argv_map(&shm, &reorder) == -1) {

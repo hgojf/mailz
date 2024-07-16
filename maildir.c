@@ -106,9 +106,9 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 			exit(MAILDIR_READ_LETTER_DUP);
 		if (dup2(pe[1], STDERR_FILENO) == -1)
 			exit(MAILDIR_READ_LETTER_DUP);
-		if (ignore->fd != -1 && dup2(ignore->fd, 4) == -1)
+		if (ignore->fd != -1 && dup2(ignore->fd, 3) == -1)
 			exit(MAILDIR_READ_LETTER_DUP);
-		if (reorder->fd != -1 && dup2(reorder->fd, 5) == -1)
+		if (reorder->fd != -1 && dup2(reorder->fd, 4) == -1)
 			exit(MAILDIR_READ_LETTER_DUP);
 		execv(PATH_MAILDIR_READ_LETTER, argv);
 		exit(MAILDIR_READ_LETTER_EXEC);
