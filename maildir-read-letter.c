@@ -523,17 +523,8 @@ argv_map(struct argv_shm *shm, struct argv_mapped *mapped)
 static int
 argv_find(struct argv_mapped *mapped, const char *key)
 {
-	void *h;
-	size_t ll;
-
-	if (mapped->sz == 0)
-		return 0;
-
-	ll = strlen(key);
-
-	h = mapped->p;
-	while ((h = memmem(h, mapped->sz - (h - mapped->p), key, ll)) != NULL) {
-		if ((h == mapped->p || ((char *)h)[-1] == '\0') && ((char *)h)[ll] == '\0')
+	ARGV_FOREACH(i, mapped) {
+		if (strcasecmp(i, key) == 0)
 			return 1;
 	}
 	return 0;
