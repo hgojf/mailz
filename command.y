@@ -80,11 +80,15 @@ static struct interactive *interactive;
 %type<string> STRING
 
 %%
-toplevel: command '\n' {
+grammer: /* empty */
+	| commands
+	;
+
+commands: command '\n' {
 		if (interactive != NULL)
 			return 0;
 	}
-	| toplevel command '\n'
+	| commands command '\n'
 	;
 
 command: ignore
@@ -113,6 +117,7 @@ command: ignore
 	| thread
 	| unignore
 	| unread
+	| /* empty */ { }
 	;
 
 more: MORE optional_message_number {
@@ -562,6 +567,7 @@ command(struct config *cfg, struct letter *letters, size_t nletters,
 		yyparse();
 		yylex_destroy();
 	}
+	putchar('\n');
 
 	if (ferror(stdin)) {
 		warn(NULL);
