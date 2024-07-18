@@ -170,7 +170,7 @@ main(int argc, char *argv[])
 			rv = MAILDIR_READ_LETTER_MALLOC;
 			goto headers;
 		}
-		switch (header_read(fp, &gl, &header->header, 0)) {
+		switch (header_read(fp, &gl, &header->header, 1)) {
 		case HEADER_ERR:
 			free(header);
 			goto headers;
@@ -307,6 +307,9 @@ main(int argc, char *argv[])
 
 		if (c == '=') {
 			switch (c = equal_escape(fp, qp)) {
+			case -2:
+				/* soft break */
+				continue;
 			case EOF:
 				save_errno = 0;
 				rv = MAILDIR_READ_LETTER_ASCII;
@@ -467,8 +470,12 @@ equal_escape(FILE *fp, int qp)
 
 	if ((t = fgetc(fp)) == EOF)
 		return '=';
-	if (t == '\n')
-		return '\n';
+	if (t == '\n') {
+		if (qp)
+			return -2;
+		else
+			return '\n';
+	}
 
 	if (qp) {
 		int d;
