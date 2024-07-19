@@ -22,6 +22,7 @@
 "r" { return READ; }
 "read" { return READ; }
 "reorder" { return REORDER; }
+"reply" { return REPLY; }
 "s" { return SAVE; }
 "save" { return SAVE; }
 "send" { return SEND; }

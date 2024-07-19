@@ -180,7 +180,7 @@ send_mail(const char *subject, const char *to)
 		goto tmp;
 	}
 
-	if (maildir_send(EDIT_MODE_CAT, config.address.addr, subject, to) == -1)
+	if (maildir_send(EDIT_MODE_CAT, config.address.addr, subject, to, NULL) == -1)
 		goto tmp;
 
 	rv = 0;

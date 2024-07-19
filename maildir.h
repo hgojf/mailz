@@ -11,6 +11,6 @@ struct maildir_read {
 int maildir_read(char *, int, int, struct maildir_read *);
 
 int
-maildir_read_letter(const char *, const char *, int, FILE *, int, 
-struct argv_shm *, struct argv_shm *);
+maildir_read_letter(const char *, const char *, int, FILE *, struct ignore *,
+struct reorder *);
 #endif /* MAILZ_MAILDIR_H */

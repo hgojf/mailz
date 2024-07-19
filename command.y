@@ -45,6 +45,8 @@ static int argv_shm(struct argv *, struct argv_shm *);
 static int letter_mark_read(int, struct letter *);
 static int letter_mark_unread(int, struct letter *);
 
+static FILE *mkftemp(char *path);
+
 extern int yylex_destroy(void);
 extern int yylex(void);
 extern int yylineno;
@@ -59,7 +61,7 @@ static struct interactive *interactive;
 
 %}
 
-%token ADDRESS CACHE EDIT IGNORE MANUAL PRINT MORE NUMBER READ REORDER SAVE
+%token ADDRESS CACHE EDIT IGNORE MANUAL PRINT MORE NUMBER READ REORDER REPLY SAVE
 %token SEND SET STRING THREAD UNIGNORE UNREAD VI
 
 %union {
@@ -97,9 +99,8 @@ command: ignore
 		e = maildir_read_letter(interactive->root,
 			interactive->letters[$1].path, 
 			interactive->dev_null, stdout,
-			config->ignore.type == IGNORE_RETAIN,
-			&config->ignore.shm,
-			&config->reorder.shm);
+			&config->ignore,
+			&config->reorder);
 		if (e == -1)
 			YYERROR;
 
@@ -109,6 +110,7 @@ command: ignore
 	| print
 	| read
 	| reorder
+	| reply
 	| save 
 	| send
 	| set
@@ -165,9 +167,8 @@ more: MORE optional_message_number {
 
 		e = maildir_read_letter(interactive->root,
 			interactive->letters[$2].path, interactive->dev_null, fp,
-			config->ignore.type == IGNORE_RETAIN,
-			&config->ignore.shm,
-			&config->reorder.shm);
+			&config->ignore,
+			&config->reorder);
 		if (e == -1) {
 			/* 
 			 * maildir_read_letter will get a broken pipe if the pager
@@ -203,6 +204,110 @@ more: MORE optional_message_number {
 	}
 	;
 
+/* 
+ * XXX: this should probably read character-by-character from 
+ * maildir-read-letter instead of using two temporary files
+ */
+reply: REPLY optional_message_number {
+		char path1[] = PATH_TMPDIR "reply1.XXXXXX";
+		char path2[] = PATH_TMPDIR "reply2.XXXXXX";
+		struct ignore ignore;
+		struct from from;
+		struct tm *tm;
+		char date[32];
+		FILE *one, *two;
+		const char *subject;
+		int c, e, lastnl;
+
+		if (config->address.addr == NULL) {
+			warnx("must set an address");
+			YYERROR;
+		}
+
+		if ((one = mkftemp(path1)) == NULL) {
+			warn("mkstemp");
+			YYERROR;
+		}
+
+		if ((two = mkftemp(path2)) == NULL) {
+			warn("mkstemp");
+			(void) fclose(one);
+			YYERROR;
+		}
+
+		ignore.type = IGNORE_ALL;
+
+		e = maildir_read_letter(interactive->root, 
+			interactive->letters[$2].path,
+			interactive->dev_null,
+			one, &ignore, &config->reorder);
+		if (e == -1)
+			goto fail;
+
+		if (fseek(one, 0, SEEK_SET) == -1)
+			goto fail;
+
+		if ((tm = localtime(&interactive->letters[$2].date)) == NULL) {
+			warn("localtime");
+			goto fail;
+		}
+		if (strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %z", tm) == 0) {
+			warnx("strftime");
+			goto fail;
+		}
+
+		from_extract(&interactive->letters[$2].from, &from);
+
+		if (fprintf(two, "On %s, %s wrote:\n", 
+				date, from.name != NULL ? from.name : from.addr) < 0) {
+			warn("fprintf");
+			goto fail;
+		}
+
+		lastnl = 0;
+		while ((c = fgetc(one)) != EOF) {
+			if (lastnl) {
+				if (fputs("> ", two) == EOF)
+					goto fail;
+				lastnl = 0;
+			}
+
+			if (fputc(c, two) == EOF)
+				goto fail;
+
+			/* this is to avoid putting a '>' for the last line */
+			if (c == '\n')
+				lastnl = 1;
+		}
+
+		if (fseek(two, 0, SEEK_SET) == -1)
+			goto fail;
+
+		subject = interactive->letters[$2].subject;
+		if (subject != NULL && strncmp(subject, "Re: ", 4) != 0) {
+			char *s;
+
+			if (asprintf(&s, "Re: %s", subject) == -1)
+				goto fail;
+			e = maildir_send(config->edit_mode, config->address.addr,
+				s, from.addr, two);
+			free(s);
+		}
+		else
+			e = maildir_send(config->edit_mode, config->address.addr,
+				subject, from.addr, two);
+
+		if (e == -1) {
+			warnx("maildir_send");
+			goto fail;
+		}
+
+		fail:
+		(void) fclose(one);
+		(void) fclose(two);
+	}
+	;
+
 save: SAVE optional_message_number {
 		char path[] = PATH_TMPDIR "save.XXXXXX";
 		int e;
@@ -221,9 +326,8 @@ save: SAVE optional_message_number {
 
 		e = maildir_read_letter(interactive->root,
 			interactive->letters[$2].path, interactive->dev_null, fp,
-			config->ignore.type == IGNORE_RETAIN,
-			&config->ignore.shm,
-			&config->reorder.shm);
+			&config->ignore,
+			&config->reorder);
 
 		if (e == -1) {
 			(void) fclose(fp);
@@ -252,7 +356,7 @@ send: SEND address STRING {
 		}
 
 		err = maildir_send(config->edit_mode, config->address.addr,
-				$3, $2.addr);
+				$3, $2.addr, NULL);
 
 		free($2.addr);
 		free($2.name);
@@ -770,4 +874,22 @@ letter_mark_unread(int root, struct letter *letter)
 	(void) strlcpy(letter->path, new, strlen(letter->path) + 1);
 
 	return 0;
+}
+
+static FILE *
+mkftemp(char *path)
+{
+	int fd;
+	FILE *fp;
+
+	if ((fd = mkstemp(path)) == -1)
+		return NULL;
+	if (unlink(path) == -1) {
+		(void) close(fd);
+		return NULL;
+	}
+	if ((fp = fdopen(fd, "w+")) == NULL) {
+		(void) close(fd);
+	}
+	return fp;
 }

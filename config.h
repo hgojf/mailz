@@ -7,7 +7,7 @@ struct reorder {
 
 struct ignore {
 	enum {
-		IGNORE_IGNORE, IGNORE_RETAIN,
+		IGNORE_ALL, IGNORE_NONE, IGNORE_IGNORE, IGNORE_RETAIN,
 	} type;
 
 	struct argv_shm shm;

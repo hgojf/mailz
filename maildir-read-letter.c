@@ -26,6 +26,7 @@ static int argv_find(struct argv_mapped *, const char *);
 
 struct ignore {
 	enum {
+		IGNORE_ALL,
 		IGNORE_NONE,
 		IGNORE_IGNORE,
 		IGNORE_RETAIN,
@@ -71,8 +72,11 @@ main(int argc, char *argv[])
 
 	reorder.sz = 0;
 	ignore.type = IGNORE_NONE;
-	while ((ch = getopt(argc, argv, "i:r:u:")) != -1) {
+	while ((ch = getopt(argc, argv, "ai:r:u:")) != -1) {
 		switch (ch) {
+		case 'a':
+			ignore.type = IGNORE_ALL;
+			break;
 		case 'i':
 			ignore.type = IGNORE_IGNORE;
 			ignore.mapped.sz = strtonum(optarg, 0, LLONG_MAX, &errstr);
@@ -101,7 +105,7 @@ main(int argc, char *argv[])
 	if (argc != 1)
 		errx(1, "invalid usage");
 
-	if (ignore.type != IGNORE_NONE) {
+	if (ignore.type == IGNORE_IGNORE || ignore.type == IGNORE_RETAIN) {
 		struct argv_shm shm;
 
 		shm.fd = 3;
@@ -259,7 +263,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (fputc('\n', stdout) == EOF) {
+	if (ignore.type != IGNORE_ALL && fputc('\n', stdout) == EOF) {
 		warn("fputc");
 		goto headers;
 	}
@@ -357,7 +361,7 @@ main(int argc, char *argv[])
 	if (reorder.sz != 0)
 		(void) munmap(reorder.p, reorder.sz);
 	ignore:
-	if (ignore.type != IGNORE_IGNORE)
+	if (ignore.type == IGNORE_IGNORE || ignore.type == IGNORE_RETAIN)
 		(void) munmap(ignore.mapped.p, ignore.mapped.sz);
 	return rv;
 }
@@ -452,13 +456,16 @@ equal_escape(FILE *fp)
 static int
 header_ignore(struct ignore *ignore, const char *key)
 {
-	if (ignore->type == IGNORE_IGNORE) {
-		return argv_find(&ignore->mapped, key);
-	}
-	else if (ignore->type == IGNORE_RETAIN)
-		return !argv_find(&ignore->mapped, key);
-	else
+	switch (ignore->type) {
+	case IGNORE_ALL:
+		return 1;
+	case IGNORE_NONE:
 		return 0;
+	case IGNORE_IGNORE:
+		return argv_find(&ignore->mapped, key);
+	case IGNORE_RETAIN:
+		return !argv_find(&ignore->mapped, key);
+	}
 }
 
 static int

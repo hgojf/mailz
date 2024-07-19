@@ -13,6 +13,8 @@
 
 #include "address.h"
 #include "argv.h"
+#include "edit.h"
+#include "config.h"
 #include "getline.h"
 #include "letter.h"
 #include "maildir.h"
@@ -28,7 +30,7 @@ static void output_childerr(int);
 
 int
 maildir_read_letter(const char *root, const char *letter, int dev_null,
-	FILE *out, int retain, struct argv_shm *ignore, struct argv_shm *reorder)
+	FILE *out, struct ignore *ignore, struct reorder *reorder)
 {
 	char *argv[6], path[PATH_MAX], i[20], r[20];
 	struct utf8_decode u8;
@@ -46,18 +48,29 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 		return -1;
 	}
 
-	if (ignore->fd != -1) {
-		if (retain)
-			n = snprintf(i, sizeof(i), "-u%lld", ignore->sz);
-		else
-			n = snprintf(i, sizeof(i), "-i%lld", ignore->sz);
-		if (n < 0 || n >= sizeof(i) ) {
+	switch (ignore->type) {
+	case IGNORE_ALL:
+		(void)strlcpy(i, "-a", sizeof(i));
+		break;
+	case IGNORE_NONE:
+		break;
+	case IGNORE_IGNORE:
+		n = snprintf(i, sizeof(i), "-i%lld", ignore->shm.sz);
+		if (n < 0 || n >= sizeof(i)) {
 			warn("snprintf");
 			return -1;
 		}
+		break;
+	case IGNORE_RETAIN:
+		n = snprintf(i, sizeof(i), "-u%lld", ignore->shm.sz);
+		if (n < 0 || n >= sizeof(i)) {
+			warn("snprintf");
+			return -1;
+		}
+		break;
 	}
-	if (reorder->fd != -1) {
-		n = snprintf(r, sizeof(r), "-r%lld", reorder->sz);
+	if (reorder->shm.fd != -1) {
+		n = snprintf(r, sizeof(r), "-r%lld", reorder->shm.sz);
 		if (n < 0 || n >= sizeof(r)) {
 			warn("snprintf");
 			return -1;
@@ -77,12 +90,10 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 
 	argc = 0;
 	argv[argc++] = "maildir-read-letter";
-	if (ignore->fd != -1) {
+	if (ignore->type != IGNORE_NONE)
 		argv[argc++] = i;
-	}
-	if (reorder->fd != -1) {
+	if (reorder->shm.fd != -1)
 		argv[argc++] = r;
-	}
 	argv[argc++] = "--";
 	argv[argc++] = path;
 	argv[argc++] = NULL;
@@ -102,9 +113,11 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 			err(1, "dup2");
 		if (dup2(po[1], STDOUT_FILENO) == -1)
 			err(1, "dup2");
-		if (ignore->fd != -1 && dup2(ignore->fd, 3) == -1)
-			err(1, "dup2");
-		if (reorder->fd != -1 && dup2(reorder->fd, 4) == -1)
+		if (ignore->type == IGNORE_IGNORE || ignore->type == IGNORE_RETAIN) {
+			if (dup2(ignore->shm.fd, 3) == -1)
+				err(1, "dup2");
+		}
+		if (reorder->shm.fd != -1 && dup2(reorder->shm.fd, 4) == -1)
 			err(1, "dup2");
 		execv(PATH_MAILDIR_READ_LETTER, argv);
 		err(1, "%s", PATH_MAILDIR_READ_LETTER);

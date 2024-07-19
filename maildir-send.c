@@ -14,7 +14,8 @@ static int sendmail(int);
 static int vi(const char *);
 
 int
-maildir_send(enum edit_mode em, const char *from, const char *subject, const char *to)
+maildir_send(enum edit_mode em, const char *from, const char *subject, 
+	const char *to, FILE *seed)
 {
 	char path[] = PATH_TMPDIR "send.XXXXXX";
 	FILE *fp;
@@ -37,6 +38,14 @@ maildir_send(enum edit_mode em, const char *from, const char *subject, const cha
 			goto fail;
 	if (fputc('\n', fp) == EOF)
 		goto fail;
+
+	if (seed != NULL) {
+		while ((c = fgetc(seed)) != EOF)
+			if (fputc(c, fp) == EOF)
+				goto fail;
+		if (ferror(seed))
+			goto fail;
+	}
 
 	switch (em) {
 		case EDIT_MODE_CAT:
