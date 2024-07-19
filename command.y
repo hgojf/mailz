@@ -183,7 +183,8 @@ more: MORE optional_message_number {
 		if (fclose(fp) == EOF) {
 			(void) kill(pid, SIGKILL);
 			(void) waitpid(pid, NULL, 0);
-			warn("fclose");
+			if (errno != EPIPE)
+				warn("fclose");
 			YYERROR;
 		}
 
