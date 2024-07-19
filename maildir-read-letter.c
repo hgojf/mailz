@@ -54,7 +54,7 @@ static int content_type_parse(char *, struct content_type *);
 
 static int is_allowed_ascii(int);
 
-static int equal_escape(FILE *, int);
+static int equal_escape(FILE *);
 
 int
 main(int argc, char *argv[])
@@ -305,8 +305,8 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (c == '=') {
-			switch (c = equal_escape(fp, qp)) {
+		if (c == '=' && qp) {
+			switch (c = equal_escape(fp)) {
 			case -2:
 				/* soft break */
 				continue;
@@ -464,39 +464,26 @@ hexdigcaps(int c)
 }
 
 static int
-equal_escape(FILE *fp, int qp)
+equal_escape(FILE *fp)
 {
-	int t;
+	int t, d;
 
 	if ((t = fgetc(fp)) == EOF)
 		return '=';
-	if (t == '\n') {
-		if (qp)
-			return -2;
-		else
-			return '\n';
+	if (t == '\n')
+		return -2;
+
+	if ((d = fgetc(fp)) == EOF) {
+		(void) fseek(fp, -1, SEEK_CUR);
+		return EOF;
 	}
 
-	if (qp) {
-		int d;
-
-		if ((d = fgetc(fp)) == EOF) {
-			(void) fseek(fp, -1, SEEK_CUR);
-			return EOF;
-		}
-
-		if ((t = hexdigcaps(t)) == -1 || (d = hexdigcaps(d)) == -1) {
-			(void) fseek(fp, -1, SEEK_CUR);
-			return EOF;
-		}
-
-		return (t << 4) | d;
+	if ((t = hexdigcaps(t)) == -1 || (d = hexdigcaps(d)) == -1) {
+		(void) fseek(fp, -1, SEEK_CUR);
+		return EOF;
 	}
-	else {
-		if (fseek(fp, -1, SEEK_CUR) == -1)
-			return EOF;
-		return '=';
-	}
+
+	return (t << 4) | d;
 }
 
 static int
