@@ -33,6 +33,7 @@ main(int argc, char *argv[])
 	if ((mainfd = open(argv[1], O_RDONLY | O_DIRECTORY)) == -1)
 		err(1, "%s", argv[1]);
 
+	rv = 1;
 	if ((curfd = openat(mainfd, "cur", O_RDONLY | O_DIRECTORY)) == -1) {
 		warn("%s/cur", argv[1]);
 		goto main;
