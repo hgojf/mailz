@@ -414,7 +414,7 @@ cache_path_cmp(const void *one, const void *two)
 	const char *n1 = one;
 	const struct maildir_cache_entry *n2 = two;
 
-	return strcmp(one, n2->path);
+	return strcmp(n1, n2->path);
 }
 
 static int
