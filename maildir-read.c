@@ -22,7 +22,6 @@ struct letter {
 	char *subject;
 };
 
-static struct maildir_cache_entry *cache_find(struct maildir_cache *, const char *);
 static int cache_path_cmp(const void *, const void *);
 static FILE *fopenat(int, const char *);
 static int letter_read(FILE *, struct getline *, struct letter *);
@@ -39,7 +38,6 @@ main(int argc, char *argv[])
 	struct maildir_cache cache;
 	DIR *dp;
 	struct getline gl;
-	ssize_t nw;
 	int ch, dfd, root, rv, view_all;
 	uint8_t need_recache;
 
@@ -141,7 +139,6 @@ main(int argc, char *argv[])
 		struct maildir_cache_entry *cached;
 		struct dirent *de;
 		FILE *fp;
-		int r;
 
 		errno = 0;
 		if ((de = readdir(dp)) == NULL) {

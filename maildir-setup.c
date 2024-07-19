@@ -18,7 +18,6 @@ main(int argc, char *argv[])
 {
 	DIR *new;
 	struct dirent *de;
-	ssize_t nw;
 	int curfd, mainfd, newfd, rv;
 
 	if (argc != 2)

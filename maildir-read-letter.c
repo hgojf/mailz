@@ -67,7 +67,6 @@ main(int argc, char *argv[])
 	struct utf8_decode u8;
 	const char *errstr;
 	FILE *fp;
-	ssize_t nw;
 	int ch, rv, qp, utf8;
 
 	reorder.sz = 0;

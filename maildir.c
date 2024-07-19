@@ -34,7 +34,6 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 	struct utf8_decode u8;
 	FILE *fp;
 	pid_t pid;
-	ssize_t nr;
 	int argc, n, pe[2], po[2], status;
 
 	n = snprintf(path, sizeof(path), "%s/cur/%s", root, letter);
@@ -178,9 +177,7 @@ int
 maildir_setup(const char *path, int dev_null)
 {
 	pid_t pid;
-	ssize_t nr;
-	int p[2], pe[2], status;
-	FILE *e;
+	int p[2], status;
 
 	if (pipe(p) == -1) {
 		warn("pipe");
@@ -230,7 +227,6 @@ maildir_setup(const char *path, int dev_null)
 		return -1;
 	}
 
-	fail:
 	if (close(p[0]) == -1) {
 		warn("close");
 		return -1;
@@ -246,7 +242,6 @@ maildir_read(char *path, int dev_null, int view_all, struct maildir_read *out)
 	struct getline gl;
 	FILE *fp;
 	size_t nletters;
-	ssize_t nr;
 	pid_t pid;
 	uint8_t need_recache;
 	int argc, po[2], pe[2], status;

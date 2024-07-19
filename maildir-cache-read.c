@@ -112,7 +112,6 @@ cache_entry_read(FILE *fp, struct getline *gl, struct maildir_cache_entry *out)
 	struct from_safe from;
 	char *f, *path, *subject;
 	uint64_t date;
-	int rv;
 
 	n = fread(&date, 1, sizeof(date), fp);
 	if (n == 0) {
