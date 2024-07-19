@@ -238,7 +238,7 @@ save: SAVE optional_message_number {
 	}
 	;
 
-send: SEND STRING address {
+send: SEND address STRING {
 		int err;
 		if (interactive == NULL) {
 			yyerror("no interactive");
@@ -251,11 +251,11 @@ send: SEND STRING address {
 		}
 
 		err = maildir_send(config->edit_mode, config->address.addr,
-				$2, $3.addr);
+				$3, $2.addr);
 
-		free($3.addr);
-		free($3.name);
-		free($2);
+		free($2.addr);
+		free($2.name);
+		free($3);
 		if (err == -1) {
 			warnx("maildir_send");
 			YYERROR;
