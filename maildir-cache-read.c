@@ -40,6 +40,8 @@ maildir_cache_read(FILE *fp, struct maildir_cache *out)
 	if (flock(fd, LOCK_SH) == -1)
 		return -1;
 
+	rv = -1;
+
 	if (fread(&magic, sizeof(magic), 1, fp) != 1)
 		goto lock;
 
