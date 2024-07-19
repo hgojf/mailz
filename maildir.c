@@ -117,6 +117,10 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 
 	if ((fp = fdopen(po[0], "r")) == NULL) {
 		warn("fdopen");
+		(void) close(po[0]);
+		(void) close(pe[0]);
+		(void) kill(pid, SIGKILL);
+		(void) waitpid(pid, NULL, 0);
 		return -1;
 	}
 
@@ -127,7 +131,7 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 		if ((c = fgetc(fp)) == EOF) {
 			if (u8.n != 0) {
 				warnx("invalid utf8");
-				return -1;
+				goto fail;
 			}
 			break;
 		}
@@ -142,17 +146,24 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 					&& !isprint((unsigned char)u8.buf[0])
 					&& !isspace((unsigned char)u8.buf[0])) {
 				warn("invalid ascii");
-				return -1;
+				goto fail;
 			}
 			if (fwrite(u8.buf, u8.n, 1, out) != 1) {
+				if (errno == EPIPE) {
+					(void) kill(pid, SIGKILL);
+					(void) waitpid(pid, NULL, 0);
+					(void) fclose(fp);
+					(void) close(pe[0]);
+					return 0;
+				}
 				warn("write");
-				return -1;
+				goto fail;
 			}
 			u8.n = 0;
 			break;
 		case UTF8_DECODE_INVALID:
 			warnx("invalid ascii");
-			return -1;
+			goto fail;
 		case UTF8_DECODE_MORE:
 			continue;
 		}
@@ -171,6 +182,13 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 	fclose(fp);
 	close(pe[0]);
 	return 0;
+
+	fail:
+	(void) kill(pid, SIGKILL);
+	(void) waitpid(pid, NULL, 0);
+	(void) fclose(fp);
+	(void) close(pe[0]);
+	return -1;
 }
 
 int
