@@ -74,13 +74,17 @@ main(int argc, char *argv[])
 	if ((dev_null = open(PATH_DEV_NULL, O_RDWR)) == -1)
 		err(1, "%s", PATH_DEV_NULL);
 
-	if (configure(&config) == -1)
+	if (configure(&config) == -1) {
+		goto dev_null;
 		exit(1);
+	}
 
 	rv = 1;
 
-	if (mkdir(PATH_TMPDIR, 0700) == -1 && errno != EEXIST)
+	if (mkdir(PATH_TMPDIR, 0700) == -1 && errno != EEXIST) {
 		warn("mkdir");
+		goto config;
+	}
 
 	if (unveil(PATH_LESS, "x") == -1)
 		err(1, "unveil");
