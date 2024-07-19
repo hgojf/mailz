@@ -16,7 +16,6 @@
 #include "letter.h"
 #include "config.h"
 #include "command.h"
-#include "errstr.h"
 #include "maildir.h"
 #include "maildir-cache-write.h"
 #include "maildir-send.h"
@@ -31,7 +30,6 @@ struct mailbox {
 static void config_free(struct config *);
 static int read_maildir(char *, int, int, int *, struct mailbox *);
 static int send_mail(const char *, const char *);
-static int setup_maildir(const char *, int);
 static __dead void usage(void);
 static int write_cache(struct mailbox *, int);
 
@@ -105,7 +103,7 @@ main(int argc, char *argv[])
 
 	signal(SIGPIPE, SIG_IGN);
 
-	if (setup_maildir(argv[0], dev_null) == -1)
+	if (maildir_setup(argv[0], dev_null) == -1)
 		goto config;
 	if (read_maildir(argv[0], view_all, dev_null, &need_recache, &mailbox) == -1)
 		goto config;
@@ -280,22 +278,6 @@ read_maildir(char *root, int show_all, int dev_null, int *need_recache,
 	out->nletters = mdr.val.good.nletters;
 	out->letters = mdr.val.good.letters;
 	*need_recache = mdr.val.good.need_recache;
-	return 0;
-}
-
-static int
-setup_maildir(const char *path, int dev_null)
-{
-	struct maildir_setup mds;
-
-	mds = maildir_setup(path, dev_null);
-	if (mds.status != 0) {
-		if (mds.save_errno != 0)
-			warnc(mds.save_errno, "%s", maildir_setup_errstr(mds.status));
-		else
-			warnx("%s (%d)", maildir_setup_errstr(mds.status), mds.status);
-		return -1;
-	}
 	return 0;
 }
 

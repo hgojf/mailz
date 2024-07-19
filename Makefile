@@ -7,7 +7,7 @@ CFLAGS = -O0 -pipe -g -MD -MP
 TIDYCHECKS = \
 	-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
-SRCS = 	address.c command.c command-lex.c errstr.c header.c mail.c \
+SRCS = 	address.c command.c command-lex.c header.c mail.c \
 		maildir.c maildir-cache-read.c maildir-cache-write.c maildir-read.c \
 		maildir-read-letter.c maildir-send.c maildir-setup.c utf8.c
 OBJS = $(SRCS:.c=.o)
@@ -20,9 +20,9 @@ INSTALL ?= install
 
 all: ${PROGS}
 
-mail: address.o command.o command-lex.o errstr.o mail.o maildir.o maildir-cache-write.o \
+mail: address.o command.o command-lex.o mail.o maildir.o maildir-cache-write.o \
 	maildir-send.o utf8.o
-	$(CC) -o $@ ${LDFLAGS} address.o command.o command-lex.o errstr.o \
+	$(CC) -o $@ ${LDFLAGS} address.o command.o command-lex.o \
 							mail.o maildir.o maildir-cache-write.o maildir-send.o \
 							utf8.o
 

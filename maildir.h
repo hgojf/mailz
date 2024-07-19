@@ -1,11 +1,6 @@
 #ifndef MAILZ_MAILDIR_H
 #define MAILZ_MAILDIR_H
-struct maildir_setup {
-	int status;
-	int save_errno;
-};
-
-struct maildir_setup maildir_setup(const char *, int);
+int maildir_setup(const char *, int);
 
 struct maildir_read {
 	int status;

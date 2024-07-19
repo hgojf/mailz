@@ -1,6 +1,7 @@
 #include <sys/wait.h>
 
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
@@ -17,7 +18,6 @@
 #include "maildir.h"
 #include "maildir-read.h"
 #include "maildir-read-letter.h"
-#include "maildir-setup.h"
 #include "pathnames.h"
 #include "utf8.h"
 
@@ -195,86 +195,102 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 	return rv;
 }
 
-struct maildir_setup
+int
 maildir_setup(const char *path, int dev_null)
 {
-	struct maildir_setup rv;
 	pid_t pid;
 	ssize_t nr;
-	int p[2], status;
+	int p[2], pe[2], status;
+	FILE *e;
 
 	if (pipe(p) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SETUP_PIPE;
-		return rv;
+		warn("pipe");
+		return -1;
 	}
 
 	switch (pid = fork()) {
 	case -1:
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SETUP_FORK;
+		warn("fork");
 		(void) close(p[0]);
 		(void) close(p[1]);
-		return rv;
+		return -1;
 	case 0:
+		/* do this first so err sends to our stderr pipe */
+		if (dup2(p[1], STDERR_FILENO) == -1)
+			err(1, "dup2");
 		if (dup2(dev_null, STDIN_FILENO) == -1)
-			exit(MAILDIR_SETUP_DUP);
-		if (dup2(p[1], STDOUT_FILENO) == -1)
-			exit(MAILDIR_SETUP_DUP);
-		if (dup2(dev_null, STDERR_FILENO) == -1)
-			exit(MAILDIR_SETUP_DUP);
+			err(1, "dup2");
+		if (dup2(dev_null, STDOUT_FILENO) == -1)
+			err(1, "dup2");
 		if (close(p[0]) == -1)
-			exit(MAILDIR_SETUP_CLOSE);
+			err(1, "close");
 		if (close(p[1]) == -1)
-			exit(MAILDIR_SETUP_CLOSE);
+			err(1, "close");
 		execl(PATH_MAILDIR_SETUP, "maildir-setup", path, NULL);
-		exit(MAILDIR_SETUP_EXEC);
+		err(1, "%s", PATH_MAILDIR_SETUP);
 	default:
 		break;
 	}
 
 	if (close(p[1]) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SETUP_CLOSE;
+		warn("close");
 		(void) kill(pid, SIGKILL);
 		(void) waitpid(pid, NULL, 0);
-		goto fail;
+		return -1;
 	}
 
 	if (waitpid(pid, &status, 0) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SETUP_WAITPID;
-		goto fail;
+		warn("waitpid");
+		(void) close(p[0]);
+		(void) close(p[1]);
+		return -1;
 	}
 
-	nr = read(p[0], &rv.save_errno, sizeof(rv.save_errno));
-	if (nr == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SETUP_READ;
-		goto fail;
+	if (WEXITSTATUS(status) != 0) {
+		struct getline gl;
+		ssize_t len;
+		FILE *e;
+		int eo;
+
+		if ((e = fdopen(p[0], "r")) == NULL) {
+			warn("fdopen");
+			(void) close(p[0]);
+			return -1;
+		}
+
+		memset(&gl, 0, sizeof(gl));
+
+		if ((len = getdelim(&gl.line, &gl.n, EOF, e)) == -1) {
+			warn("getdelim");
+			(void) fclose(e);
+			return -1;
+		}
+
+		(void) fclose(e);
+
+		if (mbstowcs(NULL, gl.line, len) < 0) {
+			warnx("maildir-setup gave invalid error message");
+			return -1;
+		}
+		if (fputs(gl.line, stderr) == EOF) {
+			warn("fputs");
+			return -1;
+		}
+		return -1;
 	}
-	else if (nr != sizeof(rv.save_errno)) {
-		rv.save_errno = 0;
-		rv.status = MAILDIR_SETUP_SREAD;
-		goto fail;
-	}
-	else
-		/* save.errno set fully by read */
-		rv.status = WEXITSTATUS(status);
 
 	fail:
-	if (close(p[0]) == -1 && rv.status == MAILDIR_SETUP_OK) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_SETUP_CLOSE;
+	if (close(p[0]) == -1) {
+		warn("close");
+		return -1;
 	}
-	return rv;
+	return 0;
 }
 
 struct maildir_read
 maildir_read(char *path, int dev_null, int view_all)
 {
 	char *argv[5];
-	struct maildir_read rv;
 	struct letter *letters;
 	struct getline gl;
 	FILE *fp;
@@ -282,6 +298,7 @@ maildir_read(char *path, int dev_null, int view_all)
 	ssize_t nr;
 	pid_t pid;
 	uint8_t need_recache;
+	struct maildir_read rv;
 	int argc, po[2], pe[2], status;
 
 	if (pipe(po) == -1) {

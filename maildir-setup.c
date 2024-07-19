@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -6,8 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "maildir-setup.h"
 
 /*
  * takes a maildir directory and moves all letters in the 'new' directory
@@ -20,46 +19,31 @@ main(int argc, char *argv[])
 	DIR *new;
 	struct dirent *de;
 	ssize_t nw;
-	int curfd, mainfd, newfd, rv, save_errno;
+	int curfd, mainfd, newfd, rv;
 
-	if (argc != 2) {
-		save_errno = 0;
-		rv = MAILDIR_SETUP_USAGE;
-		goto fail;
-	}
+	if (argc != 2)
+		errx(1, "invalid usage");
 
 	/* XXX: unveil 'cur' as 'c' and 'new' as 'r' */
-	if (unveil(argv[1], "rc") == -1) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_UNVEIL;
-		goto fail;
-	}
-	if (pledge("stdio rpath cpath", NULL) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_PLEDGE;
-		goto fail;
-	}
+	if (unveil(argv[1], "rc") == -1)
+		err(1, "unveil %s", argv[1]);
+	if (pledge("stdio rpath cpath", NULL) == -1)
+		err(1, "pledge");
 
-	if ((mainfd = open(argv[1], O_RDONLY | O_DIRECTORY)) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_OPENMAIN;
-		goto fail;
-	}
+	if ((mainfd = open(argv[1], O_RDONLY | O_DIRECTORY)) == -1)
+		err(1, "%s", argv[1]);
 
 	if ((curfd = openat(mainfd, "cur", O_RDONLY | O_DIRECTORY)) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_OPENCUR;
+		warn("%s/cur", argv[1]);
 		goto main;
 	}
 
 	if ((newfd = openat(mainfd, "new", O_RDONLY | O_DIRECTORY)) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_OPENNEW;
+		warn("%s/new", argv[1]);
 		goto cur;
 	}
 	if ((new = fdopendir(newfd)) == NULL) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_FDOPENNEW;
+		warn("fdopendir");
 		(void) close(newfd);
 		goto cur;
 	}
@@ -70,8 +54,7 @@ main(int argc, char *argv[])
 		errno = 0;
 		if ((de = readdir(new)) == NULL) {
 			if (errno != 0) {
-				save_errno = errno;
-				rv = MAILDIR_SETUP_READDIR;
+				warn("readdir");
 				goto new;
 			}
 			/* else EOF */
@@ -87,13 +70,11 @@ main(int argc, char *argv[])
 
 			n = snprintf(path, sizeof(path), "%s:2,", de->d_name);
 			if (n < 0) {
-				save_errno = errno;
-				rv = MAILDIR_SETUP_SNPRINTF;
+				warn("snprintf");
 				goto new;
 			}
 			if (n >= sizeof(path)) {
-				save_errno = 0;
-				rv = MAILDIR_SETUP_TOOLONG;
+				warnc(ENAMETOOLONG, "%s:2,", de->d_name);
 				goto new;
 			}
 
@@ -105,37 +86,26 @@ main(int argc, char *argv[])
 		}
 
 		if (renameat(newfd, de->d_name, curfd, pathp) == -1) {
-			save_errno = errno;
-			rv = MAILDIR_SETUP_RENAME;
+			warn("rename %s -> %s", de->d_name, pathp);
 			goto new;
 		}
 	}
 
-	save_errno = 0;
-	rv = MAILDIR_SETUP_OK;
+	rv = 0;
 	new:
-	if (closedir(new) == -1 && rv == MAILDIR_SETUP_OK) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_CLOSE;
+	if (closedir(new) == -1) {
+		warn("closedir");
+		rv = 1;
 	}
 	cur:
-	if (close(curfd) == -1 && rv == MAILDIR_SETUP_OK) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_CLOSE;
+	if (close(curfd) == -1) {
+		warn("close");
+		rv = 1;
 	}
 	main:
-	if (close(mainfd) == -1 && rv == MAILDIR_SETUP_OK) {
-		save_errno = errno;
-		rv = MAILDIR_SETUP_CLOSE;
-	}
-	fail:
-	nw = write(STDOUT_FILENO, &save_errno, sizeof(save_errno));
-	if (rv == MAILDIR_SETUP_OK) {
-		if (nw == -1) {
-			rv = MAILDIR_SETUP_WRITE;
-		}
-		else if (nw != sizeof(save_errno))
-			rv = MAILDIR_SETUP_SWRITE;
+	if (close(mainfd) == -1) {
+		warn("close");
+		rv = 1;
 	}
 	return rv;
 }
