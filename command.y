@@ -505,8 +505,8 @@ edit_mode: MANUAL { $$ = EDIT_MODE_MANUAL; }
 	;
 
 address: STRING '<' STRING '>' {
-		$$.addr = $1;
-		$$.name = $3;
+		$$.name = $1;
+		$$.addr = $3;
 	}
 	| STRING {
 		$$.addr = $1;
