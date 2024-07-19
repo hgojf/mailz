@@ -16,8 +16,6 @@
 #include "getline.h"
 #include "letter.h"
 #include "maildir.h"
-#include "maildir-read.h"
-#include "maildir-read-letter.h"
 #include "pathnames.h"
 #include "utf8.h"
 
@@ -26,13 +24,13 @@
 
 static int letter_date_cmp(const void *, const void *);
 static int maildir_letter_read(FILE *, struct getline *, struct letter *);
+static void output_childerr(int);
 
-struct maildir_read_letter
+int
 maildir_read_letter(const char *root, const char *letter, int dev_null,
 	FILE *out, int retain, struct argv_shm *ignore, struct argv_shm *reorder)
 {
 	char *argv[6], path[PATH_MAX], i[20], r[20];
-	struct maildir_read_letter rv;
 	struct utf8_decode u8;
 	FILE *fp;
 	pid_t pid;
@@ -41,14 +39,12 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 
 	n = snprintf(path, sizeof(path), "%s/cur/%s", root, letter);
 	if (n < 0) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_SNPRINTF;
-		return rv;
+		warn("snprintf");
+		return -1;
 	}
 	if (n >= sizeof(path)) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_TOOLONG;
-		return rv;
+		warnc(ENAMETOOLONG, "%s/cur/%s", root, letter);
+		return -1;
 	}
 
 	if (ignore->fd != -1) {
@@ -56,30 +52,28 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 			n = snprintf(i, sizeof(i), "-u%lld", ignore->sz);
 		else
 			n = snprintf(i, sizeof(i), "-i%lld", ignore->sz);
-		if (n < 0 || n >= sizeof(i)) {
-			rv.save_errno = errno;
-			rv.status = MAILDIR_READ_LETTER_SNPRINTF;
-			return rv;
+		if (n < 0 || n >= sizeof(i) ) {
+			warn("snprintf");
+			return -1;
 		}
 	}
 	if (reorder->fd != -1) {
 		n = snprintf(r, sizeof(r), "-r%lld", reorder->sz);
 		if (n < 0 || n >= sizeof(r)) {
-			rv.save_errno = errno;
-			rv.status = MAILDIR_READ_LETTER_SNPRINTF;
-			return rv;
+			warn("snprintf");
+			return -1;
 		}
 	}
 
 	if (pipe(pe) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_PIPE;
-		return rv;
+		warn("pipe");
+		return -1;
 	}
 	if (pipe(po) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_PIPE;
-		return rv;
+		warn("pipe");
+		(void) close(pe[1]);
+		(void) close(pe[0]);
+		return -1;
 	}
 
 	argc = 0;
@@ -96,36 +90,35 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 
 	switch (pid = fork()) {
 	case -1:
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_FORK;
-		return rv;
+		warn("fork");
+		(void) close(pe[1]);
+		(void) close(pe[0]);
+		(void) close(po[1]);
+		(void) close(po[0]);
+		return -1;
 	case 0:
-		if (dup2(dev_null, STDIN_FILENO) == -1)
-			exit(MAILDIR_READ_LETTER_DUP);
-		if (dup2(po[1], STDOUT_FILENO) == -1)
-			exit(MAILDIR_READ_LETTER_DUP);
 		if (dup2(pe[1], STDERR_FILENO) == -1)
-			exit(MAILDIR_READ_LETTER_DUP);
+			err(1, "dup2");
+		if (dup2(dev_null, STDIN_FILENO) == -1)
+			err(1, "dup2");
+		if (dup2(po[1], STDOUT_FILENO) == -1)
+			err(1, "dup2");
 		if (ignore->fd != -1 && dup2(ignore->fd, 3) == -1)
-			exit(MAILDIR_READ_LETTER_DUP);
+			err(1, "dup2");
 		if (reorder->fd != -1 && dup2(reorder->fd, 4) == -1)
-			exit(MAILDIR_READ_LETTER_DUP);
+			err(1, "dup2");
 		execv(PATH_MAILDIR_READ_LETTER, argv);
-		exit(MAILDIR_READ_LETTER_EXEC);
+		err(1, "%s", PATH_MAILDIR_READ_LETTER);
 	default:
 		break;
 	}
 
-	if (close(po[1]) == -1 || close(pe[1]) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_CLOSE;
-		return rv;
-	}
+	(void) close(po[1]);
+	(void) close(pe[1]);
 
 	if ((fp = fdopen(po[0], "r")) == NULL) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_FDOPEN;
-		return rv;
+		warn("fdopen");
+		return -1;
 	}
 
 	memset(&u8, 0, sizeof(u8));
@@ -134,9 +127,8 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 
 		if ((c = fgetc(fp)) == EOF) {
 			if (u8.n != 0) {
-				rv.save_errno = errno;
-				rv.status = MAILDIR_READ_LETTER_UTF8;
-				return rv;
+				warnx("invalid utf8");
+				return -1;
 			}
 			break;
 		}
@@ -150,49 +142,36 @@ maildir_read_letter(const char *root, const char *letter, int dev_null,
 			if (u8.n == 1
 					&& !isprint((unsigned char)u8.buf[0])
 					&& !isspace((unsigned char)u8.buf[0])) {
-				rv.save_errno = errno;
-				rv.status = MAILDIR_READ_LETTER_ASCII;
-				return rv;
+				warn("invalid ascii");
+				return -1;
 			}
 			if (fwrite(u8.buf, u8.n, 1, out) != 1) {
-				rv.save_errno = errno;
-				rv.status = MAILDIR_READ_LETTER_PRINTF;
-				return rv;
+				warn("write");
+				return -1;
 			}
 			u8.n = 0;
 			break;
 		case UTF8_DECODE_INVALID:
-			rv.save_errno = errno;
-			rv.status = MAILDIR_READ_LETTER_ASCII;
-			return rv;
+			warnx("invalid ascii");
+			return -1;
 		case UTF8_DECODE_MORE:
 			continue;
 		}
 	}
 
 	if (waitpid(pid, &status, 0) == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_WAITPID;
-		return rv;
+		warn("waitpid");
+		return -1;
 	}
 
-	nr = read(pe[0], &rv.save_errno, sizeof(rv.save_errno));
-	if (nr == -1) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_READ;
-		return rv;
+	if (WEXITSTATUS(status) != 0) {
+		output_childerr(pe[0]);
+		return -1;
 	}
-	else if (nr != sizeof(rv.save_errno)) {
-		rv.save_errno = errno;
-		rv.status = MAILDIR_READ_LETTER_SREAD;
-		return rv;
-	}
-	else
-		rv.status = WEXITSTATUS(status);
 
 	fclose(fp);
 	close(pe[0]);
-	return rv;
+	return 0;
 }
 
 int
@@ -247,35 +226,7 @@ maildir_setup(const char *path, int dev_null)
 	}
 
 	if (WEXITSTATUS(status) != 0) {
-		struct getline gl;
-		ssize_t len;
-		FILE *e;
-		int eo;
-
-		if ((e = fdopen(p[0], "r")) == NULL) {
-			warn("fdopen");
-			(void) close(p[0]);
-			return -1;
-		}
-
-		memset(&gl, 0, sizeof(gl));
-
-		if ((len = getdelim(&gl.line, &gl.n, EOF, e)) == -1) {
-			warn("getdelim");
-			(void) fclose(e);
-			return -1;
-		}
-
-		(void) fclose(e);
-
-		if (mbstowcs(NULL, gl.line, len) < 0) {
-			warnx("maildir-setup gave invalid error message");
-			return -1;
-		}
-		if (fputs(gl.line, stderr) == EOF) {
-			warn("fputs");
-			return -1;
-		}
+		output_childerr(p[0]);
 		return -1;
 	}
 
@@ -287,8 +238,8 @@ maildir_setup(const char *path, int dev_null)
 	return 0;
 }
 
-struct maildir_read
-maildir_read(char *path, int dev_null, int view_all)
+int
+maildir_read(char *path, int dev_null, int view_all, struct maildir_read *out)
 {
 	char *argv[5];
 	struct letter *letters;
@@ -298,28 +249,24 @@ maildir_read(char *path, int dev_null, int view_all)
 	ssize_t nr;
 	pid_t pid;
 	uint8_t need_recache;
-	struct maildir_read rv;
 	int argc, po[2], pe[2], status;
 
 	if (pipe(po) == -1) {
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_PIPE;
-		return rv;
+		warn("pipe");
+		return -1;
 	}
 	if ((fp = fdopen(po[0], "r")) == NULL) {
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_PIPE;
+		warn("fdopen");
 		(void) close(po[0]);
 		(void) close(po[1]);
-		return rv;
+		return -1;
 	}
 
 	if (pipe(pe) == -1) {
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_PIPE;
+		warn("pipe");
 		(void) fclose(fp);
 		(void) close(po[1]);
-		return rv;
+		return -1;
 	}
 
 	argc = 0;
@@ -332,33 +279,33 @@ maildir_read(char *path, int dev_null, int view_all)
 
 	switch (pid = fork()) {
 	case -1:
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_FORK;
-		return rv;
+		warn("fork");
+		(void) close(po[1]);
+		(void) fclose(fp);
+		(void) close(pe[1]);
+		(void) close(pe[0]);
+		return -1;
 	case 0:
-		if (dup2(dev_null, STDIN_FILENO) == -1)
-			exit(MAILDIR_READ_DUP);
-		if (dup2(po[1], STDOUT_FILENO) == -1)
-			exit(MAILDIR_READ_DUP);
 		if (dup2(pe[1], STDERR_FILENO) == -1)
-			exit(MAILDIR_READ_DUP);
+			err(1, "dup2");
+		if (dup2(dev_null, STDIN_FILENO) == -1)
+			err(1, "dup2");
+		if (dup2(po[1], STDOUT_FILENO) == -1)
+			err(1, "dup2");
 		execv(PATH_MAILDIR_READ, argv);
-		exit(MAILDIR_READ_EXEC);
+		err(1, "%s", PATH_MAILDIR_READ);
 	default:
 		break;
 	}
-	if (close(po[1]) == -1 || close(pe[1]) == -1) {
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_CLOSE;
-		return rv;
-	}
+
+	(void) close(po[1]);
+	(void) close(pe[1]);
 
 	if (fread(&need_recache, sizeof(need_recache), 1, fp) != 1) {
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_READ;
+		warn("fread");
 		(void) fclose(fp);
 		(void) close(pe[0]);
-		return rv;
+		return -1;
 	}
 
 	nletters = 0;
@@ -389,43 +336,26 @@ maildir_read(char *path, int dev_null, int view_all)
 	done:
 
 	if (waitpid(pid, &status, 0) == -1) {
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_WAITPID;
+		warn("waitpid");
 		goto fail;
 	}
 
-	nr = read(pe[0], &rv.val.save_errno, sizeof(rv.val.save_errno));
-	if (nr == -1) {
-		rv.val.save_errno = errno;
-		rv.status = MAILDIR_READ_READ;
-		goto fail;
-	}
-	else if (nr != sizeof(rv.val.save_errno)) {
-		rv.val.save_errno = 0;
-		rv.status = MAILDIR_READ_SREAD;
-		goto fail;
-	}
-	else
-		rv.status = MAILDIR_READ_OK;
+	(void) fclose(fp);
+	free(gl.line);
 
-	if (close(pe[0]) == -1) {
-		rv.val.save_errno = 0;
-		rv.status = MAILDIR_READ_CLOSE;
-		goto fail;
+	if (WEXITSTATUS(status) != 0) {
+		output_childerr(pe[0]);
+		return -1;
 	}
-	if (fclose(fp) == -1) {
-		rv.val.save_errno = 0;
-		rv.status = MAILDIR_READ_CLOSE;
-		goto fail;
-	}
+
+	(void) close(pe[0]);
 
 	qsort(letters, nletters, sizeof(*letters), letter_date_cmp);
 
-	free(gl.line);
-	rv.val.good.letters = letters;
-	rv.val.good.nletters = nletters;
-	rv.val.good.need_recache = need_recache;
-	return rv;
+	out->letters = letters;
+	out->nletters = nletters;
+	out->need_recache = need_recache;
+	return 0;
 
 	fail:
 	for (size_t i = 0; i < nletters; i++) {
@@ -435,7 +365,7 @@ maildir_read(char *path, int dev_null, int view_all)
 	}
 	free(letters);
 	free(gl.line);
-	return rv;
+	return -1;
 }
 
 static int
@@ -509,4 +439,36 @@ maildir_letter_read(FILE *fp, struct getline *gl, struct letter *out)
 	path:
 	free(path);
 	return MAILDIR_LETTER_READ_ERR;
+}
+
+static void
+output_childerr(int serr)
+{
+	FILE *e;
+	ssize_t len;
+	struct getline gl;
+
+	if ((e = fdopen(serr, "r")) == NULL) {
+		warn("fdopen");
+		return;
+	}
+
+	memset(&gl, 0, sizeof(gl));
+	if ((len = getdelim(&gl.line, &gl.n, EOF, e)) == -1) {
+		warn("getdelim");
+		(void) fclose(e);
+		free(gl.line);
+		return;
+	}
+
+	(void) fclose(e);
+	if (mbstowcs(NULL, gl.line, len) == (size_t) -1) {
+		warnx("child sent invalid error message");
+		free(gl.line);
+		return;
+	}
+	if (fputs(gl.line, stderr) == EOF) {
+		warn("fputs");
+		free(gl.line);
+	}
 }

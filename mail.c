@@ -268,16 +268,13 @@ read_maildir(char *root, int show_all, int dev_null, int *need_recache,
 		return -1;
 	}
 
-	mdr = maildir_read(root, dev_null, show_all);
-	if (mdr.status != 0) {
+	if (maildir_read(root, dev_null, show_all, &mdr) == -1) {
 		(void) close(out->cur);
-		warnx("maildir_read");
 		return -1;
 	}
-
-	out->nletters = mdr.val.good.nletters;
-	out->letters = mdr.val.good.letters;
-	*need_recache = mdr.val.good.need_recache;
+	out->nletters = mdr.nletters;
+	out->letters = mdr.letters;
+	*need_recache = mdr.need_recache;
 	return 0;
 }
 

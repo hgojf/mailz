@@ -2,6 +2,7 @@
 #include <sys/time.h>
 
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -14,7 +15,6 @@
 #include "getline.h"
 #include "header.h"
 #include "maildir-cache-read.h"
-#include "maildir-read.h"
 
 struct letter {
 	time_t date;
@@ -40,7 +40,7 @@ main(int argc, char *argv[])
 	DIR *dp;
 	struct getline gl;
 	ssize_t nw;
-	int ch, dfd, root, rv, save_errno, view_all;
+	int ch, dfd, root, rv, view_all;
 	uint8_t need_recache;
 
 	view_all = 0;
@@ -50,55 +50,39 @@ main(int argc, char *argv[])
 			view_all = 1;
 			break;
 		default:
-			save_errno = 0;
-			rv = MAILDIR_READ_USAGE;
-			goto fail;
+			errx(1, "invalid usage");
 		}
 	}
 
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1) {
-		save_errno = 0;
-		rv = MAILDIR_READ_USAGE;
-		goto fail;
-	}
+	if (argc != 1)
+		errx(1, "invalid usage");
 
-	if (unveil(argv[0], "r") == -1) {
-		save_errno = errno;
-		rv = MAILDIR_READ_UNVEIL;
-		goto fail;
-	}
+	if (unveil(argv[0], "r") == -1)
+		err(1, "%s", argv[0]);
 
-	if (pledge("stdio rpath flock", NULL) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_READ_PLEDGE;
-		goto fail;
-	}
+	if (pledge("stdio rpath flock", NULL) == -1)
+		err(1, "pledge");
 
-	if ((root = open(argv[0], O_RDONLY | O_DIRECTORY)) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_READ_OPENDIR;
-		goto fail;
-	}
+	if ((root = open(argv[0], O_RDONLY | O_DIRECTORY)) == -1)
+		err(1, "%s", argv[0]);
 
+	rv = 1;
 	if ((dp = opendirat(root, "cur")) == NULL) {
-		save_errno = errno;
-		rv = MAILDIR_READ_OPENDIR;
+		warn("%s/cur", argv[0]);
 		goto root;
 	}
 	dfd = dirfd(dp);
 
 	if (read_cache(root, &cache) == -1) {
-		save_errno = 0;
-		rv = MAILDIR_READ_CACHE;
+		warnx("failed to read cache");
 		goto root;
 	}
 
 	if (pledge("stdio rpath", NULL) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_READ_PLEDGE;
+		warn("pledge");
 		goto root;
 	}
 
@@ -106,16 +90,14 @@ main(int argc, char *argv[])
 		struct stat sb;
 
 		if (fstat(dfd, &sb) == -1) {
-			save_errno = errno;
-			rv = MAILDIR_READ_OPENDIR;
+			warn("fstat");
 			goto cache;
 		}
 
 		if ((!view_all || cache.view_seen) && timespeccmp(&cache.mtime, &sb.st_mtim, >=)) {
 			need_recache = 0;
 			if (fwrite(&need_recache, sizeof(need_recache), 1, stdout) != 1) {
-				save_errno = errno;
-				rv = MAILDIR_READ_WRITE;
+				warn("fwrite");
 				goto cache;
 			}
 
@@ -130,14 +112,12 @@ main(int argc, char *argv[])
 				letter.subject = cache.letters[i].subject;
 
 				if (letter_write(stdout, cache.letters[i].path, &letter) == -1) {
-					save_errno = 0;
-					rv = MAILDIR_READ_WRITE;
+					warn("write");
 					goto cache;
 				}
 			}
 
-			save_errno = 0;
-			rv = MAILDIR_READ_OK;
+			rv = 0;
 			goto cache;
 		}
 		/*
@@ -151,8 +131,7 @@ main(int argc, char *argv[])
 	need_recache = 1;
 
 	if (fwrite(&need_recache, sizeof(need_recache), 1, stdout) != 1) {
-		save_errno = errno;
-		rv = MAILDIR_READ_WRITE;
+		warn("write");
 		goto cache;
 	}
 
@@ -167,8 +146,7 @@ main(int argc, char *argv[])
 		errno = 0;
 		if ((de = readdir(dp)) == NULL) {
 			if (errno != 0) {
-				save_errno = errno;
-				rv = MAILDIR_READ_READDIR;
+				warn("readdir");
 				goto gl;
 			}
 			break;
@@ -189,35 +167,30 @@ main(int argc, char *argv[])
 			letter.subject = cached->subject;
 
 			if (letter_write(stdout, cached->path, &letter) == -1) {
-				save_errno = errno;
-				rv = MAILDIR_READ_WRITE;
+				warn("write");
 				goto gl;
 			}
 			continue;
 		}
 
 		if ((fp = fopenat(dfd, de->d_name)) == NULL) {
-			save_errno = errno;
-			rv = MAILDIR_READ_FOPEN;
+			warn("%s/%s", argv[0], de->d_name);
 			goto gl;
 		}
 		if (letter_read(fp, &gl, &letter) == -1) {
-			save_errno = errno;
-			rv = MAILDIR_READ_LETTER;
+			warnx("failed to read letter");
 			(void) fclose(fp);
 			goto gl;
 		}
 		if (fclose(fp) == EOF) {
-			save_errno = errno;
-			rv = MAILDIR_READ_FCLOSE;
+			warn("fclose");
 			free(letter.from.str);
 			free(letter.subject);
 			goto gl;
 		}
 
 		if (letter_write(stdout, de->d_name, &letter) == -1) {
-			save_errno = errno;
-			rv = MAILDIR_READ_WRITE;
+			warn("write");
 			free(letter.from.str);
 			free(letter.subject);
 			goto gl;
@@ -226,8 +199,7 @@ main(int argc, char *argv[])
 		free(letter.subject);
 	}
 
-	save_errno = 0;
-	rv = MAILDIR_READ_OK;
+	rv = 0;
 	gl:
 	free(gl.line);
 	cache:
@@ -238,21 +210,15 @@ main(int argc, char *argv[])
 	}
 	free(cache.letters);
 	dir:
-	if (closedir(dp) == -1 && rv == MAILDIR_READ_OK) {
-		save_errno = errno;
-		rv = MAILDIR_READ_CLOSEDIR;
+	if (closedir(dp) == -1) {
+		warn("closedir");
+		rv = 1;
 	}
 	root:
-	if (close(root) == -1 && rv == MAILDIR_READ_OK) {
-		save_errno = errno;
-		rv = MAILDIR_READ_CLOSEDIR;
+	if (close(root) == -1) {
+		warn("close");
+		rv = 1;
 	}
-	fail:
-	nw = write(STDERR_FILENO, &save_errno, sizeof(save_errno));
-	if (nw == -1)
-		rv = MAILDIR_READ_WRITE;
-	else if (nw != sizeof(save_errno))
-		rv = MAILDIR_READ_SWRITE;
 	return rv;
 }
 

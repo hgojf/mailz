@@ -2,6 +2,7 @@
 #include <sys/tree.h>
 
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
 #include <limits.h>
 #include <locale.h>
@@ -14,7 +15,6 @@
 #include "argv.h"
 #include "getline.h"
 #include "header.h"
-#include "maildir-read-letter.h"
 #include "utf8.h"
 
 static int argv_map(struct argv_shm *, struct argv_mapped *);
@@ -68,7 +68,7 @@ main(int argc, char *argv[])
 	const char *errstr;
 	FILE *fp;
 	ssize_t nw;
-	int ch, rv, save_errno, qp, utf8;
+	int ch, rv, qp, utf8;
 
 	reorder.sz = 0;
 	ignore.type = IGNORE_NONE;
@@ -77,44 +77,30 @@ main(int argc, char *argv[])
 		case 'i':
 			ignore.type = IGNORE_IGNORE;
 			ignore.mapped.sz = strtonum(optarg, 0, LLONG_MAX, &errstr);
-			if (errstr != NULL) {
-				save_errno = 0;
-				rv = MAILDIR_READ_LETTER_USAGE;
-				goto fail;
-			}
+			if (errstr != NULL)
+				errx(1, "invalid usage");
 			break;
 		case 'r':
 			reorder.sz = strtonum(optarg, 0, LLONG_MAX, &errstr);
-			if (errstr != NULL) {
-				save_errno = 0;
-				rv = MAILDIR_READ_LETTER_USAGE;
-				goto fail;
-			}
+			if (errstr != NULL)
+				errx(1, "invalid usage");
 			break;
 		case 'u':
 			ignore.type = IGNORE_RETAIN;
 			ignore.mapped.sz = strtonum(optarg, 0, LLONG_MAX, &errstr);
-			if (errstr != NULL) {
-				save_errno = 0;
-				rv = MAILDIR_READ_LETTER_USAGE;
-				goto fail;
-			}
+			if (errstr != NULL)
+				errx(1, "invalid usage");
 			break;
 		default:
-			save_errno = 0;
-			rv = MAILDIR_READ_LETTER_USAGE;
-			goto fail;
+			errx(1, "invalid usage");
 		}
 	}
 
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1) {
-		save_errno = 0;
-		rv = MAILDIR_READ_LETTER_USAGE;
-		goto fail;
-	}
+	if (argc != 1)
+		errx(1, "invalid usage");
 
 	if (ignore.type != IGNORE_NONE) {
 		struct argv_shm shm;
@@ -122,12 +108,11 @@ main(int argc, char *argv[])
 		shm.fd = 3;
 		shm.sz = ignore.mapped.sz;
 
-		if (argv_map(&shm, &ignore.mapped) == -1) {
-			save_errno = errno;
-			rv = MAILDIR_READ_LETTER_SHM;
-			goto fail;
-		}
+		if (argv_map(&shm, &ignore.mapped) == -1)
+			err(1, "mmap");
 	}
+
+	rv = 1;
 
 	if (reorder.sz != 0) {
 		struct argv_shm shm;
@@ -136,27 +121,23 @@ main(int argc, char *argv[])
 		shm.sz = reorder.sz;
 
 		if (argv_map(&shm, &reorder) == -1) {
-			save_errno = errno;
-			rv = MAILDIR_READ_LETTER_SHM;
+			warn("mmap");
 			goto ignore;
 		}
 	}
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL) {
-		save_errno = 0;
-		rv = MAILDIR_READ_LETTER_SETLOCALE;
+		warn("setlocale");
 		goto reorder;
 	}
 
 	if ((fp = fopen(argv[0], "r")) == NULL) {
-		save_errno = errno;
-		rv = MAILDIR_READ_LETTER_FOPEN;
-		goto fail;
+		warn("%s", argv[0]);
+		goto reorder;
 	}
 
 	if (pledge("stdio", NULL) == -1) {
-		save_errno = errno;
-		rv = MAILDIR_READ_LETTER_PLEDGE;
+		warn("pledge");
 		goto fp;
 	}
 
@@ -166,12 +147,12 @@ main(int argc, char *argv[])
 		struct header_rb *f, *header;
 
 		if ((header = malloc(sizeof(*header))) == NULL) {
-			save_errno = errno;
-			rv = MAILDIR_READ_LETTER_MALLOC;
+			warn("malloc");
 			goto headers;
 		}
 		switch (header_read(fp, &gl, &header->header, 1)) {
 		case HEADER_ERR:
+			warnx("invalid header");
 			free(header);
 			goto headers;
 		case HEADER_EOF:
@@ -200,8 +181,7 @@ main(int argc, char *argv[])
 			nlen = olen + clen;
 
 			if ((t = realloc(f->header.val, nlen + 1)) == NULL) {
-				save_errno = errno;
-				rv = MAILDIR_READ_LETTER_MALLOC;
+				warn("realloc %zu", nlen + 1);
 				free(header->header.key);
 				free(header->header.val);
 				free(header);
@@ -246,8 +226,10 @@ main(int argc, char *argv[])
 			free(h);
 		}
 		else {
-			if ((cts = strdup(h->header.val)) == NULL)
+			if ((cts = strdup(h->header.val)) == NULL) {
+				warn("strdup");
 				goto headers;
+			}
 		}
 		if (content_type_parse(cts, &ct) != -1
 				&& ct.charset != NULL
@@ -261,8 +243,7 @@ main(int argc, char *argv[])
 
 		if ((h = RB_FIND(headers, &headers, &f)) != NULL) {
 			if (printf("%s: %s\n", h->header.key, h->header.val) < 0) {
-				save_errno = errno;
-				rv = MAILDIR_READ_LETTER_PRINTF;
+				warn("printf");
 				goto headers;
 			}
 			RB_REMOVE(headers, &headers, h);
@@ -274,15 +255,13 @@ main(int argc, char *argv[])
 
 	RB_FOREACH(i, headers, &headers) {
 		if (printf("%s: %s\n", i->header.key, i->header.val) < 0) {
-			save_errno = errno;
-			rv = MAILDIR_READ_LETTER_PRINTF;
+			warn("printf");
 			goto headers;
 		}
 	}
 
 	if (fputc('\n', stdout) == EOF) {
-		save_errno = errno;
-		rv = MAILDIR_READ_LETTER_PRINTF;
+		warn("fputc");
 		goto headers;
 	}
 
@@ -297,8 +276,7 @@ main(int argc, char *argv[])
 		if ((c = fgetc(fp)) == EOF) {
 			if (utf8 && u8.n != 0) {
 				/* EOF in the middle of decoding a utf-8 codepoint */
-				save_errno = 0;
-				rv = MAILDIR_READ_LETTER_UTF8;
+				warnx("letter had invalid utf-8");
 				goto headers;
 			}
 
@@ -311,8 +289,7 @@ main(int argc, char *argv[])
 				/* soft break */
 				continue;
 			case EOF:
-				save_errno = 0;
-				rv = MAILDIR_READ_LETTER_ASCII;
+				warnx("letter had invalid ascii");
 				goto headers;
 			default:
 				break;
@@ -328,8 +305,7 @@ main(int argc, char *argv[])
 					goto invalid;
 				}
 				if (fwrite(u8.buf, u8.n, 1, stdout) != 1) {
-					save_errno = errno;
-					rv = MAILDIR_READ_LETTER_PRINTF;
+					warn("write");
 					goto headers;
 				}
 				u8.n = 0;
@@ -337,8 +313,7 @@ main(int argc, char *argv[])
 			case UTF8_DECODE_MORE:
 				continue;
 			case UTF8_DECODE_INVALID:
-				save_errno = 0;
-				rv = MAILDIR_READ_LETTER_ASCII;
+				rv = 1;
 				goto headers;
 			}
 		}
@@ -347,8 +322,7 @@ main(int argc, char *argv[])
 				goto invalid;
 			}
 			if (fputc(c, stdout) == EOF) {
-				save_errno = errno;
-				rv = MAILDIR_READ_LETTER_PRINTF;
+				warn("fputc");
 				goto headers;
 			}
 		}
@@ -359,16 +333,14 @@ main(int argc, char *argv[])
 
 		/* unicode replacement character */
 		if (fwrite("\xEF\xBF\xBD", 3, 1, stdout) != 1) {
-			save_errno = errno;
-			rv = MAILDIR_READ_LETTER_PRINTF;
+			warn("write");
 			goto headers;
 		}
 		if (utf8)
 			memset(&u8, 0, sizeof(u8));
 	}
 
-	save_errno = 0;
-	rv = MAILDIR_READ_LETTER_OK;
+	rv = 0;
 	headers:
 	RB_FOREACH_SAFE(i, headers, &headers, tv) {
 		RB_REMOVE(headers, &headers, i);
@@ -378,9 +350,9 @@ main(int argc, char *argv[])
 	}
 	free(gl.line);
 	fp:
-	if (fclose(fp) == EOF && rv == MAILDIR_READ_LETTER_OK) {
-		save_errno = errno;
-		rv = MAILDIR_READ_LETTER_CLOSE;
+	if (fclose(fp) == EOF) {
+		warn("fclose");
+		rv = 1;
 	}
 	reorder:
 	if (reorder.sz != 0)
@@ -388,14 +360,6 @@ main(int argc, char *argv[])
 	ignore:
 	if (ignore.type != IGNORE_IGNORE)
 		(void) munmap(ignore.mapped.p, ignore.mapped.sz);
-	fail:
-	nw = write(STDERR_FILENO, &save_errno, sizeof(save_errno));
-	if (nw == -1 && rv == MAILDIR_READ_LETTER_OK) {
-		save_errno = errno;
-		rv = MAILDIR_READ_LETTER_WRITE;
-	}
-	else if (nw != sizeof(save_errno) && rv == MAILDIR_READ_LETTER_OK)
-		rv = MAILDIR_READ_LETTER_SWRITE;
 	return rv;
 }
 

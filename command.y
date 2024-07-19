@@ -17,7 +17,6 @@
 #include "../config.h"
 #include "../letter.h"
 #include "../maildir.h"
-#include "../maildir-read-letter.h"
 #include "../maildir-send.h"
 #include "../pathnames.h"
 
@@ -94,16 +93,15 @@ commands: command '\n' {
 command: ignore
 	| more
 	| message_number {
-		struct maildir_read_letter mdrl;
-
-		mdrl = maildir_read_letter(interactive->root,
+		int e;
+		e = maildir_read_letter(interactive->root,
 			interactive->letters[$1].path, 
 			interactive->dev_null, stdout,
 			config->ignore.type == IGNORE_RETAIN,
 			&config->ignore.shm,
 			&config->reorder.shm);
-		if (mdrl.status != 0)
-			warnc(mdrl.save_errno, "maildir_read_letter %d", mdrl.status);
+		if (e == -1)
+			YYERROR;
 
 		if (letter_mark_read(interactive->cur, &interactive->letters[$1]) == -1)
 			YYERROR;
@@ -122,7 +120,7 @@ command: ignore
 
 more: MORE optional_message_number {
 		FILE *fp;
-		struct maildir_read_letter mdrl;
+		int e;
 		pid_t pid;
 		int p[2], status;
 
@@ -165,12 +163,12 @@ more: MORE optional_message_number {
 			YYERROR;
 		}
 
-		mdrl = maildir_read_letter(interactive->root,
+		e = maildir_read_letter(interactive->root,
 			interactive->letters[$2].path, interactive->dev_null, fp,
 			config->ignore.type == IGNORE_RETAIN,
 			&config->ignore.shm,
 			&config->reorder.shm);
-		if (mdrl.status != 0 && mdrl.status != MAILDIR_READ_LETTER_PRINTF) {
+		if (e == -1) {
 			/* 
 			 * maildir_read_letter will get a broken pipe if the pager
 			 * exits without reading the entire file
@@ -206,7 +204,7 @@ more: MORE optional_message_number {
 
 save: SAVE optional_message_number {
 		char path[] = PATH_TMPDIR "save.XXXXXX";
-		struct maildir_read_letter mdrl;
+		int e;
 		int fd;
 		FILE *fp;
 
@@ -220,14 +218,13 @@ save: SAVE optional_message_number {
 			YYERROR;
 		}
 
-		mdrl = maildir_read_letter(interactive->root,
+		e = maildir_read_letter(interactive->root,
 			interactive->letters[$2].path, interactive->dev_null, fp,
 			config->ignore.type == IGNORE_RETAIN,
 			&config->ignore.shm,
 			&config->reorder.shm);
 
-		if (mdrl.status != 0 && mdrl.status != MAILDIR_READ_LETTER_PIPE) {
-			warnx("maildir_read_letter");
+		if (e == -1) {
 			(void) fclose(fp);
 			YYERROR;
 		}
