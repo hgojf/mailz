@@ -88,13 +88,14 @@ header_read(FILE *fp, struct getline *gl, struct header *out, int tv)
 				goto val;
 		}
 
-		t = realloc(out->val, vlen + len + 1);
+		t = realloc(out->val, vlen + len + 2);
 		if (t == NULL)
 			goto val;
 		out->val = t;
-		memcpy(&out->val[vlen], line, len);
-		out->val[vlen + len] = '\0';
-		vlen += len;
+		out->val[vlen] = c;
+		memcpy(&out->val[vlen + 1], line, len);
+		out->val[vlen + 1 + len] = '\0';
+		vlen += len + 1;
 	}
 
 	return 0;
