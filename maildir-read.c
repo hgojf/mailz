@@ -78,12 +78,12 @@ main(int argc, char *argv[])
 
 	if (read_cache(root, &cache) == -1) {
 		warnx("failed to read cache");
-		goto root;
+		goto dir;
 	}
 
 	if (pledge("stdio rpath", NULL) == -1) {
 		warn("pledge");
-		goto root;
+		goto cache;
 	}
 
 	if (cache.nletters != 0) {
