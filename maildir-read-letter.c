@@ -70,6 +70,7 @@ main(int argc, char *argv[])
 	FILE *fp;
 	int ch, rv, qp, utf8;
 
+	reorder.p = NULL; /* for ARGV_FOREACH */
 	reorder.sz = 0;
 	ignore.type = IGNORE_NONE;
 	while ((ch = getopt(argc, argv, "ai:r:u:")) != -1) {
