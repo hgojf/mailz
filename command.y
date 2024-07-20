@@ -264,6 +264,9 @@ reply: REPLY optional_message_number {
 			goto fail;
 		}
 
+		if (fputs("> ", two) == EOF)
+			goto fail;
+
 		lastnl = 0;
 		while ((c = fgetc(one)) != EOF) {
 			if (lastnl) {
