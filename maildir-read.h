@@ -1,0 +1,7 @@
+#ifndef MAILZ_MAILDIR_READ_H
+#define MAILZ_MAILDIR_READ_H
+enum {
+	IMSG_MDR_FILE,
+	IMSG_MDR_LETTER,
+};
+#endif /* MAILZ_MAILDIR_READ_H */
