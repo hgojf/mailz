@@ -1,0 +1,10 @@
+obj/
+
+
+*.[od]
+lex.c
+maildir-read
+maildir-read-letter
+mailz
+parse.c
+parse.h
