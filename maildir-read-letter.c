@@ -421,6 +421,9 @@ getbyte(enum encoding encoding)
 		}
 
 		return (hi << 4) | lo;
+	default:
+		/* NOTREACHED */
+		abort();
 	}
 }
 
@@ -516,6 +519,9 @@ header_ignore(const char *key, struct ignore *ignore)
 	case IGNORE_RETAIN:
 		rv = 0;
 		break;
+	default:
+		/* NOTREACHED */
+		abort();
 	}
 
 	for (size_t i = 0; i < ignore->argc; i++)
