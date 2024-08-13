@@ -165,11 +165,15 @@ main(int argc, char *argv[])
 
 	if (conf.cache && cache_write(root, view_all, mbox.letters, mbox.nletter) == -1) {
 		warn("cache_write");
-		goto cur;
+		goto letters;
 	}
 
 	good:
 	rv = 0;
+	letters:
+	for (size_t i = 0; i < mbox.nletter; i++)
+		letter_free(&mbox.letters[i]);
+	free(mbox.letters);
 	close(dev_null);
 	cur:
 	close(cur);
