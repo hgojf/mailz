@@ -10,6 +10,7 @@
 
 #include "letter.h"
 #include "cache.h"
+#include "printable.h"
 
 #define MAILZCACHE_MAGIC_MASK	0xFFFFFF00
 #define MAILZCACHE_MAGIC		0x48414D00	
@@ -156,7 +157,7 @@ fread_letter(struct getline *gl, struct letter *letter, FILE *fp)
 }
 
 static int
-fread_optstring(struct getline *gl, char **s, FILE *fp)
+fread_opt_bytestring(struct getline *gl, char **s, FILE *fp)
 {
 	ssize_t len;
 	char *rv;
@@ -171,7 +172,7 @@ fread_optstring(struct getline *gl, char **s, FILE *fp)
 
 	if (gl->line[0] == '\0') {
 		*s = NULL;
-		return 0;
+		return -2;
 	}
 
 	if ((rv = malloc(len)) == NULL)
@@ -182,31 +183,51 @@ fread_optstring(struct getline *gl, char **s, FILE *fp)
 	return 0;
 }
 
+static int
+fread_optstring(struct getline *gl, char **s, FILE *fp)
+{
+	int rv;
+
+	switch (rv = fread_opt_bytestring(gl, s, fp)) {
+	case -1:
+	case -2:
+		return rv;
+	default:
+		if (!string_isprint(*s)) {
+			errno = EILSEQ;
+			free(*s);
+			return -1;
+		}
+		return 0;
+	}
+}
+
 static char *
 fread_bytestring(struct getline *gl, FILE *fp)
 {
-	ssize_t len;
 	char *rv;
 
-	if ((len = getdelim(&gl->line, &gl->sz, '\0', fp)) == -1)
+	switch (fread_opt_bytestring(gl, &rv, fp)) {
+	case -1:
+	case -2:
 		return NULL;
-
-	if (gl->line[len - 1] != '\0') {
-		errno = EILSEQ;
-		return NULL;
+	default:
+		return rv;
 	}
-
-	if ((rv = malloc(len)) == NULL)
-		return NULL;
-	memcpy(rv, gl->line, len); /* includes NUL */
-
-	return rv;
 }
 
 static char *
 fread_string(struct getline *gl, FILE *fp)
 {
-	return fread_bytestring(gl, fp);
+	char *rv;
+
+	switch (fread_optstring(gl, &rv, fp)) {
+	case -1:
+	case -2:
+		return NULL;
+	default:
+		return rv;
+	}
 }
 
 static int

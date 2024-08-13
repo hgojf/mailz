@@ -25,11 +25,11 @@
 #include "cache.h"
 #include "maildir-read.h"
 #include "pathnames.h"
+#include "printable.h"
 #include "read-letters.h"
 
 static int imsg_get_letter(struct imsg *, const char *, struct letter *);
 static int letter_date_cmp(const void *, const void *);
-static int string_isprint(const char *);
 
 int
 maildir_read(int curfd, int do_cache, int view_all, 
@@ -298,41 +298,6 @@ imsg_get_letter(struct imsg *msg, const char *path, struct letter *out)
 	addr:
 	free(out->from.addr);
 	return -1;
-}
-
-static int
-string_isprint(const char *s)
-{
-	mbstate_t mbs;
-	size_t len, n;
-
-	memset(&mbs, 0, sizeof(mbs));
-
-	len = strlen(s);
-	while (len != 0) {
-		switch (n = mbrtowc(NULL, s, len, &mbs)) {
-		case -1:
-		case -3:
-			return 0;
-		case 0: /* NUL */
-			return 0;
-		case -2:
-			len -= 1;
-			s += 1;
-			break;
-		default:
-			if (n == 1) {
-				if (!isprint((unsigned char)*s) && !isspace((unsigned char)*s))
-					return 0;
-			}
-
-			len -= n;
-			s += n;
-			break;
-		}
-	}
-
-	return 1;
 }
 
 static int

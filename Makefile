@@ -1,4 +1,4 @@
-#DEBUG = -g -fno-inline-functions
+DEBUG = -g -fno-inline-functions
 CFLAGS = -O2 -pipe
 CFLAGS += -MD -MP 
 CFLAGS += -I${.CURDIR}/ 
@@ -11,7 +11,7 @@ CFLAGS += -Wshadow -Wdeclaration-after-statement
 PREFIX = /usr/local
 
 SRCS_MAILZ = cache.c commands.c leak.c imsg-util.c letter.c lex.c mailz.c parse.c
-SRCS_MAILZ += read-letter.c read-letters.c send.c setup.c
+SRCS_MAILZ += printable.c read-letter.c read-letters.c send.c setup.c
 OBJS_MAILZ = $(SRCS_MAILZ:.c=.o)
 LDFLAGS_MAILZ = -lutil
 
