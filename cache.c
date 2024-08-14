@@ -68,7 +68,7 @@ cache_read(FILE *fp, struct cache *out)
 
 	if (fread_all(&version, sizeof(version), fp) == -1)
 		return -1;
-	version = letoh32(version);
+	version = le32toh(version);
 
 	if ((version & MAILZCACHE_MAGIC_MASK) != MAILZCACHE_MAGIC) {
 		errno = EILSEQ;
@@ -130,7 +130,7 @@ fread_letter(struct getline *gl, struct letter *letter, FILE *fp)
 		return -2;
 	if (n != sizeof(date))
 		return -1;
-	letter->date = letoh64(date);
+	letter->date = le64toh(date);
 
 	if ((letter->from.addr = fread_string(gl, fp)) == NULL)
 		return -1;
