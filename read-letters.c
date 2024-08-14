@@ -68,6 +68,10 @@ maildir_read(int curfd, int do_cache, int view_all,
 			return -1;
 		}
 
+		if (flock(cache_fd, LOCK_SH) == -1) {
+			fclose(fp);
+			return -1;
+		}
 		switch (cache_read(fp, &cache)) {
 		case CACHE_VERSION_MISMATCH:
 			memset(&cache, 0, sizeof(cache));

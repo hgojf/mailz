@@ -133,7 +133,7 @@ main(int argc, char *argv[])
 		goto tmpdir;
 	}
 
-	if (pledge("stdio rpath cpath wpath sendfd proc exec", NULL) == -1)
+	if (pledge("stdio rpath cpath wpath flock sendfd proc exec", NULL) == -1)
 		err(1, "pledge");
 
 	if ((root = open(argv[0], O_RDONLY | O_CLOEXEC)) == -1) {

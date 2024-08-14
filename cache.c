@@ -252,6 +252,10 @@ cache_write(int root, int view_all, struct letter *letters, size_t nl)
 		return -1;
 	}
 
+	if (flock(fd, LOCK_EX) == -1) {
+		fclose(fp);
+		return -1;
+	}
 	rv = cache_write1(view_all, letters, nl, fp);
 
 	fclose(fp);
