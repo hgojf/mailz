@@ -1,5 +1,6 @@
 #include <sys/wait.h>
 
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -59,6 +60,16 @@ static struct command { // NOLINT(clang-analyzer-optin.performance.Padding)
 };
 
 static int
+cat_letter(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
+{
+	if (read_letter_quick(cur, mbox->letters[idx].path, &conf->ignore, 
+			&conf->reorder, stdout) == -1)
+		return -1;
+
+	return read_cmd(idx, cur, mbox, conf);
+}
+
+static int
 command_cmp(const void *one, const void *two)
 {
 	const char *n1 = one;
@@ -106,6 +117,25 @@ commands_run(int cur, struct mailbox *mbox, struct mailz_conf *conf)
 			continue;
 
 		args = line;
+
+		if (isdigit((unsigned char)*args)) {
+			idx = strtonum(args, 0, mbox->nletter, &errstr);
+			if (errstr != NULL) {
+				warnx("message number was %s", errstr);
+				continue;
+			}
+			idx -= 1;
+
+			sidx = idx;
+
+			if (cat_letter(idx, cur, mbox, conf) == -1) {
+				warn("failed to print letter");
+				continue;
+			}
+
+			continue;
+		}
+
 		if ((arg0 = strsep(&args, " \t")) == NULL)
 			continue;
 
