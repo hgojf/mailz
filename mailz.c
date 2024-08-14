@@ -174,7 +174,6 @@ main(int argc, char *argv[])
 	for (size_t i = 0; i < mbox.nletter; i++)
 		letter_free(&mbox.letters[i]);
 	free(mbox.letters);
-	close(dev_null);
 	cur:
 	close(cur);
 	root:
@@ -184,6 +183,7 @@ main(int argc, char *argv[])
 		warn("rmdir %s", PATH_TMPDIR);
 		rv = 1;
 	}
+	close(dev_null);
 	config_free(&conf);
 
 	if (fd_leak_report())
