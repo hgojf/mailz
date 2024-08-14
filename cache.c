@@ -350,23 +350,25 @@ letter_search_path(const void *one, const void *two)
 	return strcmp(n1, n2->path);
 }
 
-struct letter *
-cache_take(struct cache *cache, const char *path)
+int
+cache_take(struct cache *cache, const char *path, struct letter *out)
 {
 	struct letter *letter;
 
 	if (cache->entries == NULL)
-		return NULL;
+		return -1;
 
 	letter = bsearch(path, cache->entries, cache->nentry, sizeof(*cache->entries),
 		letter_search_path);
 	if (letter == NULL)
-		return NULL;
+		return -1;
 
 	/* already taken */
 	if (letter->date == -1)
-		return NULL;
+		return -1;
+
+	*out = *letter;
 
 	letter->date = -1;
-	return letter;
+	return 0;
 }

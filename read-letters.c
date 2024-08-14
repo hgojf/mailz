@@ -129,7 +129,7 @@ maildir_read(int curfd, int do_cache, int view_all,
 	letters = NULL;
 	nletter = 0;
 	for (;;) {
-		struct letter *ca, letter, *t;
+		struct letter letter, *t;
 		struct imsg msg;
 		struct dirent *de;
 		int fd;
@@ -147,14 +147,14 @@ maildir_read(int curfd, int do_cache, int view_all,
 		if (!view_all && letter_seen(de->d_name))
 			continue;
 
-		if ((ca = cache_take(&cache, de->d_name)) != NULL) {
+		if (cache_take(&cache, de->d_name, &letter) == 0) {
 			t = reallocarray(letters, nletter + 1, sizeof(*letters));
-			if (t == NULL) {
-				letter_free(ca);
+			if (t == NULL)
 				goto pid;
-			}
 			letters = t;
-			letters[nletter++] = *ca;
+			letters[nletter++] = letter;
+
+			continue;
 		}
 
 		if ((fd = openat(cur2, de->d_name, O_RDONLY)) == -1)
