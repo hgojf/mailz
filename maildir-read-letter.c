@@ -365,6 +365,8 @@ content_type_parse(char *s, struct content_type *out)
 		char *key, *val;
 		size_t len;
 
+		param += strspn(param, " \t");
+
 		if ((key = strsep(&param, "=")) == NULL)
 			return -1;
 		if ((val = param) == NULL)
