@@ -149,8 +149,10 @@ maildir_read(int curfd, int do_cache, int view_all,
 
 		if (cache_take(&cache, de->d_name, &letter) == 0) {
 			t = reallocarray(letters, nletter + 1, sizeof(*letters));
-			if (t == NULL)
+			if (t == NULL) {
+				letter_free(&letter);
 				goto pid;
+			}
 			letters = t;
 			letters[nletter++] = letter;
 
