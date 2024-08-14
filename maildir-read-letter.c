@@ -39,8 +39,8 @@ struct ignore {
 	size_t argc;
 	char **argv;
 	enum {
+		IGNORE_IGNORE = 0,
 		IGNORE_ALL,
-		IGNORE_IGNORE,
 		IGNORE_RETAIN,
 	} type;
 };
