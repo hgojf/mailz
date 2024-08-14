@@ -223,6 +223,9 @@ more(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 			&conf->reorder, o) == -1 && errno != EPIPE)
 		goto pid;
 
+	if (fflush(o) == EOF && errno != EPIPE)
+		goto pid;
+
 	fclose(o);
 	if (waitpid(pid, &status, 0) == -1 || WEXITSTATUS(status) != 0)
 		return -1;
@@ -230,6 +233,7 @@ more(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 	return read_cmd(idx, cur, mbox, conf);
 
 	pid:
+	(void)fclose(o);
 	(void)kill(pid, SIGKILL);
 	(void)waitpid(pid, NULL, 0);
 	return -1;
