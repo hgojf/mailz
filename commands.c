@@ -53,8 +53,8 @@ static struct command { // NOLINT(clang-analyzer-optin.performance.Padding)
 	{ 'p', "print", CMD_OPTMESSAGE, .fn.msg = print },
 	{ 'r', "read", CMD_MESSAGE, .fn.msg = read_cmd },
 	{ CMD_NOALIAS, "reply", CMD_MESSAGE, .fn.msg = reply },
-	{ CMD_NOALIAS, "send", CMD_FREEFORM, .fn.freeform = send },
 	{ 's', "save", CMD_MESSAGE, .fn.msg = save },
+	{ CMD_NOALIAS, "send", CMD_FREEFORM, .fn.freeform = send },
 	{ 't', "thread", CMD_MESSAGE, .fn.msg = thread },
 	{ 'x', "unread", CMD_MESSAGE, .fn.msg = unread },
 };
