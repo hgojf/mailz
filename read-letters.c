@@ -147,6 +147,8 @@ maildir_read(int curfd, int do_cache, int view_all,
 
 		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
 			continue;
+		if (de->d_type == DT_DIR)
+			continue;
 
 		if (!view_all && letter_seen(de->d_name))
 			continue;
