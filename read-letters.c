@@ -198,6 +198,8 @@ maildir_read(int curfd, int do_cache, int view_all,
 		}
 		letters = t;
 		letters[nletter++] = letter;
+
+		imsg_free(&msg);
 	}
 
 	shutdown(msgbuf.fd, SHUT_RDWR);
