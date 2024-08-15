@@ -22,3 +22,5 @@ lex.o: parse.h
 
 parse.c parse.h: parse.y
 	$(YACC) -do parse.c ${.CURDIR}/parse.y
+
+-include ${DEPS_MAILZ}

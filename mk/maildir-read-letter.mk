@@ -14,3 +14,5 @@ install-maildir-read-letter:
 
 maildir-read-letter: ${OBJS_MAILDIR_READ_LETTER}
 	$(CC) -o $@ ${LDFLAGS_MAILDIR_READ_LETTER} ${OBJS_MAILDIR_READ_LETTER}
+
+-include ${DEPS_MAILDIR_READ_LETTER}
