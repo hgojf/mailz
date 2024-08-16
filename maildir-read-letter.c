@@ -274,6 +274,10 @@ main(int argc, char *argv[])
 
 		if ((found = RB_FIND(headers, &headers, &find)) != NULL) {
 			if (printf("%s: %s\n", found->key, found->val) < 0) {
+				if (ferror(stdout) && errno == EPIPE) {
+					rv = 0;
+					goto headers;
+				}
 				warn("printf");
 				goto headers;
 			}
@@ -286,12 +290,20 @@ main(int argc, char *argv[])
 
 	RB_FOREACH(h, headers, &headers) {
 		if (printf("%s: %s\n", h->key, h->val) < 0) {
+			if (ferror(stdout) && errno == EPIPE) {
+				rv = 0;
+				goto headers;
+			}
 			warn("printf");
 			goto headers;
 		}
 	}
 
 	if (putchar('\n') == EOF) {
+		if (ferror(stdout) && errno == EPIPE) {
+			rv = 0;
+			goto headers;
+		}
 		warn("putchar");
 		goto headers;
 	}
@@ -309,6 +321,10 @@ main(int argc, char *argv[])
 		}
 
 		if (fwrite(buf, n, 1, stdout) != 1) {
+			if (ferror(stdout) && errno == EPIPE) {
+				rv = 0;
+				goto headers;
+			}
 			warn("fwrite");
 			goto headers;
 		}

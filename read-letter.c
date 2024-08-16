@@ -211,8 +211,11 @@ read_letter_quick(int cur, const char *path, struct ignore *ignore,
 		if (n == 0)
 			break;
 
-		if (fwrite(buf, n, 1, out) != 1)
+		if (fwrite(buf, n, 1, out) != 1) {
+			if (ferror(out) && errno == EPIPE)
+				rv = 0;
 			goto close;
+		}
 	}
 
 	rv = 0;

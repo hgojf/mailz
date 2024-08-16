@@ -220,10 +220,10 @@ more(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 	close(p[0]);
 
 	if (read_letter_quick(cur, mbox->letters[idx].path, &conf->ignore, 
-			&conf->reorder, o) == -1 && errno != EPIPE)
+			&conf->reorder, o) == -1)
 		goto pid;
 
-	if (fflush(o) == EOF && errno != EPIPE)
+	if (fflush(o) == EOF && ferror(o) && errno != EPIPE)
 		goto pid;
 
 	fclose(o);
