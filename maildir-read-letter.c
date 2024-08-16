@@ -330,7 +330,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (fflush(stdout) == EOF) {
+	if (fflush(stdout) == EOF && (!ferror(stdout) || errno != EPIPE)) {
 		warn("fflush");
 		goto headers;
 	}
