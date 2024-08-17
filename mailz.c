@@ -81,6 +81,14 @@ main(int argc, char *argv[])
 		FILE *fp;
 		int c;
 
+		if ((fp = tmpfile()) == NULL)
+			err(1, NULL);
+
+		if (unveil(PATH_SENDMAIL, "x") == -1)
+			err(1, "%s", PATH_SENDMAIL);
+		if (pledge("stdio proc exec", NULL) == -1)
+			err(1, "pledge");
+
 		if (conf.address.addr == NULL)
 			errx(1, "must set a sending address");
 
@@ -92,9 +100,6 @@ main(int argc, char *argv[])
 
 		to.addr = argv[0];
 		to.name = NULL;
-
-		if ((fp = tmpfile()) == NULL)
-			err(1, NULL);
 
 		if (sendmail_setup(&sms, &from, &to, NULL, 0, fp) == -1)
 			err(1, "sendmail_setup");
