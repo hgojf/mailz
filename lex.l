@@ -1,5 +1,6 @@
 %{
 #include <err.h>
+#include <string.h>
 
 #include "parse.h"
 %}
