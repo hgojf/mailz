@@ -23,6 +23,7 @@ struct mailz_conf {
 	struct address address;
 	struct ignore ignore;
 	struct reorder reorder;
+	long long linewrap;
 	int cache;
 };
 

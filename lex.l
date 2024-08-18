@@ -1,5 +1,7 @@
 %{
 #include <err.h>
+#include <limits.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "parse.h"
@@ -12,6 +14,7 @@
 "address" { return ADDRESS; }
 "cache" { return CACHE; }
 "ignore" { return IGNORE; }
+"linewrap" { return LINEWRAP; }
 "no" { return NO; }
 "reorder" { return REORDER; }
 "retain" { return RETAIN; }
@@ -30,6 +33,15 @@
 		return OOM;
 	}
 	return STRING;
+}
+
+[0-9]+ {
+	const char *errstr;
+
+	yylval.number = strtonum(yytext, 0, LLONG_MAX, &errstr);
+	if (errstr != NULL)
+		return BADNUM;
+	return NUMBER;
 }
 
 "\\"\n { }

@@ -9,9 +9,9 @@ struct read_letter {
 };
 
 int read_letter(int, const char *, struct ignore *, struct reorder *, 
-	struct read_letter *);
+	long long, struct read_letter *);
 int read_letter_close(struct read_letter *);
 int read_letter_getc(struct read_letter *, char [static 4]);
 int read_letter_quick(int, const char *, struct ignore *, struct reorder *,
-	FILE *);
+	long long, FILE *);
 #endif /* MAILZ_READ_LETTER_H */

@@ -23,7 +23,7 @@ static int imsg_compose_argv(struct imsgbuf *, uint32_t, char **, size_t);
 
 int
 read_letter(int cur, const char *path, struct ignore *ignore, 
-	struct reorder *reorder, struct read_letter *out)
+	struct reorder *reorder, long long linewrap, struct read_letter *out)
 {
 	struct imsgbuf msgbuf;
 	FILE *o;
@@ -99,6 +99,11 @@ read_letter(int cur, const char *path, struct ignore *ignore,
 	if (reorder->argc != 0) {
 		if (imsg_compose_argv(&msgbuf, IMSG_MDR_REORDER, reorder->argv, 
 				reorder->argc) == -1)
+			goto kill;
+	}
+
+	if (linewrap != 0) {
+		if (imsg_compose(&msgbuf, IMSG_MDR_LINEWRAP, 0, -1, -1, &linewrap, sizeof(linewrap)) == -1)
 			goto kill;
 	}
 
@@ -192,14 +197,14 @@ read_letter_getc(struct read_letter *letter, char buf[static 4])
 
 int
 read_letter_quick(int cur, const char *path, struct ignore *ignore,
-	struct reorder *reorder, FILE *out)
+	struct reorder *reorder, long long linewrap, FILE *out)
 {
 	struct read_letter rl;
 	int rv;
 
 	rv = -1;
 
-	if (read_letter(cur, path, ignore, reorder, &rl) == -1)
+	if (read_letter(cur, path, ignore, reorder, linewrap, &rl) == -1)
 		return -1;
 
 	for (;;) {

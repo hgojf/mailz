@@ -83,6 +83,7 @@ main(int argc, char *argv[])
 	struct ignore ignore;
 	mbstate_t mbs;
 	struct reorder reorder;
+	long long lastnl, linewrap;
 	int rv;
 
 	if (argc != 1)
@@ -102,6 +103,7 @@ main(int argc, char *argv[])
 	imsg_init(&msgbuf, 3);
 	memset(&ignore, 0, sizeof(ignore));
 	memset(&reorder, 0, sizeof(reorder));
+	linewrap = 0;
 
 	for (;;) {
 		struct imsg msg;
@@ -137,6 +139,13 @@ main(int argc, char *argv[])
 			case IMSG_MDR_RETAIN:
 				ignore.type = IGNORE_RETAIN;
 				break;
+			}
+			break;
+		case IMSG_MDR_LINEWRAP:
+			if (imsg_get_data(&msg, &linewrap, sizeof(linewrap)) == -1) {
+				warnx("parent sent bogus imsg (bad size)");
+				imsg_free(&msg);
+				goto msgbuf;
 			}
 			break;
 		case IMSG_MDR_REORDER:
@@ -309,6 +318,8 @@ main(int argc, char *argv[])
 	}
 
 	memset(&mbs, 0, sizeof(mbs));
+	if (linewrap != 0)
+		lastnl = 0;
 	for (;;) {
 		char buf[4];
 		int n;
@@ -319,6 +330,29 @@ main(int argc, char *argv[])
 			warnx("failed to get character from letter");
 			goto headers;
 		}
+
+		if (linewrap != 0 && n == 1 && buf[0] == '\n')
+			lastnl = 0;
+		else
+			lastnl++;
+
+		if (linewrap != 0 && (n != 1 || isspace((unsigned char)buf[0]))
+				&& lastnl >= linewrap) {
+			if (fwrite("\n", 1, 1, stdout) != 1) {
+				if (ferror(stdout) && errno == EPIPE) {
+					rv = 0;
+					goto headers;
+				}
+				warn("fwrite");
+				goto headers;
+			}
+			lastnl = 0;
+
+			/* avoid putting a leading space on the next line */
+			if (n == 1 && isspace((unsigned char)buf[0]))
+				continue;
+		}
+
 
 		if (fwrite(buf, n, 1, stdout) != 1) {
 			if (ferror(stdout) && errno == EPIPE) {

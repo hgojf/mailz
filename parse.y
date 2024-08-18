@@ -27,9 +27,11 @@ static struct mailz_conf *conf;
 	} argv;
 	char *string;
 	int val;
+	long long number;
 }
 
-%token ADDRESS CACHE IGNORE OOM NO REORDER RETAIN
+%token ADDRESS BADNUM CACHE IGNORE LINEWRAP OOM NO REORDER RETAIN
+%token<number> NUMBER
 %token<string> STRING
 
 %type<argv> argument_list
@@ -43,6 +45,7 @@ grammar: line '\n'
 line: address
 	| cache
 	| ignore
+	| linewrap
 	| reorder
 	| /* empty */
 	;
@@ -109,6 +112,15 @@ ignore: ignore_type argument_list {
 		conf->ignore.type = $1;
 		conf->ignore.argc = $2.argc;
 		conf->ignore.argv = $2.argv;
+	}
+	;
+
+linewrap: LINEWRAP NUMBER {
+		if ($2 < 0) {
+			yyerror("linewrap cannot be negative");
+			YYERROR;
+		}
+		conf->linewrap = $2;
 	}
 	;
 

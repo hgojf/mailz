@@ -63,7 +63,7 @@ static int
 cat_letter(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 {
 	if (read_letter_quick(cur, mbox->letters[idx].path, &conf->ignore, 
-			&conf->reorder, stdout) == -1)
+			&conf->reorder, conf->linewrap, stdout) == -1)
 		return -1;
 
 	return read_cmd(idx, cur, mbox, conf);
@@ -220,7 +220,7 @@ more(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 	close(p[0]);
 
 	if (read_letter_quick(cur, mbox->letters[idx].path, &conf->ignore, 
-			&conf->reorder, o) == -1)
+			&conf->reorder, conf->linewrap, o) == -1)
 		goto pid;
 
 	if (fflush(o) == EOF && ferror(o) && errno != EPIPE)
@@ -335,7 +335,8 @@ reply(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 
 	memset(&ignore, 0, sizeof(ignore));
 	ignore.type = IGNORE_ALL;
-	if (read_letter(cur, letter->path, &ignore, &conf->reorder, &rl) == -1)
+	if (read_letter(cur, letter->path, &ignore, &conf->reorder, 
+			conf->linewrap, &rl) == -1)
 		goto fp;
 
 	lastnl = 1;
@@ -404,7 +405,7 @@ save(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 	}
 
 	if (read_letter_quick(cur, mbox->letters[idx].path, &conf->ignore, 
-			&conf->reorder, fp) == -1)
+			&conf->reorder, conf->linewrap, fp) == -1)
 		goto fp;
 	if (fflush(fp) == EOF)
 		goto fp;
