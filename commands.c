@@ -312,6 +312,8 @@ reply(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 
 	subject.reply = 1;
 	subject.s = letter->subject;
+	if (letter->subject != NULL && !strncmp(letter->subject, "Re: ", 4))
+		subject.s += 4;
 
 	to.addr = letter->from.addr;
 	to.name = letter->from.name;
