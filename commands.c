@@ -294,7 +294,9 @@ reply(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 	struct sendmail_from from, to;
 	struct sendmail_header hv[1];
 	struct sendmail_subject subject;
+	char date[33];
 	char path[] = PATH_TMPDIR "reply.XXXXXX";
+	struct tm *tm;
 	FILE *fp;
 	int fd, hc, lastnl, rv;
 
@@ -339,6 +341,26 @@ reply(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 	ignore.type = IGNORE_ALL;
 	if (read_letter(cur, letter->path, &ignore, &conf->reorder, 
 			conf->linewrap, &rl) == -1)
+		goto fp;
+
+	if ((tm = localtime(&letter->date)) == NULL)
+		goto fp;
+	if (strftime(date, sizeof(date), "%d %b %Y %H:%M:%S", tm) == 0)
+		goto fp;
+
+	if (fprintf(fp, "On %s ", date) < 0)
+		goto fp;
+
+	if (letter->from.name != NULL) {
+		if (fprintf(fp, "%s <%s> ", letter->from.name, letter->from.addr) < 0)
+			goto fp;
+	}
+	else {
+		if (fprintf(fp, "%s ", letter->from.addr) < 0)
+			goto fp;
+	}
+
+	if (fputs("wrote:\n", fp) == EOF)
 		goto fp;
 
 	lastnl = 1;
