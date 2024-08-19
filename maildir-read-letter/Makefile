@@ -1,5 +1,5 @@
 PROG = maildir-read-letter
-SRCS = header.c imsg-util.c leak.c maildir-read-letter.c
+SRCS = header.c imsg-util.c leak.c maildir-read-letter.c util.c
 LDADD = -lutil
 NOMAN = 1
 

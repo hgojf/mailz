@@ -4,8 +4,7 @@
 #include <string.h>
 
 #include "header.h"
-
-static char *strip_trailing(char *);
+#include "util.h"
 
 int
 header_read(FILE *fp, struct getline *gl, struct header *out, int tv)
@@ -102,18 +101,4 @@ header_read(FILE *fp, struct getline *gl, struct header *out, int tv)
 	key:
 	free(out->key);
 	return HEADER_ERR;
-}
-
-static char *
-strip_trailing(char *p)
-{
-	char *e;
-
-	e = &p[strlen(p) - 1];
-	while (e > p && (*e == ' ' || *e == '\t'))
-		e--;
-	if (e != p)
-		e++;
-	*e = '\0';
-	return e;
 }

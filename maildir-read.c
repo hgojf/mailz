@@ -15,6 +15,7 @@
 #include "header.h"
 #include "leak.h"
 #include "maildir-read.h"
+#include "util.h"
 
 struct from {
 	char *addr;
@@ -358,6 +359,7 @@ from_parse(char *s, struct from *out)
 
 		addr[-1] = '\0';
 
+		strip_trailing(s);
 		out->name = s;
 	}
 	else {
