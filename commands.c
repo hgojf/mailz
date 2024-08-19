@@ -590,9 +590,9 @@ prompt_letter(const char *path)
 			errno = EINVAL;
 			return -1;
 		}
-		return 0;
-	case '\n':
 		return 1;
+	case '\n':
+		return 0;
 	default:
 		while ((c = fgetc(stdin)) != '\n' && c != EOF) 
 			;
