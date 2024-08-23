@@ -322,7 +322,7 @@ reply(size_t idx, int cur, struct mailbox *mbox, struct mailz_conf *conf)
 
 	hc = 0;
 	if (letter->message_id != NULL) {
-		hv[hc].key = "Reply-To";
+		hv[hc].key = "In-Reply-To";
 		hv[hc].val = letter->message_id;
 		hc++;
 	}
