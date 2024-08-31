@@ -50,8 +50,6 @@ imsg_get_blocking(struct imsgbuf *msgbuf, struct imsg *msg)
 	poll:
 	if (poll(&pollfd, 1, -1) == -1)
 		return -1;
-//	if (pollfd.revents & POLLHUP)
-//		return 0;
 
 	n = imsg_read(msgbuf);
 	if (n == -1) {
@@ -63,4 +61,3 @@ imsg_get_blocking(struct imsgbuf *msgbuf, struct imsg *msg)
 		return 0;
 	goto again;
 }
-
