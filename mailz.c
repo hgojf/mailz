@@ -138,6 +138,12 @@ main(int argc, char *argv[])
 		goto cur;
 	}
 
+	if (nletter == 0) {
+		puts("No mail.");
+		rv = 0;
+		goto good;
+	}
+
 	if (commands_run(cur, letters, nletter, &conf) == -1)
 		goto letters;
 
@@ -147,6 +153,7 @@ main(int argc, char *argv[])
 				goto letters;
 	}
 
+	good:
 	rv = 0;
 	letters:
 	for (size_t i = 0; i < nletter; i++)
