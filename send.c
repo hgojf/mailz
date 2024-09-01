@@ -436,7 +436,7 @@ send(const char *subject, int argc, char **argv, FILE *fp, FILE *in,
 			if ((size_t)n + ml > MAIL_LINE_MAX) {
 				if (fputs("\n ", fp) == EOF)
 					return -1;
-				n = 0;
+				n = 1;
 			}
 
 			if (i == argc - 1)
