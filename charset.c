@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "charset.h"
@@ -16,31 +17,31 @@ charset_getchar(FILE *fp, struct charset *charset, char buf[static 4])
 {
 	int c;
 
-	if (charset->type == CHARSET_UTF8)
-		return utf8_getchar(&charset->val.utf8, &charset->encoding, fp, buf);
-
-	if ((c = encoding_getbyte(fp, &charset->encoding)) == ENCODING_ERR)
-		return -1;
-	if (c == ENCODING_EOF)
-		return 0;
-
 	switch (charset->type) {
 	case CHARSET_ASCII:
-		if (!isascii(c))
-			return -1;
+	case CHARSET_OTHER:
+		if ((c = fgetc(fp)) == EOF)
+			return 0;
+
+		if (!isascii(c)) {
+			if (charset->type == CHARSET_OTHER)
+				goto replace;
+			else
+				return -1;
+		}
+
 		if (!isprint(c) && !isspace(c))
 			goto replace;
-		break;
-	case CHARSET_OTHER:
-		if (!isascii(c) || (!isprint(c) && !isspace(c)))
-			goto replace;
-		break;
+
+		buf[0] = c;
+		return 1;
 	case CHARSET_UTF8:
-		assert(0);
+		return utf8_getchar(&charset->val.utf8, &charset->encoding, 
+			fp, buf);
 	}
 
-	buf[0] = c;
-	return 1;
+	/* invalid charset type */
+	abort();
 
 	replace:
 	/* utf8 replacement character */
