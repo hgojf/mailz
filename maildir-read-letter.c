@@ -68,6 +68,9 @@ main(int argc, char *argv[])
 	struct reorder reorder;
 	int linewrap;
 
+	if (getdtablecount() != 4)
+		errx(1, "extra file descriptors open");
+
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		err(1, "setlocale");
 	if (pledge("stdio", NULL) == -1)

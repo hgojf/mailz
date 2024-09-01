@@ -87,7 +87,7 @@ read_letter_quick(int cur, struct letter *letter, struct ignore *ignore,
 
 	rv = -1;
 
-	if ((fd = openat(cur, letter->path, O_RDONLY)) == -1)
+	if ((fd = openat(cur, letter->path, O_RDONLY | O_CLOEXEC)) == -1)
 		return -1;
 
 	if (maildir_read_letter(&rl, fd, pipeok, linewrap, ignore, reorder) == -1)
@@ -136,7 +136,7 @@ save_letter(int cur, struct letter *letter, struct ignore *ignore,
 	FILE *fp;
 	int fd;
 
-	if ((fd = mkstemp(path)) == -1)
+	if ((fd = mkostemp(path, O_CLOEXEC)) == -1)
 		return -1;
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		close(fd);
