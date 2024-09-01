@@ -20,30 +20,25 @@ encoding_getbyte(FILE *fp, struct encoding *encoding)
 {
 	int c;
 
-	if (encoding->type == ENCODING_QUOTED_PRINTABLE)
-		return quoted_printable(fp);
-	else if (encoding->type == ENCODING_BASE64)
-		return base64(fp, &encoding->val.base64);
-
-	if ((c = fgetc(fp)) == EOF)
-		return ENCODING_EOF;
-
 	switch (encoding->type) {
-	case ENCODING_7BIT:	
-		if (c > 127)
-			return ENCODING_ERR;
-		break;
+	case ENCODING_7BIT:
 	case ENCODING_8BIT:
 	case ENCODING_BINARY:
-		break;
-	default:
+		if ((c = fgetc(fp)) == EOF)
+			return ENCODING_EOF;
+
+		if (encoding->type == ENCODING_7BIT && c > 127)
+			return ENCODING_ERR;
+
+		return c;
 	case ENCODING_QUOTED_PRINTABLE:
-		/* see above */
-		assert(0);
-		break;
+		return quoted_printable(fp);
+	case ENCODING_BASE64:
+		return base64(fp, &encoding->val.base64);
 	}
 
-	return c;
+	/* invalid encoding type */
+	abort();
 }
 
 int
