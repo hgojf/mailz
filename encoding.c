@@ -94,13 +94,12 @@ static int
 base64(FILE *fp, struct b64_decode *b64)
 {
 	char buf[5], obuf[3];
-	size_t n;
 	int ni;
 
 	if (b64->i != b64->end)
 		return b64->buf[b64->i++];
 
-	for (n = 0; n < 4;) {
+	for (int n = 0; n < 4;) {
 		int c;
 
 		if ((c = fgetc(fp)) == EOF) {
