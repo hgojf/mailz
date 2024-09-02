@@ -121,9 +121,12 @@ base64(FILE *fp, struct b64_decode *b64)
 
 	if ((ni = b64_pton(buf, obuf, sizeof(obuf))) == -1)
 		return ENCODING_ERR;
-	if (ni == 0) /* begins with a NUL byte */
-		return ENCODING_ERR;
 
+	/* 
+	 * ni will always be >= 1 because we dont allow NUL bytes in 
+	 * the input, and because b64_pton will not allow a string 
+	 * consisting of only padding.
+	 */
 	memcpy(b64->buf, &obuf[1], ni - 1);
 	b64->i = 0;
 	b64->end = ni - 1;
