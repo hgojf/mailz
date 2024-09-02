@@ -266,6 +266,7 @@ charset_test(void)
 		const char *encoding;
 	} charsets[] = {
 		{ "hello", "hello", "us-ascii", "7bit" },
+		{ "hel=6Co", "hello", "us-ascii", "quoted-printable" },
 		{ "\xf0\x9f\x90\xb7", "\xf0\x9f\x90\xb7", "UtF-8", "8bit" },
 		{ "=F0=9F=90=B7", "\xf0\x9f\x90\xb7", "utf-8", "quoted-printable" },
 	};

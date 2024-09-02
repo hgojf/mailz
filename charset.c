@@ -20,7 +20,7 @@ charset_getchar(FILE *fp, struct charset *charset, char buf[static 4])
 	switch (charset->type) {
 	case CHARSET_ASCII:
 	case CHARSET_OTHER:
-		if ((c = fgetc(fp)) == EOF)
+		if ((c = encoding_getbyte(fp, &charset->encoding)) == ENCODING_EOF)
 			return 0;
 
 		if (!isascii(c)) {
