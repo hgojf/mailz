@@ -275,16 +275,19 @@ mde_process_letter(struct imsgbuf *msgbuf, struct pollfd *pollfd,
 			}
 			}
 
-			free(header.key);
-			free(header.val);
-
 			headers[i].seen = 1;
 
-			if (++nseen == nh)
+			if (++nseen == nh) {
+				free(header.key);
+				free(header.val);
 				goto done;
+			}
 
 			break;
 		}
+
+		free(header.key);
+		free(header.val);
 	}
 
 	done:
