@@ -6,10 +6,7 @@ SKIPDIR = regress
 
 .include <bsd.subdir.mk>
 
-.PHONY: cflow test tidy
-
-cflow:
-	@make MAKE_FLAGS=cflow
+.PHONY: test tidy
 
 test: maildir-extract maildir-read-letter regress
 	./regress/obj/regress
