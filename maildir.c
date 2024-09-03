@@ -11,7 +11,7 @@ struct maildir_info {
 static int
 maildir_info(const char *path, struct maildir_info *info)
 {
-	char *type;
+	const char *type;
 
 	if ((type = strchr(path, ':')) == NULL)
 		return -1;
