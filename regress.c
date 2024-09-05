@@ -150,6 +150,9 @@ date_format_test(void)
 		{ 1724585251, -2, 0, "Sun, 25 Aug 2024 09:27:31 -0200" },
 	};
 
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+
 	for (size_t i = 0; i < nitems(dates); i++) {
 		struct tm *tm;
 		long off;
@@ -418,6 +421,9 @@ content_type_test(void)
 		{ "text/ferrets charset=hello!", NULL, NULL, NULL },
 	};
 
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+
 	for (size_t i = 0; i < nitems(types); i++) {
 		struct content_type type;
 		struct content_type_var var;
@@ -495,6 +501,9 @@ encoding_test(void)
 
 		{ "\xff", invalid, "7bit" },
 	};
+
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
 
 	for (size_t i = 0; i < nitems(encodings); i++) {
 		FILE *fp;
@@ -909,6 +918,8 @@ printable_test(void)
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		err(1, "setlocale");
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
 
 	for (size_t i = 0; i < nitems(strings); i++) {
 		int isprint;
