@@ -220,19 +220,6 @@ main(int argc, char *argv[])
 	if (print_body(&charset, linewrap, stdin, stdout) == -1)
 		errx(1, "failed to print body of letter");
 
-	for (;;) {
-		char buf[4];
-		int n;
-
-		if ((n = charset_getchar(stdin, &charset, buf)) == -1)
-			errx(1, "failed to get character from letter");
-		if (n == 0)
-			break;
-
-		if (fwrite(buf, (size_t)n, 1, stdout) != 1)
-			err(1, "fwrite");
-	}
-
 	if (fflush(stdout) == EOF)
 		err(1, "fflush");
 
