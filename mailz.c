@@ -140,7 +140,6 @@ main(int argc, char *argv[])
 
 	if (nletter == 0) {
 		puts("No mail.");
-		rv = 0;
 		goto good;
 	}
 
