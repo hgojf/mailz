@@ -27,6 +27,5 @@
 #endif /* REGRESS */
 
 #define PATH_SENDMAIL "/usr/sbin/sendmail"
-//#define PATH_SENDMAIL "/bin/cat"
 #define PATH_TMPDIR "/tmp/mailz"
 #endif /* MAILZ_PATHNAMES_H */
