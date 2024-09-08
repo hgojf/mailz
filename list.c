@@ -25,8 +25,6 @@
 
 static int letter_print(size_t, const struct letter *);
 
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
-
 int
 list_letters(struct letter *letters, size_t start, size_t end)
 {

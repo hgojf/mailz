@@ -29,8 +29,7 @@
 #include "letter.h"
 #include "maildir.h"
 #include "read-letters.h"
-
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
+#include "util.h"
 
 #define HEADER_DATE 0
 #define HEADER_FROM 1

@@ -32,6 +32,7 @@
 #include "pathnames.h"
 #include "read-letter.h"
 #include "send.h"
+#include "util.h"
 
 #define MAIL_LINE_MAX 996 /* not including the CRLF */
 #define PROMPT_ERR 0
@@ -44,8 +45,6 @@ static int print_references(FILE *, const char *, const char *,
 	const char *);
 static int prompt(const char *);
 static int sendmail(int);
-
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 /*
  * XXX: the line folding performed in these functions is too involved,

@@ -22,8 +22,7 @@
 
 #include "charset.h"
 #include "string-util.h"
-
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
+#include "util.h"
 
 static int utf8_getchar(mbstate_t *, struct encoding *, FILE *, 
 	char [static 4]);

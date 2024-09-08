@@ -24,8 +24,7 @@
 #include <string.h>
 
 #include "encoding.h"
-
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
+#include "util.h"
 
 static int base64(FILE *, struct b64_decode *);
 static int hexdigcaps(int);

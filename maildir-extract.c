@@ -33,6 +33,7 @@
 #include "header.h"
 #include "ibuf-util.h"
 #include "maildir-extract.h"
+#include "util.h"
 
 struct header_def {
 	char *key;
@@ -41,8 +42,6 @@ struct header_def {
 };
 
 #define PARENT_FD 3
-
-#define nitems(a) (sizeof((a)) / sizeof((*a)))
 
 static void mde_process_letter(struct imsgbuf *, struct pollfd *, 
 	FILE *, struct getline *, struct header_def *, size_t);

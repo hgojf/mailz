@@ -34,8 +34,7 @@
 #include "maildir-extract.h"
 #include "pathnames.h"
 #include "printable.h"
-
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
+#include "util.h"
 
 void
 extract_header_free(enum extract_header_type type,

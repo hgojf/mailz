@@ -26,6 +26,7 @@
 #include "mark.h"
 #include "print.h"
 #include "send.h"
+#include "util.h"
 
 struct command {
 	#define CMD_TYPE_LETTER 0
@@ -50,8 +51,6 @@ struct command {
 };
 
 static int command_cmp(const void *, const void *);
-
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 static const struct command commands[] = {
 	{ CMD_TYPE_LETTER, CMD_LETTER_PRINT , CMD_NOALIAS, "more", .fn.print = page_letter },

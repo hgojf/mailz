@@ -43,6 +43,7 @@
 #include "read-letter.h"
 #include "read-letters.h"
 #include "string-util.h"
+#include "util.h"
 
 struct test {
 	const char *ident;
@@ -73,7 +74,6 @@ static int test_cmp(const void *, const void *);
 static void usage(void);
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 static struct test tests[] = {
 	{ "cache", cache_test },

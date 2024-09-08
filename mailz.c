@@ -37,10 +37,9 @@
 #include "read-letters.h"
 #include "send.h"
 #include "setup.h"
+#include "util.h"
 
 static void usage(void);
-
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 struct {
 	const char *path;
