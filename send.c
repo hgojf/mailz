@@ -374,17 +374,15 @@ reply(int cur, struct address *addr, struct letter *letter)
 	case PROMPT_ERR:
 		goto headers;
 	case PROMPT_OK:
+		if (fseek(fp, 0, SEEK_SET) == -1)
+			goto headers;
+		if (sendmail(fd) == -1)
+			goto headers;
 		break;
 	case PROMPT_QUIT:
-		goto good;
+		break;
 	}
 
-	if (fseek(fp, 0, SEEK_SET) == -1)
-		goto headers;
-	if (sendmail(fd) == -1)
-		goto headers;
-
-	good:
 	for (size_t i = 0; i < nitems(headers); i++)
 		extract_header_free(headers[i].type, &headers[i].val);
 
