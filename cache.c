@@ -71,7 +71,7 @@ void
 cache_free(struct cache *cache)
 {
 	for (size_t i = 0; i < cache->nletter; i++) {
-		if (cache->letters[i].date == -1)
+		if (cache->letters[i].from.addr == NULL)
 			continue;
 		letter_free(&cache->letters[i]);
 	}
@@ -154,11 +154,11 @@ cache_take(struct cache *cache, const char *path, struct letter *letter)
 	l = bsearch(path, cache->letters, cache->nletter, 
 		sizeof(*cache->letters), letter_path_cmp);
 
-	if (l == NULL || l->date == -1)
+	if (l == NULL || l->from.addr == NULL)
 		return -1;
 
 	*letter = *l;
-	l->date = -1;
+	l->from.addr = NULL;
 	return 0;
 }
 
