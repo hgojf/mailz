@@ -485,7 +485,7 @@ send(const char *subject, int argc, char **argv, FILE *fp, FILE *in,
 		else
 			lastnl++;
 	}
-	if (ferror(in) == EOF)
+	if (ferror(in))
 		return -1;
 
 	if (fseek(fp, 0, SEEK_SET) == EOF)
