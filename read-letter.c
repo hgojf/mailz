@@ -163,14 +163,14 @@ maildir_read_letter(struct read_letter *read, int fd, int pipeok,
 		any = 1;
 	}
 	else if (ignore->type == IGNORE_ALL) {
-		if (imsg_compose(&msgbuf, IMSG_MDR_IGNOREALL, 0, -1, -1, 
+		if (imsg_compose(&msgbuf, IMSG_MDR_IGNOREALL, 0, -1, -1,
 			NULL, 0) == -1)
 				goto proc;
 		any = 1;
 	}
 
 	if (linewrap != 0) {
-		if (imsg_compose(&msgbuf, IMSG_MDR_LINEWRAP, 0, -1, -1, 
+		if (imsg_compose(&msgbuf, IMSG_MDR_LINEWRAP, 0, -1, -1,
 			&linewrap, sizeof(linewrap)) == -1)
 				goto proc;
 		any = 1;
@@ -184,7 +184,7 @@ maildir_read_letter(struct read_letter *read, int fd, int pipeok,
 	}
 
 	if (pipeok) {
-		if (imsg_compose(&msgbuf, IMSG_MDR_PIPEOK, 0, -1, -1, 
+		if (imsg_compose(&msgbuf, IMSG_MDR_PIPEOK, 0, -1, -1,
 			NULL, 0) == -1)
 				goto proc;
 		any = 1;
