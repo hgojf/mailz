@@ -37,7 +37,7 @@
 #include "read-letters.h"
 #include "send.h"
 #include "setup.h"
-#include "util.h"
+#include "macro.h"
 
 static void usage(void);
 

@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ_UTIL_H
-#define MAILZ_UTIL_H
+#ifndef MAILZ_MACRO_H
+#define MAILZ_MACRO_H
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
-#endif /* MAILZ_UTIL_H */
+#endif /* MAILZ_MACRO_H */

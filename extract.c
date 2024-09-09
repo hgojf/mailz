@@ -34,7 +34,7 @@
 #include "maildir-extract.h"
 #include "pathnames.h"
 #include "printable.h"
-#include "util.h"
+#include "macro.h"
 
 void
 extract_header_free(enum extract_header_type type,

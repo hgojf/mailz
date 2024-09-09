@@ -24,7 +24,7 @@
 #include <string.h>
 
 #include "encoding.h"
-#include "util.h"
+#include "macro.h"
 
 static int base64(FILE *, struct b64_decode *);
 static int hexdigcaps(int);

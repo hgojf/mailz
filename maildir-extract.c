@@ -33,7 +33,7 @@
 #include "header.h"
 #include "ibuf-util.h"
 #include "maildir-extract.h"
-#include "util.h"
+#include "macro.h"
 
 struct header_def {
 	char *key;

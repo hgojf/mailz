@@ -29,7 +29,7 @@
 #include "letter.h"
 #include "maildir.h"
 #include "read-letters.h"
-#include "util.h"
+#include "macro.h"
 
 #define HEADER_DATE 0
 #define HEADER_FROM 1

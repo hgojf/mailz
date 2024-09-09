@@ -43,7 +43,7 @@
 #include "read-letter.h"
 #include "read-letters.h"
 #include "string-util.h"
-#include "util.h"
+#include "macro.h"
 
 struct test {
 	const char *ident;

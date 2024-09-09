@@ -32,7 +32,7 @@
 #include "pathnames.h"
 #include "read-letter.h"
 #include "send.h"
-#include "util.h"
+#include "macro.h"
 
 #define MAIL_LINE_MAX 996 /* not including the CRLF */
 #define PROMPT_ERR 0

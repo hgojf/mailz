@@ -26,7 +26,7 @@
 #include "mark.h"
 #include "print.h"
 #include "send.h"
-#include "util.h"
+#include "macro.h"
 
 struct command {
 	#define CMD_TYPE_LETTER 0
