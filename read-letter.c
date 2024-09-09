@@ -22,6 +22,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <imsg.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,8 +35,6 @@
 #include "maildir-read-letter.h"
 #include "pathnames.h"
 #include "read-letter.h"
-
-static int maildir_read_letter1(struct read_letter *, struct imsgbuf *, int);
 
 static int
 imsg_compose_argv(struct imsgbuf *msgbuf, uint32_t type, uint32_t id, 
@@ -89,12 +88,13 @@ maildir_read_letter_close(struct read_letter *rl)
 	return rv;
 }
 
-static int
-maildir_read_letter1(struct read_letter *read, struct imsgbuf *msgbuf, 
-	int fd)
+int
+maildir_read_letter(struct read_letter *read, int fd, int pipeok, 
+	int linewrap, struct ignore *ignore, struct reorder *reorder)
 {
+	struct imsgbuf msgbuf;
 	FILE *e, *o;
-	int p[2], p1[2], sv[2];
+	int any, p[2], p1[2], sv[2];
 	pid_t pid;
 
 	if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK,
@@ -134,44 +134,12 @@ maildir_read_letter1(struct read_letter *read, struct imsgbuf *msgbuf,
 		break;
 	}
 
-	read->pid = pid;
 
 	close(sv[1]);
-	imsg_init(msgbuf, sv[0]);
+	imsg_init(&msgbuf, sv[0]);
 
 	close(p[1]);
-	read->e = e;
-
 	close(p1[1]);
-	read->o = o;
-
-	return sv[0];
-
-	p1:
-	fclose(o);
-	close(p1[1]);
-	p:
-	fclose(e);
-	close(p[1]);
-	sv:
-	close(sv[1]);
-	close(sv[0]);
-	return -1;
-}
-
-int
-maildir_read_letter(struct read_letter *rl, int fd, int pipeok,
-	int linewrap, struct ignore *ignore, struct reorder *reorder)
-{
-	struct imsgbuf msgbuf;
-	int any, s;
-
-	if ((s = maildir_read_letter1(rl, &msgbuf, fd)) == -1) {
-		close(fd);
-		return -1;
-	}
-
-	close(fd);
 
 	any = 0;
 	if (ignore->argc != 0) {
@@ -185,53 +153,66 @@ maildir_read_letter(struct read_letter *rl, int fd, int pipeok,
 			type = IMSG_MDR_RETAIN;
 			break;
 		default:
-			goto rl;
+			/* should be probably be assert(0), but we have children */
+			goto proc;
 		}
 
 		if (imsg_compose_argv(&msgbuf, type, 0, -1,
 			ignore->argv, ignore->argc) == -1)
-				goto rl;
+				goto proc;
 		any = 1;
 	}
 	else if (ignore->type == IGNORE_ALL) {
 		if (imsg_compose(&msgbuf, IMSG_MDR_IGNOREALL, 0, -1, -1, 
 			NULL, 0) == -1)
-				goto rl;
+				goto proc;
 		any = 1;
 	}
 
 	if (linewrap != 0) {
 		if (imsg_compose(&msgbuf, IMSG_MDR_LINEWRAP, 0, -1, -1, 
 			&linewrap, sizeof(linewrap)) == -1)
-				goto rl;
+				goto proc;
 		any = 1;
 	}
 
 	if (reorder->argc != 0) {
 		if (imsg_compose_argv(&msgbuf, IMSG_MDR_REORDER, 0, -1,
 			reorder->argv, reorder->argc) == -1)
-				goto rl;
+				goto proc;
 		any = 1;
 	}
 
 	if (pipeok) {
 		if (imsg_compose(&msgbuf, IMSG_MDR_PIPEOK, 0, -1, -1, 
 			NULL, 0) == -1)
-				goto rl;
+				goto proc;
 		any = 1;
 	}
 
 	if (any && imsg_flush_blocking(&msgbuf) == -1)
-		goto rl;
+		goto proc;
 
-	close(s);
 	imsg_clear(&msgbuf);
+	close(sv[0]);
+
+	read->pid = pid;
+	read->e = e;
+	read->o = o;
 	return 0;
 
-	rl:
-	maildir_read_letter_close(rl);
-	close(s);
-	imsg_clear(&msgbuf);
+	proc:
+	(void)kill(pid, SIGKILL);
+	(void)waitpid(pid, NULL, 0);
+	p1:
+	fclose(o);
+	close(p1[1]);
+	p:
+	fclose(e);
+	close(p[1]);
+	sv:
+	close(sv[1]);
+	close(sv[0]);
 	return -1;
 }
 

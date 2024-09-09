@@ -977,7 +977,7 @@ read_letter_test(void)
 	memset(&ignore, 0, sizeof(ignore));
 	memset(&reorder, 0, sizeof(reorder));
 	if (maildir_read_letter(&rl, fd, 0, 0, &ignore, &reorder) == -1)
-		goto rl;
+		errx(1, "maildir_read_letter");
 
 	if (pledge("stdio proc", NULL) == -1)
 		err(1, "pledge");
