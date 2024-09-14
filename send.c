@@ -277,7 +277,9 @@ reply(int cur, struct address *addr, struct letter *letter)
 	struct extracted_header headers[4];
 	char path[] = PATH_TMPDIR "/reply.XXXXXX";
 	FILE *fp;
-	int fd, fd1;
+	int fd, fd1, rv;
+
+	rv = -1;
 
 	if (addr->addr == NULL)
 		return -1;
@@ -382,20 +384,14 @@ reply(int cur, struct address *addr, struct letter *letter)
 		break;
 	}
 
-	for (size_t i = 0; i < nitems(headers); i++)
-		extract_header_free(headers[i].type, &headers[i].val);
-
-	unlink(path);
-	fclose(fp);
-	return 0;
-
+	rv = 0;
 	headers:
 	for (size_t i = 0; i < nitems(headers); i++)
 		extract_header_free(headers[i].type, &headers[i].val);
 	fp:
 	unlink(path);
 	fclose(fp);
-	return -1;
+	return rv;
 }
 
 int
