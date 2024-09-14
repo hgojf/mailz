@@ -229,6 +229,7 @@ quote_body(FILE *fp, int fd)
 	struct ignore ignore;
 	struct reorder reorder;
 	struct read_letter rl;
+	int lastnl;
 
 	memset(&ignore, 0, sizeof(ignore));
 	memset(&reorder, 0, sizeof(reorder));
@@ -239,8 +240,10 @@ quote_body(FILE *fp, int fd)
 		return -1;
 
 	if (fputs("> ", fp) == EOF)
-		return -1;
-	for (int lastnl = 2;;) {
+		goto rl;
+
+	lastnl = 2;
+	for (;;) {
 		char buf[4];
 		int n;
 
