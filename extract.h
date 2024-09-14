@@ -42,7 +42,7 @@ struct extracted_header {
 			char *addr;
 			char *name;
 		} from;
-		/* EXTRACT_MESSAGE_ID, EXTRACT_STRING */
+		/* EXTRACT_STRING */
 		char *string;
 	} val;
 };

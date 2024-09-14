@@ -126,7 +126,6 @@ main(int argc, char *argv[])
 				switch (header.type) {
 				case EXTRACT_DATE:
 				case EXTRACT_FROM:
-				case EXTRACT_MESSAGE_ID:
 				case EXTRACT_STRING:
 					break;
 				default:
@@ -253,25 +252,6 @@ mde_process_letter(struct imsgbuf *msgbuf, struct pollfd *pollfd,
 					iov, ioc) == -1)
 						err(1, "imsg_composev");
 
-				break;
-			}
-			case EXTRACT_MESSAGE_ID: {
-				struct iovec iov[2];
-				size_t sl;
-
-				sl = strlen(header.val);
-				if (header.val[0] != '<' || header.val[sl - 1] != '>')
-					errx(1, "invalid message id");
-
-				iov[0].iov_base = &i;
-				iov[0].iov_len = sizeof(i);
-
-				iov[1].iov_base = header.val + 1;
-				iov[1].iov_len = sl - 2;
-
-				if (imsg_composev(msgbuf, IMSG_MDE_HEADER, 0, -1, -1, 
-					iov, nitems(iov)) == -1)
-						err(1, "imsg_composev");
 				break;
 			}
 			case EXTRACT_STRING: {

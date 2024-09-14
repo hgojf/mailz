@@ -31,7 +31,6 @@ enum {
 enum extract_header_type {
 	EXTRACT_DATE,
 	EXTRACT_FROM,
-	EXTRACT_MESSAGE_ID,
 	EXTRACT_STRING,
 };
 #endif /* MAILZ_MAILDIR_EXTRACT_H */

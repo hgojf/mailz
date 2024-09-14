@@ -584,7 +584,7 @@ encoding_test(void)
 static int
 extract_test(void)
 {
-	struct extracted_header headers[5];
+	struct extracted_header headers[4];
 	int fd, rv;
 
 	rv = -1;
@@ -609,11 +609,8 @@ extract_test(void)
 	headers[2].key = "Subject";
 	headers[2].type = EXTRACT_STRING;
 
-	headers[3].key = "Message-ID";
-	headers[3].type = EXTRACT_MESSAGE_ID;
-
-	headers[4].key = "X-missing";
-	headers[4].type = EXTRACT_STRING;
+	headers[3].key = "X-missing";
+	headers[3].type = EXTRACT_STRING;
 
 	if (maildir_extract_quick(fd, headers, nitems(headers)) == -1)
 		return -1;
@@ -633,11 +630,7 @@ extract_test(void)
 		|| strcmp(headers[2].val.string, "Hello") != 0)
 			goto fail;
 
-	if (headers[3].val.string == NULL
-		|| strcmp(headers[3].val.string, "random@gnu.org") != 0)
-			goto fail;
-
-	if (headers[4].val.string != NULL)
+	if (headers[3].val.string != NULL)
 		goto fail;
 
 	rv = 0;

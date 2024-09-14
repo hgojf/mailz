@@ -47,7 +47,6 @@ extract_header_free(enum extract_header_type type,
 		free(val->from.addr);
 		free(val->from.name);
 		break;
-	case EXTRACT_MESSAGE_ID:
 	case EXTRACT_STRING:
 		free(val->string);
 		break;
@@ -198,7 +197,6 @@ maildir_extract_next(struct extract *extract,
 			memset(&headers[i].val.from, 0, 
 				sizeof(headers[i].val.from));
 			break;
-		case EXTRACT_MESSAGE_ID:
 		case EXTRACT_STRING:
 			headers[i].val.string = NULL;
 			break;
@@ -267,7 +265,6 @@ maildir_extract_next(struct extract *extract,
 			else
 				headers[i].val.from.name = NULL;
 			break;
-		case EXTRACT_MESSAGE_ID:
 		case EXTRACT_STRING:
 			if (headers[i].val.string != NULL)
 				goto msg;
