@@ -401,7 +401,7 @@ int
 send(const char *subject, int argc, char **argv, FILE *fp, FILE *in,
 	struct address *addr)
 {
-	int fd;
+	int fd, n;
 
 	if (addr->addr == NULL)
 		return -1;
@@ -416,56 +416,50 @@ send(const char *subject, int argc, char **argv, FILE *fp, FILE *in,
 	if (header_print_normal(fp, "Subject", subject) == -1)
 		return -1;
 
-	if (argc != 0) {
-		int n;
+	n = fprintf(fp, "To: ");
 
-		n = fprintf(fp, "To: ");
+	if (n < 0)
+		return -1;
 
-		if (n < 0)
+	for (int i = 0; i < argc; i++) {
+		size_t ml;
+		int m;
+
+		if (i == argc - 1) /* last man */
+			ml = strlen(argv[i]);
+		else
+			ml = strlen(argv[i]) + strlen(", ");
+
+		/*
+		 * This tries to prevent folding in the middle of an email
+		 * address. This shouldnt really be possible since
+		 * email addresses are at max 320 and the longest line
+		 * is 996+CRLF. If we want to fold at 72 character 
+		 * boundaries some thought will have to be put in for
+		 * where it is ok to put folding in an address.
+		 */
+
+		if (ml > MAIL_LINE_MAX)
 			return -1;
 
-		for (int i = 0; i < argc; i++) {
-			size_t ml;
-			int m;
-
-			if (i == argc - 1) /* last man */
-				ml = strlen(argv[i]);
-			else
-				ml = strlen(argv[i]) + strlen(", ");
-
-			/*
-			 * This tries to prevent folding in the middle of an email
-			 * address. This shouldnt really be possible since
-			 * email addresses are at max 320 and the longest line
-			 * is 996+CRLF. If we want to fold at 72 character 
-			 * boundaries some thought will have to be put in for
-			 * where it is ok to put folding in an address.
-			 */
-
-			if (ml > MAIL_LINE_MAX)
+		if ((size_t)n + ml > MAIL_LINE_MAX) {
+			if (fputs("\n ", fp) == EOF)
 				return -1;
-
-			if ((size_t)n + ml > MAIL_LINE_MAX) {
-				if (fputs("\n ", fp) == EOF)
-					return -1;
-				n = 1;
-			}
-
-			if (i == argc - 1)
-				m = fprintf(fp, "%s", argv[i]);
-			else
-				m = fprintf(fp, "%s, ", argv[i]);
-
-			if (m < 0)
-				return -1;
-			n += m;
+			n = 1;
 		}
 
-		if (fputc('\n', fp) == EOF)
+		if (i == argc - 1)
+			m = fprintf(fp, "%s", argv[i]);
+		else
+			m = fprintf(fp, "%s, ", argv[i]);
+
+		if (m < 0)
 			return -1;
+		n += m;
 	}
 
-	if (fputc('\n', fp) == EOF)
+	/* End 'To' header and start body */
+	if (fputs("\n\n", fp) == EOF)
 		return -1;
 
 	for (int lastnl = 0, c = fgetc(in); c != EOF; c = fgetc(in)) {
