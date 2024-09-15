@@ -343,4 +343,3 @@ letter_path_cmp(const void *one, const void *two)
 
 	return strcmp(n1, n2->path);
 }
-
