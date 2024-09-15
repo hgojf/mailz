@@ -330,16 +330,13 @@ fwrite_string_opt(char *s, FILE *fp, long long *left)
 static int
 letter_cmp(const void *one, const void *two)
 {
-	const struct letter *n1 = one, *n2 = two;
-
-	return strcmp(n1->path, n2->path);
+	return strcmp(((const struct letter *)one)->path, 
+				((const struct letter *)two)->path);
 }
 
 static int
 letter_path_cmp(const void *one, const void *two)
 {
-	const char *n1 = one;
-	const struct letter *n2 = two;
-
-	return strcmp(n1, n2->path);
+	return strcmp((const char *)one,
+			((const struct letter *)two)->path);
 }
