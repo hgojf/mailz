@@ -59,7 +59,7 @@ struct getline {
 
 static int fread_all(void *, size_t, FILE *);
 static int fread_letter(struct letter *, struct getline *, FILE *);
-static int fread_string(char **, struct getline *, FILE *);
+static int fread_string(char **, struct getline *, FILE *, int);
 static int fread_string_opt(char **, struct getline *, FILE *);
 static int fwrite_all(void *, size_t, FILE *, long long *);
 static int fwrite_string(char *, FILE *, long long *);
@@ -231,12 +231,12 @@ fread_letter(struct letter *letter, struct getline *gl, FILE *fp)
 	if (localtime(&date) == NULL)
 		return -1;
 
-	if (fread_string(&addr, gl, fp) == -1)
+	if (fread_string(&addr, gl, fp, 1) == -1)
 		return -1;
 	if (fread_string_opt(&name, gl, fp) == -1)
 		goto addr;
 
-	if (fread_string(&path, gl, fp) == -1)
+	if (fread_string(&path, gl, fp, 0) == -1)
 		goto name;
 
 	if (fread_string_opt(&subject, gl, fp) == -1)
@@ -259,7 +259,7 @@ fread_letter(struct letter *letter, struct getline *gl, FILE *fp)
 }
 
 static int
-fread_string(char **out, struct getline *gl, FILE *fp)
+fread_string(char **out, struct getline *gl, FILE *fp, int isprint)
 {
 	ssize_t len;
 
@@ -268,7 +268,7 @@ fread_string(char **out, struct getline *gl, FILE *fp)
 	if (gl->line[len - 1] != '\0')
 		return -1;
 
-	if (!string_isprint(gl->line))
+	if (isprint && !string_isprint(gl->line))
 		return -1;
 
 	if ((*out = strdup(gl->line)) == NULL)
@@ -291,6 +291,9 @@ fread_string_opt(char **out, struct getline *gl, FILE *fp)
 		*out = NULL;
 		return 0;
 	}
+
+	if (!string_isprint(gl->line))
+		return -1;
 
 	if ((*out = strdup(gl->line)) == NULL)
 		return -1;
