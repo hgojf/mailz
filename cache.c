@@ -89,7 +89,7 @@ cache_read(FILE *fp, struct cache *cache)
 
 	if (fread_all(&version, sizeof(version), fp) == -1)
 		return -1;
-	version = letoh64(version);
+	version = letoh32(version);
 
 	if ((version & MAILZCACHE_MAGIC_MASK) != MAILZCACHE_MAGIC)
 		return -1;
@@ -170,7 +170,7 @@ cache_write(int view_all, long long max, FILE *fp,
 	uint8_t view_all1;
 
 	version = MAILZCACHE_MAGIC | MAILZCACHE_VERSION;
-	version = htole64(version);
+	version = htole32(version);
 
 	view_all1 = view_all;
 
