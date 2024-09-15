@@ -88,7 +88,7 @@ cache_read(FILE *fp, struct cache *cache)
 	uint8_t view_all;
 
 	if (fread_all(&version, sizeof(version), fp) == -1)
-		return 1;
+		return -1;
 	version = letoh64(version);
 
 	if ((version & MAILZCACHE_MAGIC_MASK) != MAILZCACHE_MAGIC)
