@@ -23,10 +23,6 @@
 #include "letter.h"
 #include "maildir.h"
 
-#define HEADER_DATE 0
-#define HEADER_FROM 1
-#define HEADER_SUBJECT 2
-
 void
 letter_free(struct letter *letter)
 {
