@@ -21,7 +21,6 @@
 #include <err.h>
 #include <errno.h>
 #include <imsg.h>
-#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +31,7 @@
 #include "from.h"
 #include "header.h"
 #include "ibuf-util.h"
+#include "imsg-sync.h"
 #include "maildir-extract.h"
 #include "macro.h"
 
@@ -43,8 +43,8 @@ struct header_def {
 
 #define PARENT_FD 3
 
-static void mde_process_letter(struct imsgbuf *, struct pollfd *, 
-	FILE *, struct getline *, struct header_def *, size_t);
+static void mde_process_letter(struct imsgbuf *, FILE *,
+	struct getline *, struct header_def *, size_t);
 
 int
 main(int argc, char *argv[])
@@ -52,7 +52,6 @@ main(int argc, char *argv[])
 	struct getline gl;
 	struct header_def *headers;
 	struct imsgbuf msgbuf;
-	struct pollfd pollfd;
 	size_t nheader;
 
 	if (pledge("stdio recvfd", NULL) == -1)
@@ -64,103 +63,64 @@ main(int argc, char *argv[])
 	headers = NULL;
 	imsg_init(&msgbuf, PARENT_FD);
 	nheader = 0;
-	pollfd.fd = PARENT_FD;
-	pollfd.events = POLLIN;
 
 	for (;;) {
+		struct imsg msg;
 		ssize_t n;
 
-		if (poll(&pollfd, 1, -1) == -1)
-			err(1, "poll");
-
-		if (pollfd.revents & POLLERR)
-			errx(1, "socket error");
-
-		if (pollfd.revents & POLLHUP)
-			break;
-
-		if (pollfd.revents & POLLNVAL)
-			errc(1, EBADF, "poll");
-
-		if (pollfd.revents & POLLOUT) {
-			if (imsg_flush(&msgbuf) == -1) {
-				if (errno == EAGAIN)
-					goto read;
-				err(1, "imsg_flush");
-			}
-			pollfd.events &= ~POLLOUT;
-		}
-
-		read:
-		if (!(pollfd.revents & POLLIN))
-			continue;
-
-		if ((n = imsg_read(&msgbuf)) == -1) {
-			if (errno == EAGAIN)
-				continue;
-			err(1, "imsg_read");
-		}
-
+		if ((n = imsg_get_blocking(&msgbuf, &msg)) == -1)
+			err(1, "imsg_get_blocking");
 		if (n == 0)
 			break;
 
-		for (;;) {
-			struct imsg msg;
+		switch (imsg_get_type(&msg)) {
+		case IMSG_MDE_HEADERDEF: {
+			struct header_def header;
+			struct ibuf ibuf;
 
-			if ((n = imsg_get(&msgbuf, &msg)) == -1)
-				err(1, "imsg_get");
-			if (n == 0)
-				break;
+			if (imsg_get_ibuf(&msg, &ibuf) == -1)
+				errx(1, "parent sent bogus imsg");
 
-			switch (imsg_get_type(&msg)) {
-			case IMSG_MDE_HEADERDEF: {
-				struct header_def header;
-				struct ibuf ibuf;
-
-				if (imsg_get_ibuf(&msg, &ibuf) == -1)
+			if (ibuf_get(&ibuf, &header.type, 
+				sizeof(header.type)) == -1)
 					errx(1, "parent sent bogus imsg");
-
-				if (ibuf_get(&ibuf, &header.type, 
-					sizeof(header.type)) == -1)
-						errx(1, "parent sent bogus imsg");
-				switch (header.type) {
-				case EXTRACT_DATE:
-				case EXTRACT_FROM:
-				case EXTRACT_STRING:
-					break;
-				default:
-					errx(1, "invalid header type");
-				}
-
-				if (ibuf_get_string(&ibuf, &header.key, ibuf_size(&ibuf)) == -1)
-					err(1, "ibuf_get_string");
-				header.seen = 0;
-
-				headers = reallocarray(headers, nheader + 1, sizeof(*headers));
-				if (headers == NULL)
-					err(1, NULL);
-				headers[nheader++] = header;
-
-				imsg_free(&msg);
+			switch (header.type) {
+			case EXTRACT_DATE:
+			case EXTRACT_FROM:
+			case EXTRACT_STRING:
 				break;
-			}
-			case IMSG_MDE_LETTER: {
-				FILE *fp;
-				int fd;
-
-				if ((fd = imsg_get_fd(&msg)) == -1)
-					errx(1, "parent sent bogus imsg");
-				if ((fp = fdopen(fd, "r")) == NULL)
-					err(1, "fdopen");
-
-				mde_process_letter(&msgbuf, &pollfd, fp, &gl, headers, nheader);
-				imsg_free(&msg);
-				fclose(fp);
-				break;
-			}
 			default:
-				errx(1, "parent sent bogus imsg (bad type)");
+				errx(1, "invalid header type");
 			}
+
+			if (ibuf_get_string(&ibuf, &header.key, ibuf_size(&ibuf)) == -1)
+				err(1, "ibuf_get_string");
+			header.seen = 0;
+
+			headers = reallocarray(headers, nheader + 1, sizeof(*headers));
+			if (headers == NULL)
+				err(1, NULL);
+			headers[nheader++] = header;
+
+			imsg_free(&msg);
+			break;
+		}
+		case IMSG_MDE_LETTER: {
+			FILE *fp;
+			int fd;
+
+			if ((fd = imsg_get_fd(&msg)) == -1)
+				errx(1, "parent sent bogus imsg");
+			if ((fp = fdopen(fd, "r")) == NULL)
+				err(1, "fdopen");
+
+			mde_process_letter(&msgbuf, fp, &gl, headers, nheader);
+			imsg_free(&msg);
+			fclose(fp);
+			break;
+		}
+		default:
+			errx(1, "parent sent bogus imsg (bad type)");
 		}
 	}
 
@@ -175,9 +135,8 @@ main(int argc, char *argv[])
 }
 
 static void
-mde_process_letter(struct imsgbuf *msgbuf, struct pollfd *pollfd,
-	FILE *fp, struct getline *gl, 
-	struct header_def *headers, size_t nh)
+mde_process_letter(struct imsgbuf *msgbuf, FILE *fp,
+	struct getline *gl, struct header_def *headers, size_t nh)
 {
 	size_t nseen;
 
@@ -289,6 +248,8 @@ mde_process_letter(struct imsgbuf *msgbuf, struct pollfd *pollfd,
 	if (imsg_compose(msgbuf, IMSG_MDE_HEADERDONE, 0, -1, -1, NULL, 
 		0) == -1)
 			err(1, "imsg_compose");
-	pollfd->events |= POLLOUT;
+
+	if (imsg_flush_blocking(msgbuf) == -1)
+		err(1, "imsg_flush_blocking");
 	return;
 }
