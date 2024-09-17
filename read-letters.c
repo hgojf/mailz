@@ -15,6 +15,7 @@
  */
 
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include <dirent.h>
 #include <errno.h>
