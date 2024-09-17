@@ -22,7 +22,7 @@ REPLACE_FUNCTIONS(COMPAT_SOURCES errc freezero getdtablecount
 set(COMPAT_SOURCES ${COMPAT_SOURCES} compat/imsg.c compat/imsg-buffer.c)
 
 add_executable(maildir-extract date.c from.c header.c ibuf-util.c
-	maildir-extract.c ${COMPAT_SOURCES})
+	imsg-sync.c maildir-extract.c ${COMPAT_SOURCES})
 
 add_executable(maildir-read-letter charset.c content-type.c 
 	encoding.c header.c ibuf-util.c imsg-sync.c maildir-read-letter.c 
