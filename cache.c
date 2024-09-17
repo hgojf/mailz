@@ -90,7 +90,7 @@ cache_read(FILE *fp, struct cache *cache)
 
 	if (fread_all(&version, sizeof(version), fp) == -1)
 		return -1;
-	version = letoh32(version);
+	version = le32toh(version);
 
 	if ((version & MAILZCACHE_MAGIC_MASK) != MAILZCACHE_MAGIC)
 		return -1;
