@@ -16,7 +16,8 @@ MACRO(REPLACE_FUNCTIONS sources)
 	ENDFOREACH(name)
 ENDMACRO(REPLACE_FUNCTIONS)
 
-REPLACE_FUNCTIONS(COMPAT_SOURCES errc freezero getdtablecount strtonum verrc)
+REPLACE_FUNCTIONS(COMPAT_SOURCES errc freezero getdtablecount
+	scan_scaled strtonum verrc)
 
 set(COMPAT_SOURCES ${COMPAT_SOURCES} compat/imsg.c compat/imsg-buffer.c)
 
