@@ -48,3 +48,7 @@ add_executable(regress cache.c charset.c content-type.c date.c
 	read-letters.c regress.c string-util.c ${COMPAT_SOURCES})
 target_link_libraries(regress resolv)
 target_compile_options(regress PRIVATE -DREGRESS)
+
+add_custom_target(test
+	COMMAND ${CMAKE_BINARY_DIR}/regress
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
