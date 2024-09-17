@@ -19,8 +19,8 @@
 #define PATH_LESS "/usr/bin/less"
 
 #ifdef REGRESS
-#define PATH_MAILDIR_EXTRACT "./maildir-extract/obj/maildir-extract"
-#define PATH_MAILDIR_READ_LETTER "./maildir-read-letter/obj/maildir-read-letter"
+#define PATH_MAILDIR_EXTRACT "./build/maildir-extract"
+#define PATH_MAILDIR_READ_LETTER "./build/maildir-read-letter"
 #else
 #define PATH_MAILDIR_EXTRACT "/usr/local/libexec/maildir-extract"
 #define PATH_MAILDIR_READ_LETTER "/usr/local/libexec/maildir-read-letter"
