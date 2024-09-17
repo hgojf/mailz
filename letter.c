@@ -14,14 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <fcntl.h>
 #include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
-#include "extract.h"
 #include "letter.h"
-#include "maildir.h"
 
 void
 letter_free(struct letter *letter)
