@@ -40,6 +40,7 @@ static int
 cache_read1(int root, struct cache *cache, struct timespec *mtim)
 {
 	struct stat sb;
+	struct flock flock;
 	FILE *fp;
 	int fd, rv;
 
@@ -59,7 +60,12 @@ cache_read1(int root, struct cache *cache, struct timespec *mtim)
 	if (fstat(fd, &sb) == -1)
 		goto fp;
 
-	if (flock(fd, LOCK_SH) == -1)
+	flock.l_start = 0;
+	flock.l_len = 0;
+	flock.l_pid = getpid();
+	flock.l_type = F_RDLCK;
+	flock.l_whence = SEEK_SET;
+	if (fcntl(fd, F_SETLKW, &flock) == -1)
 		goto fp;
 
 	switch (cache_read(fp, cache)) {

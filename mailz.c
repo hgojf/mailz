@@ -192,6 +192,7 @@ static int
 cache_write1(int root, int view_all, struct cache_conf *cache,
 	struct letter *letters, size_t nletter)
 {
+	struct flock flock;
 	FILE *fp;
 	int fd;
 
@@ -207,7 +208,12 @@ cache_write1(int root, int view_all, struct cache_conf *cache,
 		return -1;
 	}
 
-	if (flock(fd, LOCK_EX) == -1)
+	flock.l_start = 0;
+	flock.l_len = 0;
+	flock.l_pid = getpid();
+	flock.l_type = F_WRLCK;
+	flock.l_whence = SEEK_SET;
+	if (fcntl(fd, F_SETLKW, &flock) == -1)
 		goto fp;
 
 	if (cache_write(view_all, cache->max, fp, letters, nletter) == -1)
