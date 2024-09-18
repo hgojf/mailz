@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <endian.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
