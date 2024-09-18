@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.25) # arbitrary
 project(mailz LANGUAGES C)
 
 include(CheckFunctionExists)
+include(CheckSymbolExists)
 
 add_compile_options(-isystem ${CMAKE_SOURCE_DIR}/compat -D_GNU_SOURCE)
 add_compile_options(-I${CMAKE_SOURCE_DIR}) # for yacc and lex
@@ -18,6 +19,13 @@ ENDMACRO(REPLACE_FUNCTIONS)
 
 REPLACE_FUNCTIONS(COMPAT_SOURCES errc freezero getdtablecount
 	scan_scaled strtonum verrc)
+
+set(CMAKE_REQUIRED_LIBRARIES resolv)
+check_symbol_exists(b64_pton "resolv.h" HAVE_B64_PTON)
+
+if (NOT ${HAVE_B64_PTON})
+	set(COMPAT_SOURCES ${COMPAT_SOURCES} compat/b64_pton.c)
+endif()
 
 set(COMPAT_SOURCES ${COMPAT_SOURCES} compat/imsg.c compat/imsg-buffer.c)
 
