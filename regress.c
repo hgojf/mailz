@@ -195,18 +195,14 @@ date_format_test(void)
 static int
 date_parse_test(void)
 {
-	char date1[] = "Sun, 25 Aug 2024 13:27:31 +0200";
-	char date2[] = "Sun, 25 Aug 2024 13:27:31 +0200 (GST)";
-	char date3[] = "25 Aug 2024 13:27:31 +0200";
-	char date4[] = "25 Aug 2024 7:27:31 EDT";
 	struct {
-		char *raw;
+		const char *raw;
 		time_t date;
 	} dates[] = {
-		{ date1, 1724585251 },
-		{ date2, 1724585251 },
-		{ date3, 1724585251 },
-		{ date4, 1724585251 },
+		{ "Sun, 25 Aug 2024 13:27:31 +0200", 1724585251 },
+		{ "Sun, 25 Aug 2024 13:27:31 +0200 (GST)", 1724585251 },
+		{ "25 Aug 2024 13:27:31 +0200", 1724585251 },
+		{ "25 Aug 2024 7:27:31 EDT", 1724585251 },
 	};
 
 	if (pledge("stdio", NULL) == -1)

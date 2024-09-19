@@ -63,16 +63,12 @@ date_format(struct tm* tm, long off, char buf[static EMAIL_DATE_LEN])
 }
 
 time_t
-date_parse(char *s)
+date_parse(const char *s)
 {
 	struct tm tm;
 	time_t date;
-	char *b;
-	const char *fmt;
+	const char *e, *fmt;
 	long off;
-
-	if ((b = strchr(s, '(')) != NULL)
-		*b = '\0';
 
 	if (strchr(s, ',') != NULL)
 		fmt = "%a, %d %b %Y %H:%M:%S %z";
@@ -82,7 +78,11 @@ date_parse(char *s)
 	memset(&tm, 0, sizeof(tm));
 
 	/* XXX: do this stuff manually */
-	if (strptime(s, fmt, &tm) == NULL)
+	if ((e = strptime(s, fmt, &tm)) == NULL)
+		return -1;
+
+	/* check for any gunk after the date except comments */
+	if (*e != '\0' && e[strspn(e, " \t")] != '(')
 		return -1;
 
 	off = tm.tm_gmtoff;
