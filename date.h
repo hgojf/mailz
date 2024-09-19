@@ -19,5 +19,5 @@
 #define EMAIL_DATE_LEN 33
 
 int date_format(struct tm *, long, char [static EMAIL_DATE_LEN]);
-time_t date_parse(char *);
+time_t date_parse(const char *);
 #endif /* MAILZ_DATE_H */
