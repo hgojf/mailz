@@ -3,7 +3,6 @@
 DEBUG = -g -fno-inline-functions
 
 CFLAGS += -I${.CURDIR}/..
-#CFLAGS += -Wsign-conversion
 WARNINGS = Yes
 
 TIDYCHECKS ?= \
