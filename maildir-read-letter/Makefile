@@ -4,6 +4,6 @@ SRCS += imsg-sync.c maildir-read-letter.c string-util.c
 NOMAN = 1
 LDADD = -lutil
 
-BINDIR = libexec
+BINDIR = ${LIBEXECDIR}
 
 .include <bsd.prog.mk>

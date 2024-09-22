@@ -6,6 +6,4 @@ SRCS += setup.c
 LDADD = -lutil
 NOMAN = 1
 
-BINDIR = bin
-
 .include <bsd.prog.mk>
