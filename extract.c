@@ -210,6 +210,7 @@ maildir_extract_next(struct extract *extract,
 	for (;;) {
 		struct ibuf ibuf;
 		struct imsg msg;
+		struct tm tm;
 		size_t i;
 
 		if (imsg_get_blocking(&extract->msgbuf, &msg) <= 0)
@@ -243,7 +244,7 @@ maildir_extract_next(struct extract *extract,
 				goto msg;
 
 			/* avoid errors later */
-			if (localtime(&headers[i].val.date) == NULL)
+			if (localtime_r(&headers[i].val.date, &tm) == NULL)
 				goto msg;
 			break;
 		case EXTRACT_FROM:

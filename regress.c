@@ -170,19 +170,19 @@ date_format_test(void)
 		err(1, "pledge");
 
 	for (size_t i = 0; i < nitems(dates); i++) {
-		struct tm *tm;
+		struct tm tm;
 		long off;
 		char buf[EMAIL_DATE_LEN];
 
-		if ((tm = gmtime(&dates[i].date)) == NULL)
+		if (gmtime_r(&dates[i].date, &tm) == NULL)
 			err(1, "localtime");
 
-		tm->tm_hour += dates[i].offh;
-		tm->tm_min += dates[i].offm;
+		tm.tm_hour += dates[i].offh;
+		tm.tm_min += dates[i].offm;
 
 		off = (dates[i].offh * 60 * 60) + (dates[i].offm * 60);
 
-		if (date_format(tm, off, buf) == -1)
+		if (date_format(&tm, off, buf) == -1)
 			errx(1, "date formatting failed");
 
 		if (strcmp(buf, dates[i].out) != 0)
