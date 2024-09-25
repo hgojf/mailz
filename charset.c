@@ -41,8 +41,7 @@ charset_getchar(FILE *fp, struct charset *charset, char buf[static 4])
 		if (!isascii(c)) {
 			if (charset->type == CHARSET_OTHER)
 				goto replace;
-			else
-				return -1;
+			return -1;
 		}
 
 		if (!isprint(c) && !isspace(c))
