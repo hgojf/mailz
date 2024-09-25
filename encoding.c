@@ -153,25 +153,29 @@ base64(FILE *fp, struct b64_decode *b64)
 static int 
 quoted_printable(FILE *fp)
 {
-	int eq, hi, lo;
+	for (;;) {
+		int eq, hi, lo;
 
-	again:
-	if ((eq = fgetc(fp)) == EOF)
-		return ENCODING_EOF;
-	if (eq != '=')
-		return eq;
+		if ((eq = fgetc(fp)) == EOF)
+			return ENCODING_EOF;
+		if (eq != '=')
+			return eq;
 
-	if ((hi = fgetc(fp)) == EOF)
-		return ENCODING_ERR;
+		if ((hi = fgetc(fp)) == EOF)
+			return ENCODING_ERR;
 
-	if (hi == '\n') /* soft break */
-		goto again;
+		if (hi == '\n') /* soft break */
+			continue;
 
-	if ((lo = fgetc(fp)) == EOF)
-		return ENCODING_ERR;
+		if ((lo = fgetc(fp)) == EOF)
+			return ENCODING_ERR;
 
-	if ((hi = hexdigcaps(hi)) == -1 || (lo = hexdigcaps(lo)) == -1)
-		return ENCODING_ERR;
+		if ((hi = hexdigcaps(hi)) == -1)
+			return ENCODING_ERR;
+		if ((lo = hexdigcaps(lo)) == -1)
+			return ENCODING_ERR;
 
-	return (hi << 4) | lo;
+		return (hi << 4) | lo;
+	}
+
 }
