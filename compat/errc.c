@@ -29,6 +29,7 @@
  */
 
 #include <err.h>
+#include <errno.h>
 #include <stdarg.h>
 
 void
@@ -37,6 +38,7 @@ errc(int eval, int code, const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	verrc(eval, code, fmt, ap);
+	errno = code;
+	verr(eval, fmt, ap);
 	va_end(ap);
 }
