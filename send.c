@@ -79,12 +79,12 @@ static int
 header_print_date(FILE *fp, const char *key, time_t date)
 {
 	char dbuf[EMAIL_DATE_LEN];
-	struct tm *tm;
+	struct tm tm;
 	int n;
 
-	if ((tm = localtime(&date)) == NULL)
+	if (localtime_r(&date, &tm) == NULL)
 		return -1;
-	if (date_format(tm, tm->tm_gmtoff, dbuf) == -1)
+	if (date_format(&tm, tm.tm_gmtoff, dbuf) == -1)
 		return -1;
 
 	n = fprintf(fp, "%s: %s", key, dbuf);
@@ -135,14 +135,14 @@ print_folding(FILE *fp, const char *s, int *off)
 static int
 print_quotedate(FILE *fp, const char *who, time_t time)
 {
+	struct tm tm;
 	char db[EMAIL_DATE_LEN];
-	struct tm *tm;
 	int n;
 
-	if ((tm = localtime(&time)) == NULL)
+	if (localtime_r(&time, &tm) == NULL)
 		return -1;
 
-	if (date_format(tm, tm->tm_gmtoff, db) == -1)
+	if (date_format(&tm, tm.tm_gmtoff, db) == -1)
 		return -1;
 
 	n = fprintf(fp, "On ");

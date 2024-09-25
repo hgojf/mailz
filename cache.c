@@ -222,6 +222,7 @@ fread_all(void *data, size_t n, FILE *fp)
 static int
 fread_letter(struct letter *letter, struct getline *gl, FILE *fp)
 {
+	struct tm tm;
 	char *addr, *name, *path, *subject;
 	time_t date;
 
@@ -230,7 +231,7 @@ fread_letter(struct letter *letter, struct getline *gl, FILE *fp)
 	date = (int64_t)le64toh(date);
 
 	/* avoid errors later */
-	if (localtime(&date) == NULL)
+	if (localtime_r(&date, &tm) == NULL)
 		return -1;
 
 	if (fread_string(&addr, gl, fp, 1) == -1)
