@@ -142,6 +142,7 @@ base64(FILE *fp, struct b64_decode *b64)
 	 * the input, and because b64_pton will not allow a string 
 	 * consisting of only padding.
 	 */
+	assert(ni >= 1);
 	memcpy(b64->buf, &obuf[1], ni - 1);
 	b64->i = 0;
 	b64->end = ni - 1;
