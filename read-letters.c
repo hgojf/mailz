@@ -116,7 +116,12 @@ letter_read(struct extract *extract, int fd, const char *path,
 	out->date = headers[HEADER_DATE].val.date;
 	out->from.addr = headers[HEADER_FROM].val.from.addr;
 	out->from.name = headers[HEADER_FROM].val.from.name;
-	out->subject = headers[HEADER_SUBJECT].val.string;
+	if (strlen(headers[HEADER_SUBJECT].val.string) != 0)
+		out->subject = headers[HEADER_SUBJECT].val.string;
+	else {
+		free(headers[HEADER_SUBJECT].val.string);
+		out->subject = NULL;
+	}
 
 	return 0;
 
