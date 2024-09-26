@@ -68,7 +68,7 @@ main(int argc, char *argv[])
 	rv = 1;
 
 	view_all = 0;
-	while ((ch = getopt(argc, argv, "as:")) != -1) {
+	while ((ch = getopt(argc, argv, "a")) != -1) {
 		switch (ch) {
 		case 'a':
 			view_all = 1;
@@ -216,7 +216,6 @@ cache_write1(int root, int view_all, struct cache_conf *cache,
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: mailz [-a] mailbox\n"
-					"       mailz [-s subject] to-addr...\n");
+	fprintf(stderr, "usage: mailz [-a] mailbox\n");
 	exit(2);
 }
