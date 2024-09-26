@@ -51,13 +51,12 @@ static const char *filename;
 }
 
 %token BADNUM OOM
-%token ADDRESS CACHE IGNORE LINEWRAP MAX MIN NO REORDER RETAIN
+%token ADDRESS CACHE IGNORE LINEWRAP NO REORDER RETAIN
 %token<string> STRING
 %token<number> NUMBER
 %type<addr> addr
 %type<argv> argument_list
 %type<number> ignore_type
-%type<number> size
 %%
 grammar: /* empty */
 	| grammar address '\n'
@@ -115,32 +114,11 @@ argument_list: STRING {
 	;
 
 cache: NO CACHE {
-		conf->cache.enabled = 0;
+		conf->cache = 1;
 	}
 	| CACHE {
-		conf->cache.enabled = 1;
+		conf->cache = 1;
 	}
-	| CACHE cache_opts {
-		conf->cache.enabled = 1;
-	}
-	;
-
-cache_opts: cache_opt
-	| cache_opts cache_opt
-	;
-
-cache_opt: MAX size {
-		conf->cache.max = $2;
-	}
-	| MIN NUMBER {
-		if ($2 < 0) {
-			yyerror("cache minimum cannot be negative");
-			YYERROR;
-		}
-
-		conf->cache.min = (size_t)$2;
-	}
-	;
 
 ignore_type: IGNORE { $$ = IGNORE_IGNORE; }
 	| RETAIN { $$ = IGNORE_RETAIN; }
@@ -176,31 +154,11 @@ reorder: REORDER argument_list {
 		conf->reorder.argv = $2.argv;
 	}
 	;
-
-size: NUMBER {
-		if ($1 < 0) {
-			yyerror("size cannot be negative");
-			YYERROR;
-		}
-
-		$$ = $1;
-	}
-	| STRING {
-		if (scan_scaled($1, &$$) == -1) {
-			yyerror("invalid size");
-			free($1);
-			YYABORT;
-		}
-
-		free($1);
-	}
-	;
 %%
 void
 config_default(struct mailz_conf *c)
 {
 	memset(c, 0, sizeof(*c));
-	c->cache.max = -1;
 }
 
 FILE *

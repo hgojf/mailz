@@ -63,9 +63,9 @@ static int fread_all(void *, size_t, FILE *);
 static int fread_letter(struct letter *, struct getline *, FILE *);
 static int fread_string(char **, struct getline *, FILE *, int);
 static int fread_string_opt(char **, struct getline *, FILE *);
-static int fwrite_all(void *, size_t, FILE *, long long *);
-static int fwrite_string(char *, FILE *, long long *);
-static int fwrite_string_opt(char *, FILE *, long long *);
+static int fwrite_all(void *, size_t, FILE *);
+static int fwrite_string(char *, FILE *);
+static int fwrite_string_opt(char *, FILE *);
 static int letter_cmp(const void *, const void *);
 static int letter_path_cmp(const void *, const void *);
 
@@ -165,7 +165,7 @@ cache_take(struct cache *cache, const char *path, struct letter *letter)
 }
 
 int
-cache_write(int view_all, long long max, FILE *fp, 
+cache_write(int view_all, FILE *fp, 
 	struct letter *letters, size_t nl)
 {
 	uint32_t version;
@@ -176,9 +176,9 @@ cache_write(int view_all, long long max, FILE *fp,
 
 	view_all1 = view_all;
 
-	if (fwrite_all(&version, sizeof(version), fp, &max) == -1)
+	if (fwrite_all(&version, sizeof(version), fp) == -1)
 		return -1;
-	if (fwrite_all(&view_all1, sizeof(view_all1), fp, &max) == -1)
+	if (fwrite_all(&view_all1, sizeof(view_all1), fp) == -1)
 		return -1;
 
 	qsort(letters, nl, sizeof(*letters), letter_cmp);
@@ -192,19 +192,19 @@ cache_write(int view_all, long long max, FILE *fp,
 		date = letters[i].date;
 		date = (int64_t)htole64(date);
 
-		if (fwrite_all(&date, sizeof(date), fp, &max) == -1)
+		if (fwrite_all(&date, sizeof(date), fp) == -1)
 			return -1;
 
-		if (fwrite_string(letters[i].from.addr, fp, &max) == -1)
+		if (fwrite_string(letters[i].from.addr, fp) == -1)
 			return -1;
 
-		if (fwrite_string_opt(letters[i].from.name, fp, &max) == -1)
+		if (fwrite_string_opt(letters[i].from.name, fp) == -1)
 			return -1;
 
-		if (fwrite_string(letters[i].path, fp, &max) == -1)
+		if (fwrite_string(letters[i].path, fp) == -1)
 			return -1;
 
-		if (fwrite_string_opt(letters[i].subject, fp, &max) == -1)
+		if (fwrite_string_opt(letters[i].subject, fp) == -1)
 			return -1;
 	}
 
@@ -305,32 +305,27 @@ fread_string_opt(char **out, struct getline *gl, FILE *fp)
 }
 
 static int
-fwrite_all(void *data, size_t n, FILE *fp, long long *left)
+fwrite_all(void *data, size_t n, FILE *fp)
 {
-	if (*left != -1 && n > (size_t)*left)
-		return -1;
-
 	if (fwrite(data, n, 1, fp) != 1)
 		return -1;
 
-	if (*left != -1)
-		*left -= n;
 	return 0;
 }
 
 static int
-fwrite_string(char *s, FILE *fp, long long *left)
+fwrite_string(char *s, FILE *fp)
 {
-	return fwrite_all(s, strlen(s) + 1, fp, left);
+	return fwrite_all(s, strlen(s) + 1, fp);
 }
 
 static int
-fwrite_string_opt(char *s, FILE *fp, long long *left)
+fwrite_string_opt(char *s, FILE *fp)
 {
 	if (s == NULL)
-		return fwrite_all("", 1, fp, left);
+		return fwrite_all("", 1, fp);
 	else
-		return fwrite_string(s, fp, left);
+		return fwrite_string(s, fp);
 }
 
 static int

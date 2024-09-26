@@ -53,8 +53,7 @@ struct {
 	{ PATH_TMPDIR, "rwc" },
 };
 
-static int cache_write1(int, int, struct cache_conf *, struct letter *,
-	size_t);
+static int cache_write1(int, int, struct letter *, size_t);
 
 int
 main(int argc, char *argv[])
@@ -144,9 +143,8 @@ main(int argc, char *argv[])
 	if (commands_run(cur, letters, nletter, &conf) == -1)
 		goto letters;
 
-	if (conf.cache.enabled) {
-		if (cache_write1(root, view_all, &conf.cache, letters, 
-			nletter) == -1)
+	if (conf.cache) {
+		if (cache_write1(root, view_all, letters, nletter) == -1)
 				goto letters;
 	}
 
@@ -172,15 +170,11 @@ main(int argc, char *argv[])
 }
 
 static int
-cache_write1(int root, int view_all, struct cache_conf *cache,
-	struct letter *letters, size_t nletter)
+cache_write1(int root, int view_all, struct letter *letters, size_t nletter)
 {
 	struct flock flock;
 	FILE *fp;
 	int fd;
-
-	if (nletter < cache->min)
-		return 0;
 
 	if ((fd = openat(root, ".mailzcache", O_WRONLY | O_TRUNC | O_CREAT,
 		0600)) == -1)
@@ -199,7 +193,7 @@ cache_write1(int root, int view_all, struct cache_conf *cache,
 	if (fcntl(fd, F_SETLKW, &flock) == -1)
 		goto fp;
 
-	if (cache_write(view_all, cache->max, fp, letters, nletter) == -1)
+	if (cache_write(view_all, fp, letters, nletter) == -1)
 		goto fp;
 	if (fflush(fp) == EOF)
 		goto fp;

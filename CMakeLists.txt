@@ -18,7 +18,7 @@ MACRO(REPLACE_FUNCTIONS sources)
 ENDMACRO(REPLACE_FUNCTIONS)
 
 REPLACE_FUNCTIONS(COMPAT_SOURCES errc freezero getdtablecount
-	scan_scaled strtonum verrc)
+	strtonum verrc)
 
 set(CMAKE_REQUIRED_LIBRARIES resolv)
 check_symbol_exists(b64_pton "resolv.h" HAVE_B64_PTON)
