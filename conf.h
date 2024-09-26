@@ -21,12 +21,6 @@ struct address {
 	char *name;
 };
 
-struct cache_conf {
-	size_t min; /* letters */
-	long long max; /* bytes */
-	int enabled;
-};
-
 struct ignore {
 	size_t argc;
 	char **argv;
@@ -44,9 +38,9 @@ struct reorder {
 
 struct mailz_conf {
 	struct address address;
-	struct cache_conf cache;
 	struct ignore ignore;
 	struct reorder reorder;
+	int cache;
 	int linewrap;
 };
 

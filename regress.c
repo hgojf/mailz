@@ -252,7 +252,7 @@ cache_test(void)
 	letter.path = "abcdef";
 	letter.subject = "Hello";
 
-	if (cache_write(1, -1, fp, &letter, 1) == -1)
+	if (cache_write(1, fp, &letter, 1) == -1)
 		goto fp;
 	if (fseek(fp, 0, SEEK_SET) == -1)
 		goto fp;
@@ -374,7 +374,7 @@ config_test(void)
 		errx(1, "configuration failed");
 	}
 
-	if (!conf.cache.enabled)
+	if (!conf.cache)
 		goto conf;
 
 	if (conf.address.addr == NULL 

@@ -28,8 +28,6 @@
 "cache" { return CACHE; }
 "ignore" { return IGNORE; }
 "linewrap" { return LINEWRAP; }
-"max" { return MAX; }
-"min" { return MIN; }
 "no" { return NO; }
 "reorder" { return REORDER; }
 "retain" { return RETAIN; }
