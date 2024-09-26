@@ -55,7 +55,6 @@ struct {
 
 static int cache_write1(int, int, struct cache_conf *, struct letter *,
 	size_t);
-static int send1(const char *, int, char **, struct address *);
 
 int
 main(int argc, char *argv[])
@@ -64,20 +63,15 @@ main(int argc, char *argv[])
 	struct letter *letters;
 	FILE *config_fp;
 	size_t nletter;
-	const char *subject;
 	int ch, cur, root, rv, view_all;
 
 	rv = 1;
 
-	subject = NULL;
 	view_all = 0;
 	while ((ch = getopt(argc, argv, "as:")) != -1) {
 		switch (ch) {
 		case 'a':
 			view_all = 1;
-			break;
-		case 's':
-			subject = optarg;
 			break;
 		default:
 			usage();
@@ -87,7 +81,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if ((subject != NULL && argc == 0) || (subject == NULL && argc != 1))
+	if (argc != 1)
 		usage();
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
@@ -112,10 +106,6 @@ main(int argc, char *argv[])
 	if (pledge("stdio rpath wpath cpath flock sendfd proc exec unveil", NULL) == -1)
 		err(1, "pledge");
 
-	if (subject == NULL)
-		if (pledge("stdio rpath wpath cpath flock sendfd proc exec", NULL) == -1)
-			err(1, "pledge");
-
 	if (config_fp != NULL) {
 		if (config_init(&conf, config_fp, "") == -1) {
 			warnx("configuration failed");
@@ -124,13 +114,6 @@ main(int argc, char *argv[])
 	}
 	else
 		config_default(&conf);
-
-	if (subject != NULL) {
-		if (send1(subject, argc, argv, &conf.address) == -1)
-			goto config;
-		rv = 0;
-		goto config;
-	}
 
 	if ((root = open(argv[0], 
 		O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
@@ -227,53 +210,6 @@ cache_write1(int root, int view_all, struct cache_conf *cache,
 	fp:
 	unlinkat(root, ".mailzcache", 0);
 	fclose(fp);
-	return -1;
-}
-
-static int
-send1(const char *subject, int argc, char **argv, struct address *addr)
-{
-	char path[] = PATH_TMPDIR "/send.XXXXXX";
-	FILE *fp;
-	int fd;
-
-	if ((fd = mkostemp(path, O_CLOEXEC)) == -1)
-		return -1;
-	if ((fp = fdopen(fd, "w+")) == NULL) {
-		close(fd);
-		unlink(path);
-		return -1;
-	}
-
-	for (size_t i = 0; i < nitems(unveils); i++) {
-		if (!strcmp(unveils[i].path, PATH_SENDMAIL))
-			continue;
-		else if (!strcmp(unveils[i].path, PATH_TMPDIR)) {
-			/* XXX: this isnt really used other than deleting it */
-			if (unveil(unveils[i].path, "c") == -1)
-				goto fp;
-		}
-		else if (unveil(unveils[i].path, "") == -1)
-			goto fp;
-	}
-
-	if (unveil(path, "c") == -1)
-		goto fp;
-
-	/* XXX: could drop exec by spawning sendmail here */
-	if (pledge("stdio cpath proc exec", NULL) == -1)
-		err(1, "pledge");
-
-	if (send(subject, argc, argv, fp, stdin, addr) == -1)
-		goto fp;
-
-	fclose(fp);
-	unlink(path);
-	return 0;
-
-	fp:
-	fclose(fp);
-	unlink(path);
 	return -1;
 }
 
