@@ -102,7 +102,7 @@ main(int argc, char *argv[])
 		goto config_fp;
 	}
 
-	if (pledge("stdio rpath wpath cpath flock sendfd proc exec unveil", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath flock sendfd proc exec", NULL) == -1)
 		err(1, "pledge");
 
 	if (config_fp != NULL) {
