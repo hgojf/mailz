@@ -1,0 +1,17 @@
+SRCS_MAILDIR_READ_LETTER = charset.c content-type.c encoding.c header.c
+SRCS_MAILDIR_READ_LETTER += ibuf-util.c imsg-sync.c
+SRCS_MAILDIR_READ_LETTER += maildir-read-letter.c string-util.c
+LIBS_MAILDIR_READ_LETTER = -lutil
+OBJS_MAILDIR_READ_LETTER = $(SRCS_MAILDIR_READ_LETTER:.c=.o)
+DEPS_MAILDIR_READ_LETTER = $(SRCS_MAILDIR_READ_LETTER:.c=.d)
+
+maildir-read-letter: ${OBJS_MAILDIR_READ_LETTER}
+	$(CC) -o $@ ${LIBS_MAILDIR_READ_LETTER} ${OBJS_MAILDIR_READ_LETTER}
+
+.PHONY: maildir-read-letter-clean
+
+maildir-read-letter-clean:
+	rm -f ${DEPS_MAILDIR_READ_LETTER} ${OBJS_MAILDIR_READ_LETTER}\
+		maildir-read-letter
+
+-include ${DEPS_MAILDIR_READ_LETTER}

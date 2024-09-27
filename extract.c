@@ -55,7 +55,7 @@ extract_header_free(enum extract_header_type type,
 }
 
 static int
-maildir_extract1(struct extract *extract)
+maildir_extract2(const char *path, struct extract *extract)
 {
 	FILE *e;
 	int p[2], sv[2];
@@ -80,7 +80,7 @@ maildir_extract1(struct extract *extract)
 			err(1, "dup2");
 		if (dup2(sv[1], 3) == -1)
 			err(1, "dup2");
-		execl(PATH_MAILDIR_EXTRACT, "maildir-extract", NULL);
+		execl(path, "maildir-extract", NULL);
 		err(1, "%s", PATH_MAILDIR_EXTRACT);
 	default:
 		break;
@@ -107,10 +107,10 @@ maildir_extract1(struct extract *extract)
 }
 
 int
-maildir_extract(struct extract *extract, struct extracted_header *headers, 
+maildir_extract1(const char *path, struct extract *extract, struct extracted_header *headers, 
 	size_t nh)
 {
-	if (maildir_extract1(extract) == -1)
+	if (maildir_extract2(path, extract) == -1)
 		return -1;
 
 	for (size_t i = 0; i < nh; i++) {
@@ -135,6 +135,13 @@ maildir_extract(struct extract *extract, struct extracted_header *headers,
 	extract:
 	maildir_extract_close(extract);
 	return -1;
+}
+
+int
+maildir_extract(struct extract *extract, struct extracted_header *headers, 
+	size_t nh)
+{
+	return maildir_extract1(PATH_MAILDIR_EXTRACT, extract, headers, nh);
 }
 
 int
@@ -298,12 +305,19 @@ maildir_extract_next(struct extract *extract,
 int
 maildir_extract_quick(int fd, struct extracted_header *headers, size_t nh)
 {
+	return maildir_extract_quick1(PATH_MAILDIR_EXTRACT, fd, headers, nh);
+}
+
+int
+maildir_extract_quick1(const char *path, int fd, 
+	struct extracted_header *headers, size_t nh)
+{
 	struct extract extract;
 	int rv;
 
 	rv = -1;
 
-	if (maildir_extract(&extract, headers, nh) == -1) {
+	if (maildir_extract1(path, &extract, headers, nh) == -1) {
 		close(fd);
 		return -1;
 	}

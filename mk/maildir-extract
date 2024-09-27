@@ -1,0 +1,15 @@
+SRCS_MAILDIR_EXTRACT = date.c from.c header.c ibuf-util.c imsg-sync.c
+SRCS_MAILDIR_EXTRACT += maildir-extract.c
+LIBS_MAILDIR_EXTRACT = -lutil
+DEPS_MAILDIR_EXTRACT = $(SRCS_MAILDIR_EXTRACT:.c=.d)
+OBJS_MAILDIR_EXTRACT = $(SRCS_MAILDIR_EXTRACT:.c=.o)
+
+.PHONY: maildir-extract-clean
+
+maildir-extract-clean:
+	rm -f ${DEPS_MAILDIR_EXTRACT} ${OBJS_MAILDIR_EXTRACT} maildir-extract
+
+maildir-extract: ${OBJS_MAILDIR_EXTRACT}
+	$(CC) -o $@ ${LIBS_MAILDIR_EXTRACT} ${OBJS_MAILDIR_EXTRACT}
+
+-include ${DEPS_MAILDIR_EXTRACT}

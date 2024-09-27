@@ -1,0 +1,28 @@
+SRCS_REGRESS = cache.c charset.c content-type.c date.c encoding.c
+SRCS_REGRESS += extract.c from.c header.c ibuf-util.c imsg-sync.c
+SRCS_REGRESS += letter.c lex.c maildir.c parse.c printable.c
+SRCS_REGRESS += read-letter.c read-letters.c regress.c string-util.c
+LIBS_REGRESS = -lutil
+DEPS_REGRESS = $(SRCS_REGRESS:.c=.d)
+OBJS_REGRESS = $(SRCS_REGRESS:.c=.o)
+
+lex.c: lex.l
+	$(LEX) -o $@ ${.CURDIR}/lex.l
+
+lex.o: parse.h
+
+parse.c parse.h: parse.y
+	$(YACC) -d -o parse.c ${.CURDIR}/parse.y
+
+regress.o: regress.c
+	$(CC) -c -o $@ ${CFLAGS} -DOBJDIR=\"${.OBJDIR}\" ${.CURDIR}/regress.c
+
+regress: ${OBJS_REGRESS}
+	$(CC) -o $@ ${LIBS_REGRESS} ${OBJS_REGRESS}
+
+.PHONY: regress-clean
+
+regress-clean:
+	rm -f ${DEPS_REGRESS} ${OBJS_REGRESS} regress
+
+-include ${DEPS_REGRESS}

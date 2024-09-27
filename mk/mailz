@@ -1,0 +1,26 @@
+SRCS_MAILZ = cache.c commands.c date.c extract.c ibuf-util.c imsg-sync.c
+SRCS_MAILZ += letter.c lex.c list.c maildir.c mailz.c mark.c parse.c
+SRCS_MAILZ += print.c printable.c read-letter.c read-letters.c send.c
+SRCS_MAILZ += setup.c
+LIBS_MAILZ = -lutil
+OBJS_MAILZ = $(SRCS_MAILZ:.c=.o)
+DEPS_MAILZ = $(SRCS_MAILZ:.c=.d)
+CFLAGS += -I${.CURDIR}
+
+lex.c: lex.l
+	$(LEX) -o $@ ${.CURDIR}/lex.l
+
+lex.o: parse.h
+
+parse.c parse.h: parse.y
+	$(YACC) -d -o parse.c ${.CURDIR}/parse.y
+
+mailz: ${OBJS_MAILZ}
+	$(CC) -o $@ ${LIBS_MAILZ} ${OBJS_MAILZ}
+
+.PHONY: clean-mailz
+
+mailz-clean:
+	rm -f ${DEPS_MAILZ} ${OBJS_MAILZ} parse.c parse.h lex.c mailz
+
+-include ${DEPS_MAILZ}

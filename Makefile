@@ -1,15 +1,18 @@
-SUBDIR = maildir-extract maildir-read-letter mailz regress
+.PHONY: all clean test
 
-.ifmake(install)
-SKIPDIR = regress
-.endif
+.CURDIR ?= .
+.OBJDIR ?= .
 
-.include <bsd.subdir.mk>
+CFLAGS += -MD -MP
 
-.PHONY: test tidy
+all: maildir-extract maildir-read-letter mailz regress
+
+clean: maildir-extract-clean maildir-read-letter-clean mailz-clean regress-clean
 
 test: maildir-extract maildir-read-letter regress
-	./regress/obj/regress
+	@cd ${.CURDIR} && ${.OBJDIR}/regress
 
-tidy:
-	@make MAKE_FLAGS=tidy
+include mk/mailz
+include mk/maildir-extract
+include mk/maildir-read-letter
+include mk/regress

@@ -92,6 +92,15 @@ int
 maildir_read_letter(struct read_letter *read, int fd, int pipeok, 
 	int linewrap, struct ignore *ignore, struct reorder *reorder)
 {
+	return maildir_read_letter1(PATH_MAILDIR_READ_LETTER, read, 
+		fd, pipeok, linewrap, ignore, reorder);
+}
+
+int
+maildir_read_letter1(const char *path,
+	struct read_letter *read, int fd, int pipeok, 
+	int linewrap, struct ignore *ignore, struct reorder *reorder)
+{
 	struct imsgbuf msgbuf;
 	FILE *e, *o;
 	int any, p[2], p1[2], sv[2];
@@ -128,7 +137,7 @@ maildir_read_letter(struct read_letter *read, int fd, int pipeok,
 			err(1, "dup2");
 		if (dup2(sv[1], 3) == -1)
 			err(1, "dup2");
-		execl(PATH_MAILDIR_READ_LETTER, "maildir-read-letter", NULL);
+		execl(path, "maildir-read-letter", NULL);
 		err(1, "%s", PATH_MAILDIR_READ_LETTER);
 	default:
 		break;

@@ -51,10 +51,12 @@ void extract_header_free(enum extract_header_type,
 	union extract_header_val *);
 
 int maildir_extract(struct extract *, struct extracted_header *, size_t);
+int maildir_extract1(const char *, struct extract *, struct extracted_header *, size_t);
 int maildir_extract_close(struct extract *);
 
 int maildir_extract_next(struct extract *, int, 
 	struct extracted_header *, size_t);
 
 int maildir_extract_quick(int, struct extracted_header *, size_t);
+int maildir_extract_quick1(const char *, int, struct extracted_header *, size_t);
 #endif /* MAILZ_EXTRACT_H */

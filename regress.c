@@ -74,6 +74,8 @@ static int test_cmp(const void *, const void *);
 static void usage(void);
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
+#define PATH_MAILDIR_EXTRACT_REGRESS OBJDIR "/maildir-extract"
+#define PATH_MAILDIR_READ_LETTER_REGRESS OBJDIR "/maildir-read-letter"
 
 static struct test tests[] = {
 	{ "cache", cache_test },
@@ -351,7 +353,7 @@ charset_test(void)
 	return 0;
 }
 
-#define PATH_TEST_CONF "regress/tests/mailz.conf"
+#define PATH_TEST_CONF "tests/mailz.conf"
 
 static int
 config_test(void)
@@ -586,13 +588,13 @@ extract_test(void)
 	int fd, rv;
 
 	rv = -1;
-	if ((fd = open("regress/tests/letter", O_RDONLY | O_CLOEXEC)) == -1) {
+	if ((fd = open("tests/letter", O_RDONLY | O_CLOEXEC)) == -1) {
 		warn("tests/letter");
 		return -1;
 	}
 
-	if (unveil(PATH_MAILDIR_EXTRACT, "x") == -1)
-		err(1, "%s", PATH_MAILDIR_EXTRACT);
+	if (unveil(PATH_MAILDIR_EXTRACT_REGRESS, "x") == -1)
+		err(1, "%s", PATH_MAILDIR_EXTRACT_REGRESS);
 	if (pledge("stdio proc exec sendfd", NULL) == -1)
 		err(1, "pledge");
 
@@ -610,8 +612,9 @@ extract_test(void)
 	headers[3].key = "X-missing";
 	headers[3].type = EXTRACT_STRING;
 
-	if (maildir_extract_quick(fd, headers, nitems(headers)) == -1)
-		return -1;
+	if (maildir_extract_quick1(PATH_MAILDIR_EXTRACT_REGRESS,
+		fd, headers, nitems(headers)) == -1)
+			return -1;
 
 	if (headers[0].val.from.addr == NULL 
 		|| strcmp(headers[0].val.from.addr, "dave@gnu.org") != 0)
@@ -768,7 +771,7 @@ letter_cmp(struct letter *one, struct letter *two)
 	return 0;
 }
 
-#define PATH_TEST_LETTERS "./regress/tests/inbox/"
+#define PATH_TEST_LETTERS "./tests/inbox/"
 
 static int
 letters_test(void)
@@ -791,8 +794,8 @@ letters_test(void)
 
 	if (unveil(PATH_TEST_LETTERS, "r") == -1)
 		err(1, "%s", PATH_TEST_LETTERS);
-	if (unveil(PATH_MAILDIR_EXTRACT, "x") == -1)
-		err(1, "%s", PATH_MAILDIR_EXTRACT);
+	if (unveil(PATH_MAILDIR_EXTRACT_REGRESS, "x") == -1)
+		err(1, "%s", PATH_MAILDIR_EXTRACT_REGRESS);
 	if (pledge("stdio proc sendfd exec rpath", NULL) == -1)
 		err(1, "pledge");
 
@@ -957,9 +960,9 @@ read_letter_test(void)
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		err(1, "setlocale");
 
-	if ((fd = open("regress/tests/letter", O_RDONLY | O_CLOEXEC)) == -1)
+	if ((fd = open("tests/letter", O_RDONLY | O_CLOEXEC)) == -1)
 		return -1;
-	if (unveil(PATH_MAILDIR_READ_LETTER, "x") == -1)
+	if (unveil(PATH_MAILDIR_READ_LETTER_REGRESS, "x") == -1)
 		err(1, "%s", PATH_MAILDIR_READ_LETTER);
 
 	if (pledge("stdio proc exec", NULL) == -1)
@@ -967,8 +970,9 @@ read_letter_test(void)
 
 	memset(&ignore, 0, sizeof(ignore));
 	memset(&reorder, 0, sizeof(reorder));
-	if (maildir_read_letter(&rl, fd, 0, 0, &ignore, &reorder) == -1)
-		errx(1, "maildir_read_letter");
+	if (maildir_read_letter1(PATH_MAILDIR_READ_LETTER_REGRESS,
+		&rl, fd, 0, 0, &ignore, &reorder) == -1)
+			errx(1, "maildir_read_letter");
 
 	if (pledge("stdio proc", NULL) == -1)
 		err(1, "pledge");
