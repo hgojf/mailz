@@ -38,7 +38,7 @@ from_parse(char *s, struct from *out)
 
 	addr++;
 	al = strlen(addr);
-	if (addr[al - 1] != '>')
+	if (al == 0 || addr[al - 1] != '>')
 		return -1;
 
 	/* <addr> */
