@@ -1,0 +1,18 @@
+.PHONY: clean-mailz tidy-mailz
+
+SRCS_MAILZ = content-proc.c imsg-blocking.c maildir.c mailz.c
+DEPS_MAILZ = $(SRCS_MAILZ:.c=.d)
+OBJS_MAILZ = $(SRCS_MAILZ:.c=.o)
+
+LDFLAGS_MAILZ = -lutil
+
+clean-mailz:
+	rm -f mailz ${DEPS_MAILZ} ${OBJS_MAILZ}
+
+mailz: ${OBJS_MAILZ}
+	$(CC) -o $@ ${LDFLAGS_MAILZ} ${OBJS_MAILZ}
+
+tidy-mailz:
+	cd ${.CURDIR} && clang-tidy ${TIDYFLAGS} ${SRCS_MAILZ} -- ${CFLAGS}
+
+-include ${DEPS_MAILZ}
