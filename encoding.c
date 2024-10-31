@@ -1,64 +1,73 @@
-#include <bitstring.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "encoding.h"
 
-#define nitems(a) (sizeof(a) / sizeof(*(a)))
+#define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 static int encoding_qp(struct encoding_qp *, FILE *);
+static int encoding_raw(FILE *, int);
 static int hexdigcaps(int);
+
+#define ENC_RAW_7BIT 0x1
+#define ENC_RAW_NONUL 0x2
 
 struct {
 	const char *ident;
 	enum encoding_type type;
 } encodings[] = {
-	{ "binary", ENCODING_BINARY },
-	{ "7bit", ENCODING_7BIT },
-	{ "8bit", ENCODING_8BIT },
-	{ "quoted-printable", ENCODING_QP },
+	{ "7bit",		ENCODING_7BIT },
+	{ "8bit",		ENCODING_8BIT },
+	{ "binary",		ENCODING_BINARY },
+	{ "quoted-printable",	ENCODING_QP },
 };
 
-enum encoding_type
-encoding_from_name(const char *s)
+int
+encoding_from_name(struct encoding *e, const char *name)
 {
 	size_t i;
 
-	for (i = 0; i < nitems(encodings); i++)
-		if (!strcmp(encodings[i].ident, s))
-			return encodings[i].type;
+	for (i = 0; i < nitems(encodings); i++) {
+		if (!strcmp(name, encodings[i].ident)) {
+			encoding_from_type(e, encodings[i].type);
+			return 0;
+		}
+	}
+
 	return -1;
+}
+
+void
+encoding_from_type(struct encoding *e, enum encoding_type type)
+{
+	switch (type) {
+	case ENCODING_7BIT:
+	case ENCODING_8BIT:
+	case ENCODING_BINARY:
+		break;
+	case ENCODING_QP:
+		memset(&e->qp, 0, sizeof(e->qp));
+		break;
+	}
+
+	e->type = type;
 }
 
 int
 encoding_getc(struct encoding *e, FILE *fp)
 {
-	int ch;
-
 	switch (e->type) {
-	case ENCODING_BINARY:
 	case ENCODING_7BIT:
+		return encoding_raw(fp, ENC_RAW_NONUL | ENC_RAW_7BIT);
 	case ENCODING_8BIT:
-		if ((ch = fgetc(fp)) == EOF)
-			return ENCODING_EOF;
-		if (e->type != ENCODING_BINARY && ch == '\0')
-			return ENCODING_ERR;
-		if (e->type == ENCODING_7BIT && ch > 127)
-			return ENCODING_ERR;
-		return ch;
+		return encoding_raw(fp, ENC_RAW_NONUL);
+	case ENCODING_BINARY:
+		return encoding_raw(fp, 0);
 	case ENCODING_QP:
 		return encoding_qp(&e->qp, fp);
-	default:
-		return ENCODING_ERR;
 	}
-}
 
-int
-encoding_init(struct encoding *e)
-{
-	if (e->type == 0)
-		return 0;
-	return 1;
+	return ENCODING_ERR;
 }
 
 static int
@@ -69,34 +78,6 @@ encoding_qp(struct encoding_qp *qp, FILE *fp)
 
 		if ((ch = fgetc(fp)) == EOF)
 			return ENCODING_EOF;
-
-		#if 0
-		if (ch == ' ' || ch == '\t') {
-			if (qp->nspace == QP_WS_MAX)
-				return ENCODING_ERR;
-			if (ch == ' ')
-				bit_set(qp->space, qp->nspace++);
-			else
-				bit_clear(qp->space, qp->nspace++);
-			qp->off = 0;
-			continue;
-		}
-		else if (ch == '\n') {
-			qp->nspace = 0;
-			qp->off = 0;
-		}
-		else if (qp->nspace != qp->off) {
-			int rv;
-
-			if (bit_test(qp->space, qp->off))
-				rv = ' ';
-			else
-				rv = '\t';
-
-			qp->off++;
-			return rv;
-		}
-		#endif
 
 		if (ch != '=')
 			return ch;
@@ -117,22 +98,21 @@ encoding_qp(struct encoding_qp *qp, FILE *fp)
 	}
 }
 
-void
-encoding_set(struct encoding *e, enum encoding_type type)
+static int
+encoding_raw(FILE *fp, int flags)
 {
-	switch (type) {
-	case ENCODING_BINARY:
-	case ENCODING_7BIT:
-	case ENCODING_8BIT:
-		break;
-	case ENCODING_QP:
-		memset(&e->qp, 0, sizeof(e->qp));
-		break;
-	}
+	int ch;
 
-	e->type = type;
+	if ((ch = fgetc(fp)) == EOF)
+		return ENCODING_EOF;
+
+	if (flags & ENC_RAW_NONUL && ch == '\0')
+		return ENCODING_ERR;
+	if (flags & ENC_RAW_7BIT && ch > 127)
+		return ENCODING_ERR;
+
+	return ch;
 }
-
 
 static int
 hexdigcaps(int ch)

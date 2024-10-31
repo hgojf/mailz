@@ -50,7 +50,7 @@ static int handle_reply(struct imsgbuf *, struct imsg *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static time_t header_date(FILE *);
 static int header_echo(FILE *, FILE *);
-static enum encoding_type header_encoding(FILE *, FILE *, int);
+static int header_encoding(FILE *, FILE *, int, struct encoding *);
 static int header_from(FILE *, struct from *);
 static int header_lex(FILE *, struct header_lex *);
 static int header_message_id(FILE *, char *, size_t);
@@ -96,10 +96,10 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	      struct ignore *ignore)
 {
 	struct imsg msg2;
+	struct encoding encoding;
 	FILE *in, *out;
 	ssize_t n;
-	struct encoding encoding;
-	int flags, pfd, lfd, rv;
+	int flags, got_encoding, pfd, lfd, rv;
 
 	rv = -1;
 
@@ -127,7 +127,8 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		goto out;
 	}
 
-	memset(&encoding, 0, sizeof(encoding));
+	encoding_from_type(&encoding, ENCODING_7BIT);
+	got_encoding = 0;
 	for (;;) {
 		char buf[HEADER_NAME_LEN];
 		int echo, hv;
@@ -151,17 +152,13 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		}
 
 		if (!strcasecmp(buf, "content-transfer-encoding")) {
-			enum encoding_type type;
-
-			if (encoding_init(&encoding))
+			if (got_encoding)
 				goto in;
-			if ((type = header_encoding(in, out, echo)) == -1)
+			if ((hv = header_encoding(in, out, echo, &encoding)) == -1)
 				goto in;
-			if (type == -2)
+			if (hv == 0)
 				goto done;
-
-			if (type != -3)
-				encoding_set(&encoding, type);
+			got_encoding = 1;
 		}
 		else if (echo) {
 			if ((hv = header_echo(in, out)) == -1)
@@ -180,16 +177,13 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 			goto done;
 	}
 
-	if (!encoding_init(&encoding))
-		encoding_set(&encoding, ENCODING_7BIT);
-
 	for (;;) {
 		int ch;
 
-		if ((ch = encoding_getc(&encoding, in)) == ENCODING_EOF)
-			break;
-		if (ch == ENCODING_ERR)
+		if ((ch = encoding_getc(&encoding, in)) == ENCODING_ERR)
 			goto in;
+		if (ch == ENCODING_EOF)
+			break;
 
 		if (fputc(ch, out) == EOF) {
 			if (ferror(out) && errno == EPIPE)
@@ -489,8 +483,8 @@ header_echo(FILE *in, FILE *out)
 	return 1;
 }
 
-static enum encoding_type
-header_encoding(FILE *in, FILE *out, int echo)
+static int
+header_encoding(FILE *in, FILE *out, int echo, struct encoding *e)
 {
 	struct header_lex lex;
 	char buf[17];
@@ -510,10 +504,12 @@ header_encoding(FILE *in, FILE *out, int echo)
 			return -1;
 		if (ch == HL_EOF)
 			break;
+		if (ch == HL_PIPE)
+			return 0;
 
 		if (state == 0) {
 			if (n == sizeof(buf) - 1) {
-				state = 2;
+				state = 1;
 				continue;
 			}
 			buf[n++] = ch;
@@ -533,12 +529,15 @@ header_encoding(FILE *in, FILE *out, int echo)
 
 	if (state == 0) {
 		buf[n] = '\0';
-		return encoding_from_name(buf);
+
+		if (encoding_from_name(e, buf) == -1)
+			encoding_from_type(e, ENCODING_BINARY);
 	}
+	else
+		encoding_from_type(e, ENCODING_BINARY);
 
-	return -3;
+	return 1;
 }
-
 
 static int
 header_from(FILE *fp, struct from *from)
