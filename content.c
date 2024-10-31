@@ -907,9 +907,9 @@ ignore_header(const char *name, struct ignore *ignore)
 	int rv;
 
 	if (ignore->type == IGNORE_RETAIN)
-		rv = 1;
-	else
 		rv = 0;
+	else
+		rv = 1;
 
 	for (i = 0; i < ignore->nheader; i++)
 		if (!strcasecmp(name, ignore->headers[i]))
