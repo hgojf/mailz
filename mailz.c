@@ -35,7 +35,7 @@ struct letter {
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-static void commands_run(struct letter *, size_t, int, int);
+static void commands_run(struct letter *, size_t, int, int, const char *);
 static int commands_token(FILE *, char *, size_t, int *);
 static const struct command *commands_search(const char *);
 static int command_more(struct letter *, struct command_args *);
@@ -67,7 +67,8 @@ static const struct command {
 };
 
 static void
-commands_run(struct letter *letters, size_t nletter, int cur, int null)
+commands_run(struct letter *letters, size_t nletter, int cur,
+	     int null, const char *tmpdir)
 {
 	struct command_args args;
 	struct letter *letter;
@@ -78,7 +79,7 @@ commands_run(struct letter *letters, size_t nletter, int cur, int null)
 	args.nletter = nletter;
 	args.cur = cur;
 	args.null = null;
-	args.tmpdir = "/tmp";
+	args.tmpdir = tmpdir;
 
 	letter = NULL;
 	for (;;) {
@@ -861,6 +862,7 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
+	char tmpdir[] = PATH_TMPDIR;
 	struct letter *letters;
 	size_t i, nletter;
 	int ch, cur, null, root, rv, view_all;
@@ -893,8 +895,11 @@ main(int argc, char *argv[])
 	if ((cur = openat(root, "cur", O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
 		goto root;
 
-	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
+	if (mkdtemp(tmpdir) == NULL)
 		goto cur;
+
+	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
+		goto tmpdir;
 
 	if (unveil(argv[0], "rc") == -1)
 		goto null;
@@ -904,7 +909,7 @@ main(int argc, char *argv[])
 		goto null;
 	if (unveil(PATH_SENDMAIL, "x") == -1)
 		goto null;
-	if (unveil("/tmp/", "rwc") == -1)
+	if (unveil(tmpdir, "rwc") == -1)
 		goto null;
 	if (pledge("stdio rpath cpath wpath proc exec sendfd", NULL) == -1)
 		err(1, "pledge");
@@ -920,7 +925,7 @@ main(int argc, char *argv[])
 	else {
 		for (i = 0; i < nletter; i++)
 			letter_print(i + 1, &letters[i]);
-		commands_run(letters, nletter, cur, null);
+		commands_run(letters, nletter, cur, null, tmpdir);
 	}
 
 	rv = 0;
@@ -929,6 +934,8 @@ main(int argc, char *argv[])
 	free(letters);
 	null:
 	close(null);
+	tmpdir:
+	rmdir(tmpdir);
 	cur:
 	close(cur);
 	root:

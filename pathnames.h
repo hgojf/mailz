@@ -4,4 +4,5 @@
 #define PATH_MAILZ_CONTENT "./obj/mailz-content"
 #define PATH_LESS "/usr/bin/less"
 #define PATH_SENDMAIL "/bin/cat"
+#define PATH_TMPDIR "/tmp/mailz.XXXXXX"
 #endif /* MAILZ_PATHNAMES_H */
