@@ -467,12 +467,12 @@ command_reply(struct letter *letter, struct command_args *args)
 		goto lr;
 
 	if (ch != '\n') {
-		int c, n;
+		int any, c;
 
-		n = 0;
+		any = 0;
 		while ((c = fgetc(stdin)) == EOF && c != '\n')
-			n++;
-		if (ch == 'q' && n == 0)
+			any = 1;
+		if (ch == 'q' && !any)
 			rv = 0;
 		goto lr;
 	}
