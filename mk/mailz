@@ -1,13 +1,23 @@
 .PHONY: clean-mailz install-mailz tidy-mailz
 
-SRCS_MAILZ = content-proc.c imsg-blocking.c maildir.c mailz.c
+SRCS_MAILZ = conf-lex.c conf-parse.c content-proc.c imsg-blocking.c
+SRCS_MAILZ += maildir.c mailz.c
 DEPS_MAILZ = $(SRCS_MAILZ:.c=.d)
 OBJS_MAILZ = $(SRCS_MAILZ:.c=.o)
 
 LDFLAGS_MAILZ = -lutil
 
 clean-mailz:
-	rm -f mailz ${DEPS_MAILZ} ${OBJS_MAILZ}
+	rm -f mailz conf-parse.c conf-parse.h conf-lex.c \
+	      ${DEPS_MAILZ} ${OBJS_MAILZ}
+
+conf-parse.h conf-parse.c: parse.y
+	$(YACC) -d -o conf-parse.c ${.CURDIR}/parse.y
+
+conf-lex.c: lex.l
+	$(LEX) -o $@ ${.CURDIR}/lex.l
+
+conf-lex.o: conf-parse.h
 
 install-mailz:
 	$(INSTALL) -m 0755 mailz ${PREFIX}/bin/

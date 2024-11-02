@@ -13,6 +13,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "conf.h"
 #include "content-proc.h"
 #include "maildir.h"
 #include "pathnames.h"
@@ -20,6 +21,7 @@
 struct command_args {
 	const char *addr;
 	const char *tmpdir;
+	struct mailz_ignore *ignore;
 	struct letter *letters;
 	size_t nletter;
 	int cur;
@@ -35,7 +37,9 @@ struct letter {
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-static void commands_run(struct letter *, size_t, int, int, const char *);
+static void commands_run(struct letter *, size_t, int, int,
+			 const char *, const char *,
+			 struct mailz_ignore *);
 static int commands_token(FILE *, char *, size_t, int *);
 static const struct command *commands_search(const char *);
 static int command_more(struct letter *, struct command_args *);
@@ -68,16 +72,17 @@ static const struct command {
 
 static void
 commands_run(struct letter *letters, size_t nletter, int cur,
-	     int null, const char *tmpdir)
+	     int null, const char *tmpdir, const char *addr,
+	     struct mailz_ignore *ignore)
 {
 	struct command_args args;
 	struct letter *letter;
 
-	args.addr = NULL;
-	args.addr = "jake";
+	args.addr = strlen(addr) != 0 ? addr : NULL;
 	args.letters = letters;
 	args.nletter = nletter;
 	args.cur = cur;
+	args.ignore = ignore;
 	args.null = null;
 	args.tmpdir = tmpdir;
 
@@ -180,6 +185,7 @@ command_more(struct letter *letter, struct command_args *args)
 	struct content_proc pr;
 	struct content_letter lr;
 	FILE *fp;
+	size_t i;
 	int fd, p[2], rv;
 	pid_t pid;
 
@@ -188,20 +194,18 @@ command_more(struct letter *letter, struct command_args *args)
 	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, args->null) == -1)
 		return -1;
 
-	if (content_proc_ignore(&pr, "content-transfer-encoding", CNT_IGNORE_RETAIN) == -1)
-		goto pr;
-	if (content_proc_ignore(&pr, "date", CNT_IGNORE_RETAIN) == -1)
-		goto pr;
-	if (content_proc_ignore(&pr, "subject", CNT_IGNORE_RETAIN) == -1)
-		goto pr;
-	if (content_proc_ignore(&pr, "from", CNT_IGNORE_RETAIN) == -1)
-		goto pr;
-	if (content_proc_ignore(&pr, "to", CNT_IGNORE_RETAIN) == -1)
-		goto pr;
-	if (content_proc_ignore(&pr, "cc", CNT_IGNORE_RETAIN) == -1)
-		goto pr;
-	if (content_proc_ignore(&pr, "list-id", CNT_IGNORE_RETAIN) == -1)
-		goto pr;
+	for (i = 0; i < args->ignore->nheader; i++) {
+		int type;
+
+		if (args->ignore->type == MAILZ_IGNORE_IGNORE)
+			type = CNT_IGNORE_IGNORE;
+		else
+			type = CNT_IGNORE_RETAIN;
+
+		if (content_proc_ignore(&pr, args->ignore->headers[i],
+					type) == -1)
+			goto pr;
+	}
 
 	if ((fd = openat(args->cur, letter->path,
 			 O_RDONLY | O_CLOEXEC)) == -1)
@@ -863,6 +867,7 @@ int
 main(int argc, char *argv[])
 {
 	char tmpdir[] = PATH_TMPDIR;
+	struct mailz_conf conf;
 	struct letter *letters;
 	size_t i, nletter;
 	int ch, cur, null, root, rv, view_all;
@@ -890,8 +895,11 @@ main(int argc, char *argv[])
 		return 1;
 	signal(SIGPIPE, SIG_IGN);
 
-	if ((root = open(argv[0], O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+	if (mailz_conf_init(&conf) == -1)
 		return 1;
+
+	if ((root = open(argv[0], O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+		goto conf;
 	if ((cur = openat(root, "cur", O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
 		goto root;
 
@@ -925,7 +933,8 @@ main(int argc, char *argv[])
 	else {
 		for (i = 0; i < nletter; i++)
 			letter_print(i + 1, &letters[i]);
-		commands_run(letters, nletter, cur, null, tmpdir);
+		commands_run(letters, nletter, cur, null, tmpdir,
+			     conf.address, &conf.ignore);
 	}
 
 	rv = 0;
@@ -940,5 +949,7 @@ main(int argc, char *argv[])
 	close(cur);
 	root:
 	close(root);
+	conf:
+	mailz_conf_free(&conf);
 	return rv;
 }
