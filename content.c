@@ -587,14 +587,6 @@ header_content_type(FILE *in, FILE *out, int echo,
 		}
 	}
 
-	if (echo) {
-		if (fputc('\n', out) == EOF) {
-			if (ferror(out) && errno == EPIPE)
-				return 0;
-			return -1;
-		}
-	}
-
 	if (state == 3) {
 		buf[n] = '\0';
 
@@ -677,14 +669,6 @@ header_encoding(FILE *in, FILE *out, int echo, struct encoding *e)
 
 		if (state == 1)
 			continue;
-	}
-
-	if (echo) {
-		if (fputc('\n', out) == EOF) {
-			if (ferror(out) && errno == EPIPE)
-				return 0;
-			return -1;
-		}
 	}
 
 	if (state == 0) {
@@ -856,6 +840,14 @@ header_lex(FILE *fp, struct header_lex *lex)
 	}
 
 	eof:
+	if (lex->echo != NULL) {
+		if (fputc('\n', lex->echo) == EOF) {
+			if (ferror(lex->echo) && errno == EPIPE)
+				return HL_PIPE;
+			return HL_ERR;
+		}
+	}
+
 	if (lex->cstate != 0)
 		return HL_ERR;
 	return HL_EOF;
