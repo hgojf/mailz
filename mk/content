@@ -1,3 +1,5 @@
+.PHONY: clean-content tidy-content
+
 SRCS_CONTENT = content.c encoding.c imsg-blocking.c
 DEPS_CONTENT = $(SRCS_CONTENT:.c=.d)
 OBJS_CONTENT = $(SRCS_CONTENT:.c=.o)
