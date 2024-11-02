@@ -1,8 +1,8 @@
 .PHONY: all clean tidy install
 
-DEBUG = -g -fno-inline-functions
-
+#DEBUG = -g -fno-inline-functions
 CFLAGS += ${DEBUG}
+
 CFLAGS += -MD -MP
 CFLAGS += -Wmissing-prototypes
 CFLAGS += -Wall -Wextra
