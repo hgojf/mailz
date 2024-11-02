@@ -971,35 +971,20 @@ header_skip(FILE *in, FILE *out, int echo)
 static int
 header_subject(FILE *fp, char *buf, size_t bufsz)
 {
+	struct header_lex lex;
 	size_t n;
-	int ws;
+	int ch;
 
 	if (bufsz == 0)
 		return -1;
 
+	lex.cstate = -1;
+	lex.echo = NULL;
+	lex.skipws = 1;
+
 	n = 0;
-	ws = 1;
-	for (;;) {
-		int ch;
-
-		if ((ch = fgetc(fp)) == EOF)
-			break;
-		if (ch == '\n') {
-			if ((ch = fgetc(fp)) == EOF)
-				break;
-			if (ch != ' ' && ch != '\t') {
-				if (ungetc(ch, fp) == EOF)
-					return -1;
-				break;
-			}
-		}
-
-		if (ws && (ch == ' ' || ch == '\t'))
-			continue;
-		else
-			ws = 0;
-
-		if (ch > 127)
+	while ((ch = header_lex(fp, &lex)) != HL_EOF) {
+		if (ch == HL_ERR)
 			return -1;
 		if (!isspace(ch) && !isprint(ch))
 			continue;
