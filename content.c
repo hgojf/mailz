@@ -66,14 +66,13 @@ static int handle_reply(struct imsgbuf *, struct imsg *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static int header_content_type(FILE *, FILE *, int, struct content_type *);
 static time_t header_date(FILE *);
-static int header_echo(FILE *, FILE *);
 static int header_encoding(FILE *, FILE *, int, struct encoding *);
 static int header_from(FILE *, struct from *);
 static int header_lex(FILE *, struct header_lex *);
 static int header_message_id(FILE *, char *, size_t);
 static int header_name(FILE *, char *, size_t);
 static int header_references(FILE *, struct imsgbuf *);
-static int header_skip(FILE *);
+static int header_skip(FILE *, FILE *, int);
 static int header_subject(FILE *, char *, size_t);
 static int ignore_header(const char *, struct ignore *);
 static void strip_trailing(char *);
@@ -197,14 +196,8 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 
 			got_content_type = 1;
 		}
-		else if (echo) {
-			if ((hv = header_echo(in, out)) == -1)
-				goto in;
-			if (hv == 0)
-				goto done;
-		}
 		else {
-			if (header_skip(in) == -1)
+			if (header_skip(in, out, echo) == -1)
 				goto in;
 		}
 	}
@@ -304,7 +297,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto fp;
 			if ((ref = ftello(fp)) == -1)
 				goto fp;
-			if (header_skip(fp) == -1)
+			if (header_skip(fp, NULL, 0) == -1)
 				goto fp;
 		}
 		else if (!strcasecmp(buf, "reply-to")) {
@@ -325,7 +318,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto fp;
 		}
 		else {
-			if (header_skip(fp) == -1)
+			if (header_skip(fp, NULL, 0) == -1)
 				goto fp;
 		}
 	}
@@ -413,7 +406,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 			sm.have_subject = 1;
 		}
 		else {
-			if (header_skip(fp) == -1)
+			if (header_skip(fp, NULL, 0) == -1)
 				goto fp;
 			continue;
 		}
@@ -602,40 +595,6 @@ header_content_type(FILE *in, FILE *out, int echo,
 }
 
 static int
-header_echo(FILE *in, FILE *out)
-{
-	for (;;) {
-		int ch;
-
-		if ((ch = fgetc(in)) == EOF)
-			break;
-		if (ch == '\n') {
-			if ((ch = fgetc(in)) == EOF)
-				break;
-			if (ch != ' ' && ch != '\t') {
-				if (ungetc(ch, in) == EOF)
-					return -1;
-				break;
-			}
-		}
-
-		if (fputc(ch, out) == EOF) {
-			if (ferror(out) && errno == EPIPE)
-				return 0;
-			return -1;
-		}
-	}
-
-	if (fputc('\n', out) == EOF) {
-		if (ferror(out) && errno == EPIPE)
-			return 0;
-		return -1;
-	}
-
-	return 1;
-}
-
-static int
 header_encoding(FILE *in, FILE *out, int echo, struct encoding *e)
 {
 	struct header_lex lex;
@@ -817,17 +776,19 @@ header_lex(FILE *fp, struct header_lex *lex)
 			}
 		}
 
-		if (ch == '(') {
-			if (lex->cstate == INT_MAX)
-				return HL_ERR;
-			lex->cstate++;
-			continue;
-		}
+		if (lex->cstate != -1) {
+			if (ch == '(') {
+				if (lex->cstate == INT_MAX)
+					return HL_ERR;
+				lex->cstate++;
+				continue;
+			}
 
-		if (lex->cstate != 0) {
-			if (ch == ')')
-				lex->cstate--;
-			continue;
+			if (lex->cstate > 0) {
+				if (ch == ')')
+					lex->cstate--;
+				continue;
+			}
 		}
 
 		if (lex->skipws) {
@@ -848,7 +809,7 @@ header_lex(FILE *fp, struct header_lex *lex)
 		}
 	}
 
-	if (lex->cstate != 0)
+	if (lex->cstate != -1 && lex->cstate != 0)
 		return HL_ERR;
 	return HL_EOF;
 }
@@ -987,23 +948,19 @@ header_references(FILE *fp, struct imsgbuf *msgbuf)
 }
 
 static int
-header_skip(FILE *fp)
+header_skip(FILE *in, FILE *out, int echo)
 {
-	for (;;) {
-		int ch;
+	struct header_lex lex;
+	int ch;
 
-		if ((ch = fgetc(fp)) == EOF)
-			return 0;
-		if (ch == '\n') {
-			if ((ch = fgetc(fp)) == EOF)
-				return 0;
-			if (ch != ' ' && ch != '\t') {
-				if (ungetc(ch, fp) == EOF)
-					return -1;
-				return 0;
-			}
-		}
-	}
+	lex.cstate = -1;
+	lex.echo = echo ? out : NULL;
+	lex.skipws = 0;
+
+	while ((ch = header_lex(in, &lex)) != HL_EOF)
+		if (ch == HL_ERR)
+			return -1;
+	return 0;
 }
 
 static int
