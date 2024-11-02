@@ -1,4 +1,4 @@
-.PHONY: clean-content tidy-content
+.PHONY: clean-content install-content tidy-content
 
 SRCS_CONTENT = content.c encoding.c imsg-blocking.c
 DEPS_CONTENT = $(SRCS_CONTENT:.c=.d)
@@ -8,6 +8,9 @@ LDFLAGS_CONTENT = -lutil
 
 clean-content:
 	rm -f mailz-content ${DEPS_CONTENT} ${OBJS_CONTENT}
+
+install-content:
+	$(INSTALL) -m 0755 mailz-content ${PREFIX}/libexec
 
 mailz-content: ${OBJS_CONTENT}
 	$(CC) -o $@ ${LDFLAGS_CONTENT} ${OBJS_CONTENT}

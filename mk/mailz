@@ -1,4 +1,4 @@
-.PHONY: clean-mailz tidy-mailz
+.PHONY: clean-mailz install-mailz tidy-mailz
 
 SRCS_MAILZ = content-proc.c imsg-blocking.c maildir.c mailz.c
 DEPS_MAILZ = $(SRCS_MAILZ:.c=.d)
@@ -8,6 +8,9 @@ LDFLAGS_MAILZ = -lutil
 
 clean-mailz:
 	rm -f mailz ${DEPS_MAILZ} ${OBJS_MAILZ}
+
+install-mailz:
+	$(INSTALL) -m 0755 mailz ${PREFIX}/bin/
 
 mailz: ${OBJS_MAILZ}
 	$(CC) -o $@ ${LDFLAGS_MAILZ} ${OBJS_MAILZ}
