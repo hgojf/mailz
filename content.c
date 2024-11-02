@@ -14,6 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "charset.h"
 #include "content.h"
 #include "encoding.h"
 #include "imsg-blocking.h"
@@ -23,6 +24,20 @@
 #define HL_EOF -129
 #define HL_ERR -130
 #define HL_PIPE -131
+
+struct content_type {
+	enum {
+		CT_TEXT,
+		CT_OTHER,
+	} type;
+
+	union {
+		struct {
+			enum charset_type charset;
+		} text;
+	} v;
+};
+
 
 struct header_lex {
 	int cstate;
@@ -49,6 +64,7 @@ static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
 static int handle_reply(struct imsgbuf *, struct imsg *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
+static int header_content_type(FILE *, FILE *, int, struct content_type *);
 static time_t header_date(FILE *);
 static int header_echo(FILE *, FILE *);
 static int header_encoding(FILE *, FILE *, int, struct encoding *);
@@ -97,10 +113,11 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	      struct ignore *ignore)
 {
 	struct imsg msg2;
+	struct charset charset;
 	struct encoding encoding;
 	FILE *in, *out;
 	ssize_t n;
-	int flags, got_encoding, pfd, lfd, rv;
+	int flags, got_content_type, got_encoding, pfd, lfd, rv;
 
 	rv = -1;
 
@@ -128,7 +145,9 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		goto out;
 	}
 
+	charset_from_type(&charset, CHARSET_ASCII);
 	encoding_from_type(&encoding, ENCODING_7BIT);
+	got_content_type = 0;
 	got_encoding = 0;
 	for (;;) {
 		char buf[HEADER_NAME_LEN];
@@ -161,6 +180,23 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 				goto done;
 			got_encoding = 1;
 		}
+		else if (!strcasecmp(buf, "content-type")) {
+			struct content_type ct;
+
+			if (got_content_type)
+				goto in;
+			if ((hv = header_content_type(in, out, echo, &ct)) == -1)
+				goto in;
+			if (hv == 0)
+				goto done;
+
+			if (ct.type == CT_TEXT)
+				charset_from_type(&charset, ct.v.text.charset);
+			else
+				charset_from_type(&charset, CHARSET_OTHER);
+
+			got_content_type = 1;
+		}
 		else if (echo) {
 			if ((hv = header_echo(in, out)) == -1)
 				goto in;
@@ -179,14 +215,16 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	}
 
 	for (;;) {
-		int ch;
+		char buf[4];
+		int n;
 
-		if ((ch = encoding_getc(&encoding, in)) == ENCODING_ERR)
+		if ((n = charset_getc(&charset, &encoding, in,
+				      buf)) == -1)
 			goto in;
-		if (ch == ENCODING_EOF)
+		if (n == 0)
 			break;
 
-		if (fputc(ch, out) == EOF) {
+		if (fwrite(buf, n, 1, out) != 1) {
 			if (ferror(out) && errno == EPIPE)
 				goto done;
 			goto in;
@@ -448,6 +486,127 @@ header_date(FILE *fp)
 		return -1;
 
 	return date - off;
+}
+
+static int
+header_content_type(FILE *in, FILE *out, int echo,
+		    struct content_type *ct)
+{
+	char buf[19];
+	struct header_lex lex;
+	size_t n;
+	int state;
+
+	lex.cstate = 0;
+	lex.echo = echo ? out : NULL;
+	lex.skipws = 1;
+
+	state = 0;
+	n = 0;
+	for (;;) {
+		int ch;
+
+		if ((ch = header_lex(in, &lex)) == HL_ERR)
+			return -1;
+		if (ch == HL_PIPE)
+			return 0;
+		if (ch == HL_EOF)
+			break;
+
+		if (state == 0) {
+			if (ch == '/') {
+				buf[n] = '\0';
+	
+				if (!strcmp(buf, "text")) {
+					ct->type = CT_TEXT;
+					ct->v.text.charset = CHARSET_ASCII;
+				}
+				else
+					ct->type = CT_OTHER;
+				n = 0;
+				state = 1;
+				continue;
+			}
+
+			if (n == sizeof(buf) - 1) {
+				ct->type = CT_OTHER;
+				continue;
+			}
+			buf[n++] = ch;
+		}
+
+		if (state == 1) {
+			if (ch == ';') {
+				lex.skipws = 1;
+				state = 2;
+			}
+			continue;
+		}
+
+		if (state == 2) {
+			if (ch == '=') {
+				buf[n] = '\0';
+
+				if (ct->type == CT_TEXT && !strcmp(buf, "charset"))
+					state = 3;
+				else
+					state = 4;
+				n = 0;
+				continue;
+			}
+
+			if (n == sizeof(buf) - 1)
+				continue;
+			buf[n++] = ch;
+		}
+
+		if (state == 3) {
+			if (ch == ';') {
+				buf[n] = '\0';
+
+				if (!strcasecmp(buf, "us-ascii"))
+					ct->v.text.charset = CHARSET_ASCII;
+				else if (!strcasecmp(buf, "utf-8"))
+					ct->v.text.charset = CHARSET_UTF8;
+				else
+					ct->v.text.charset = CHARSET_OTHER;
+
+				state = 2;
+				n = 0;
+			}
+
+			if (n == sizeof(buf) - 1)
+				continue;
+			buf[n++] = ch;
+		}
+
+		if (state == 4) {
+			if (ch == ';')
+				state = 2;
+			continue;
+		}
+	}
+
+	if (echo) {
+		if (fputc('\n', out) == EOF) {
+			if (ferror(out) && errno == EPIPE)
+				return 0;
+			return -1;
+		}
+	}
+
+	if (state == 3) {
+		buf[n] = '\0';
+
+		if (!strcasecmp(buf, "us-ascii"))
+			ct->v.text.charset = CHARSET_ASCII;
+		else if (!strcasecmp(buf, "utf-8"))
+			ct->v.text.charset = CHARSET_UTF8;
+		else
+			ct->v.text.charset = CHARSET_OTHER;
+	}
+
+	return 1;
 }
 
 static int
