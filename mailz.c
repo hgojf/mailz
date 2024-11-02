@@ -631,7 +631,7 @@ command_unread(struct letter *letter, struct command_args *args)
 	char buf[NAME_MAX], *new;
 
 	if ((bufp = maildir_unset_flag(letter->path, 'S',
-				     buf, sizeof(buf))) == NULL)
+				       buf, sizeof(buf))) == NULL)
 		return -1;
 	if (bufp == letter->path)
 		return 0;
