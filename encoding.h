@@ -3,13 +3,21 @@
 enum encoding_type {
 	ENCODING_7BIT,
 	ENCODING_8BIT,
+	ENCODING_BASE64,
 	ENCODING_BINARY,
 	ENCODING_QP,
 };
 
 struct encoding {
-	struct encoding_qp {
-	} qp;
+	union {
+		struct encoding_b64 {
+			char buf[2];
+			int start;
+			int end;
+		} b64;
+		struct encoding_qp {
+		} qp;
+	} v;
 
 	enum encoding_type type;
 };
