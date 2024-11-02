@@ -219,6 +219,17 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		if (n == 0)
 			break;
 
+		if (n == 1) {
+			int ch;
+
+			ch = buf[0];
+			if (!isprint(ch) && !isspace(ch)) {
+				/* UTF-8 replacement character */
+				memcpy(buf, "\xEF\xBF\xBD", 3);
+				n = 3;
+			}
+		}
+
 		if (fwrite(buf, n, 1, out) != 1) {
 			if (ferror(out) && errno == EPIPE)
 				goto done;

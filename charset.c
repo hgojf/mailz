@@ -52,11 +52,8 @@ charset_raw(struct encoding *e, FILE *fp, int flags,
 	if (ch == ENCODING_EOF)
 		return 0;
 
-	if (ch > 127) {
-		if (flags & CTR_ASCII)
-			return -1;
-		ch = '?';
-	}
+	if (flags & CTR_ASCII && ch > 127)
+		return -1;
 
 	buf[0] = ch;
 	return 1;
