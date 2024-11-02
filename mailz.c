@@ -98,8 +98,10 @@ commands_run(struct letter *letters, size_t nletter, int cur,
 		if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1)
 			goto bad;
 
-		if (strlen(buf) == 0 && gotnl)
+		if (strlen(buf) == 0 && feof(stdin))
 			break;
+		if (gotnl)
+			continue;
 
 		if ((cmd = commands_search(buf)) == NULL)
 			goto bad;
