@@ -582,6 +582,9 @@ header_content_type(FILE *in, FILE *out, int echo,
 		}
 	}
 
+	if (state != 2 && state != 3)
+		return -1;
+
 	if (state == 3) {
 		buf[n] = '\0';
 
