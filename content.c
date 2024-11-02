@@ -197,8 +197,10 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 			got_content_type = 1;
 		}
 		else {
-			if (header_skip(in, out, echo) == -1)
+			if ((hv = header_skip(in, out, echo)) == -1)
 				goto in;
+			if (hv == 0)
+				goto done;
 		}
 	}
 
@@ -957,10 +959,13 @@ header_skip(FILE *in, FILE *out, int echo)
 	lex.echo = echo ? out : NULL;
 	lex.skipws = 0;
 
-	while ((ch = header_lex(in, &lex)) != HL_EOF)
+	while ((ch = header_lex(in, &lex)) != HL_EOF) {
 		if (ch == HL_ERR)
 			return -1;
-	return 0;
+		if (echo && ch == HL_PIPE)
+			return 0;
+	}
+	return 1;
 }
 
 static int
