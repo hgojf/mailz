@@ -48,6 +48,8 @@ static int command_reply(struct letter *, struct command_args *);
 static int command_save(struct letter *, struct command_args *);
 static int command_thread(struct letter *, struct command_args *);
 static int command_unread(struct letter *, struct command_args *);
+static int content_proc_ex_ignore(struct content_proc *,
+				  const struct mailz_ignore *);
 static int letter_cmp(const void *, const void *);
 static void letter_free(struct letter *);
 static int letter_from_summary(struct letter *, const char *,
@@ -187,7 +189,6 @@ command_more(struct letter *letter, struct command_args *args)
 	struct content_proc pr;
 	struct content_letter lr;
 	FILE *fp;
-	size_t i;
 	int fd, p[2], rv;
 	pid_t pid;
 
@@ -196,18 +197,8 @@ command_more(struct letter *letter, struct command_args *args)
 	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, args->null) == -1)
 		return -1;
 
-	for (i = 0; i < args->ignore->nheader; i++) {
-		int type;
-
-		if (args->ignore->type == MAILZ_IGNORE_IGNORE)
-			type = CNT_IGNORE_IGNORE;
-		else
-			type = CNT_IGNORE_RETAIN;
-
-		if (content_proc_ignore(&pr, args->ignore->headers[i],
-					type) == -1)
-			goto pr;
-	}
+	if (content_proc_ex_ignore(&pr, args->ignore) == -1)
+		goto pr;
 
 	if ((fd = openat(args->cur, letter->path,
 			 O_RDONLY | O_CLOEXEC)) == -1)
@@ -530,6 +521,9 @@ command_save(struct letter *letter, struct command_args *args)
 	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, args->null) == -1)
 		return -1;
 
+	if (content_proc_ex_ignore(&pr, args->ignore) == -1)
+		goto pr;
+
 	if ((lfd = openat(args->cur, letter->path,
 			  O_RDONLY | O_CLOEXEC)) == -1)
 		goto pr;
@@ -649,6 +643,25 @@ command_unread(struct letter *letter, struct command_args *args)
 	free(letter->path);
 	letter->path = new;
 
+	return 0;
+}
+
+static int
+content_proc_ex_ignore(struct content_proc *pr,
+		       const struct mailz_ignore *ignore)
+{
+	size_t i;
+	int type;
+
+	if (ignore->type == MAILZ_IGNORE_IGNORE)
+		type = CNT_IGNORE_IGNORE;
+	else
+		type = CNT_IGNORE_RETAIN;
+
+	for (i = 0; i < ignore->nheader; i++)
+		if (content_proc_ignore(pr, ignore->headers[i],
+					type) == -1)
+			return -1;
 	return 0;
 }
 
