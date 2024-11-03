@@ -593,7 +593,7 @@ header_content_type(FILE *in, FILE *out, int echo,
 		}
 	}
 
-	if (state == 0 || state == 1)
+	if (state == 0)
 		return -1;
 
 	if (state == 3) {
