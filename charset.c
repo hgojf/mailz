@@ -4,11 +4,36 @@
 #include "charset.h"
 #include "encoding.h"
 
-#define CTR_ASCII 0x1
+#define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 static int charset_raw(struct encoding *, FILE *, int, char [static 4]);
 static int charset_utf8(struct charset_utf8 *, struct encoding *,
 			FILE *, char [static 4]);
+
+#define CTR_ASCII 0x1
+
+static const struct {
+	const char *ident;
+	enum charset_type type;
+} charsets[] = {
+	{ "us-ascii",	CHARSET_ASCII },
+	{ "utf-8",	CHARSET_ASCII },
+};
+
+int
+charset_from_name(struct charset *c, const char *name)
+{
+	size_t i;
+
+	for (i = 0; i < nitems(charsets); i++) {
+		if (!strcasecmp(name, charsets[i].ident)) {
+			charset_from_type(c, charsets[i].type);
+			return 0;
+		}
+	}
+
+	return -1;
+}
 
 void
 charset_from_type(struct charset *c, enum charset_type type)

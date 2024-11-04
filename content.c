@@ -25,20 +25,6 @@
 #define HL_ERR -130
 #define HL_PIPE -131
 
-struct content_type {
-	enum {
-		CT_TEXT,
-		CT_OTHER,
-	} type;
-
-	union {
-		struct {
-			enum charset_type charset;
-		} text;
-	} v;
-};
-
-
 struct header_lex {
 	int cstate;
 	int skipws;
@@ -64,7 +50,7 @@ static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
 static int handle_reply(struct imsgbuf *, struct imsg *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
-static int header_content_type(FILE *, FILE *, int, struct content_type *);
+static int header_content_type(FILE *, FILE *, int, struct charset *);
 static time_t header_date(FILE *);
 static int header_encoding(FILE *, FILE *, int, struct encoding *);
 static int header_from(FILE *, struct from *);
@@ -180,19 +166,12 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 			got_encoding = 1;
 		}
 		else if (!strcasecmp(buf, "content-type")) {
-			struct content_type ct;
-
 			if (got_content_type)
 				goto in;
-			if ((hv = header_content_type(in, out, echo, &ct)) == -1)
+			if ((hv = header_content_type(in, out, echo, &charset)) == -1)
 				goto in;
 			if (hv == 0)
 				goto done;
-
-			if (ct.type == CT_TEXT)
-				charset_from_type(&charset, ct.v.text.charset);
-			else
-				charset_from_type(&charset, CHARSET_OTHER);
 
 			got_content_type = 1;
 		}
@@ -495,8 +474,7 @@ header_date(FILE *fp)
 }
 
 static int
-header_content_type(FILE *in, FILE *out, int echo,
-		    struct content_type *ct)
+header_content_type(FILE *in, FILE *out, int echo, struct charset *ct)
 {
 	char buf[19];
 	struct header_lex lex;
@@ -522,20 +500,16 @@ header_content_type(FILE *in, FILE *out, int echo,
 		if (state == 0) {
 			if (ch == '/') {
 				buf[n] = '\0';
-	
-				if (!strcmp(buf, "text")) {
-					ct->type = CT_TEXT;
-					ct->v.text.charset = CHARSET_ASCII;
-				}
-				else
-					ct->type = CT_OTHER;
+
+				if (strcmp(buf, "text") != 0)
+					charset_from_type(ct, CHARSET_OTHER);
 				n = 0;
 				state = 1;
 				continue;
 			}
 
 			if (n == sizeof(buf) - 1) {
-				ct->type = CT_OTHER;
+				charset_from_type(ct, CHARSET_OTHER);
 				continue;
 			}
 			buf[n++] = ch;
@@ -553,7 +527,7 @@ header_content_type(FILE *in, FILE *out, int echo,
 			if (ch == '=') {
 				buf[n] = '\0';
 
-				if (ct->type == CT_TEXT && !strcmp(buf, "charset"))
+				if (!strcmp(buf, "charset"))
 					state = 3;
 				else
 					state = 4;
@@ -570,13 +544,8 @@ header_content_type(FILE *in, FILE *out, int echo,
 			if (ch == ';') {
 				buf[n] = '\0';
 
-				if (!strcasecmp(buf, "us-ascii"))
-					ct->v.text.charset = CHARSET_ASCII;
-				else if (!strcasecmp(buf, "utf-8"))
-					ct->v.text.charset = CHARSET_UTF8;
-				else
-					ct->v.text.charset = CHARSET_OTHER;
-
+				if (charset_from_name(ct, buf) == -1)
+					charset_from_type(ct, CHARSET_OTHER);
 				state = 2;
 				n = 0;
 			}
@@ -599,12 +568,8 @@ header_content_type(FILE *in, FILE *out, int echo,
 	if (state == 3) {
 		buf[n] = '\0';
 
-		if (!strcasecmp(buf, "us-ascii"))
-			ct->v.text.charset = CHARSET_ASCII;
-		else if (!strcasecmp(buf, "utf-8"))
-			ct->v.text.charset = CHARSET_UTF8;
-		else
-			ct->v.text.charset = CHARSET_OTHER;
+		if (charset_from_name(ct, buf) == -1)
+			charset_from_type(ct, CHARSET_OTHER);
 	}
 
 	return 1;

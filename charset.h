@@ -20,6 +20,7 @@ struct charset {
 	} v;
 };
 
+int charset_from_name(struct charset *, const char *);
 void charset_from_type(struct charset *, enum charset_type);
 int charset_getc(struct charset *, struct encoding *, FILE *, char [static 4]);
 #endif /* MAILZ_CHARSET_H */
