@@ -17,7 +17,7 @@ static const struct {
 	enum charset_type type;
 } charsets[] = {
 	{ "us-ascii",	CHARSET_ASCII },
-	{ "utf-8",	CHARSET_ASCII },
+	{ "utf-8",	CHARSET_UTF8 },
 };
 
 int
