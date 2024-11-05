@@ -178,7 +178,7 @@ content_proc_kill(struct content_proc *pr)
 
 	if (waitpid(pr->pid, &status, 0) == -1)
 		return -1;
-	if (WEXITSTATUS(status) != 0)
+	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
 		return -1;
 	return 0;
 }
