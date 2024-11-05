@@ -195,8 +195,10 @@ content_proc_summary(struct content_proc *pr,
 	rv = -1;
 
 	if (imsg_compose(&pr->msgbuf, IMSG_CNT_SUMMARY, 0, -1, fd,
-			 NULL, 0) == -1)
+			 NULL, 0) == -1) {
+		close(fd);
 		return -1;
+	}
 
 	if (imsg_flush_blocking(&pr->msgbuf) == -1)
 		return -1;
