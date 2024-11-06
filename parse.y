@@ -137,16 +137,16 @@ mailz_conf_free(struct mailz_conf *c)
 int
 mailz_conf_init(struct mailz_conf *c)
 {
+	struct passwd *pw;
 	char path[PATH_MAX], *pathp;
 
 	memset(c, 0, sizeof(*c));
 
-	if ((pathp = getenv("MAILZ_CONF")) == NULL) {
-		struct passwd *pw;
-		int n;
+	if ((pw = getpwuid(getuid())) == NULL)
+		return -1;
 
-		if ((pw = getpwuid(getuid())) == NULL)
-			return -1;
+	if ((pathp = getenv("MAILZ_CONF")) == NULL) {
+		int n;
 
 		n = snprintf(path, sizeof(path), "%s/.mailz.conf",
 			     pw->pw_dir);
@@ -154,6 +154,10 @@ mailz_conf_init(struct mailz_conf *c)
 			return -1;
 		pathp = path;
 	}
+
+	if (strlcpy(c->address, pw->pw_name, sizeof(c->address))
+		    >= sizeof(c->address))
+		return -1;
 
 	if (configure(c, pathp) == -1)
 		return -1;

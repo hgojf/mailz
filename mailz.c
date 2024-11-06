@@ -80,7 +80,7 @@ commands_run(struct letter *letters, size_t nletter, int cur,
 	struct command_args args;
 	struct letter *letter;
 
-	args.addr = strlen(addr) != 0 ? addr : NULL;
+	args.addr = addr;
 	args.letters = letters;
 	args.nletter = nletter;
 	args.cur = cur;
@@ -325,8 +325,6 @@ command_reply(struct letter *letter, struct command_args *args)
 		goto rpl;
 	}
 
-	if (args->addr == NULL)
-		goto fp;
 	if (fprintf(fp, "From: %s\n", args->addr) < 0)
 		goto fp;
 
