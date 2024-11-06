@@ -1,7 +1,7 @@
 .PHONY: clean-mailz install-mailz tidy-mailz
 
-SRCS_MAILZ = conf-lex.c conf-parse.c content-proc.c imsg-blocking.c
-SRCS_MAILZ += maildir.c mailz.c
+SRCS_MAILZ = ${.OBJDIR}/conf-lex.c ${.OBJDIR}/conf-parse.c
+SRCS_MAILZ +=  content-proc.c imsg-blocking.c maildir.c mailz.c
 DEPS_MAILZ = $(SRCS_MAILZ:.c=.d)
 OBJS_MAILZ = $(SRCS_MAILZ:.c=.o)
 
