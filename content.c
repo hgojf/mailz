@@ -61,6 +61,7 @@ static int header_references(FILE *, struct imsgbuf *);
 static int header_skip(FILE *, FILE *, int);
 static int header_subject(FILE *, char *, size_t);
 static int ignore_header(const char *, struct ignore *);
+static FILE *imsg_get_fp(struct imsg *, const char *);
 static void strip_trailing(char *);
 static void usage(void);
 
@@ -102,7 +103,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	struct encoding encoding;
 	FILE *in, *out;
 	ssize_t n;
-	int flags, got_content_type, got_encoding, pfd, lfd, rv;
+	int flags, got_content_type, got_encoding, rv;
 
 	rv = -1;
 
@@ -116,19 +117,11 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 
 	if (imsg_get_type(&msg2) != IMSG_CNT_LETTERPIPE)
 		goto msg2;
-	if ((pfd = imsg_get_fd(&msg2)) == -1)
+	if ((out = imsg_get_fp(&msg2, "w")) == NULL)
 		goto msg2;
-	if ((out = fdopen(pfd, "w")) == NULL) {
-		close(pfd);
-		goto msg2;
-	}
 
-	if ((lfd = imsg_get_fd(msg)) == -1)
+	if ((in = imsg_get_fp(msg, "r")) == NULL)
 		goto out;
-	if ((in = fdopen(lfd, "r")) == NULL) {
-		close(lfd);
-		goto out;
-	}
 
 	charset_from_type(&charset, CHARSET_ASCII);
 	encoding_from_type(&encoding, ENCODING_7BIT);
@@ -233,16 +226,12 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	struct content_reply_summary sm;
 	FILE *fp;
 	off_t ref;
-	int fd, rv;
+	int rv;
 
 	rv = -1;
 
-	if ((fd = imsg_get_fd(msg)) == -1)
+	if ((fp = imsg_get_fp(msg, "r")) == NULL)
 		return -1;
-	if ((fp = fdopen(fd, "r")) == NULL) {
-		close(fd);
-		return -1;
-	}
 
 	memset(&sm, 0, sizeof(sm));
 	ref = -1;
@@ -344,16 +333,12 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 {
 	struct content_summary sm;
 	FILE *fp;
-	int fd, rv;
+	int rv;
 
 	rv = -1;
 
-	if ((fd = imsg_get_fd(msg)) == -1)
+	if ((fp = imsg_get_fp(msg, "r")) == NULL)
 		return -1;
-	if ((fp = fdopen(fd, "r")) == NULL) {
-		close(fd);
-		return -1;
-	}
 
 	memset(&sm, 0, sizeof(sm));
 	sm.date = -1;
@@ -992,6 +977,23 @@ ignore_header(const char *name, struct ignore *ignore)
 		if (!strcasecmp(name, ignore->headers[i]))
 			return rv;
 	return !rv;
+}
+
+static FILE *
+imsg_get_fp(struct imsg *msg, const char *perm)
+{
+	FILE *rv;
+	int fd;
+
+	if ((fd = imsg_get_fd(msg)) == -1)
+		return NULL;
+
+	if ((rv = fdopen(fd, perm)) == NULL) {
+		close(fd);
+		return NULL;
+	}
+
+	return rv;
 }
 
 static void
