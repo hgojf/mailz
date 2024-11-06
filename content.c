@@ -1054,6 +1054,7 @@ main(int argc, char *argv[])
 	for (;;) {
 		struct imsg msg;
 		ssize_t n;
+		int hv;
 
 		if ((n = imsg_get_blocking(&msgbuf, &msg)) == -1)
 			goto msgbuf;
@@ -1062,41 +1063,28 @@ main(int argc, char *argv[])
 
 		switch (imsg_get_type(&msg)) {
 		case IMSG_CNT_IGNORE:
-			if (handle_ignore(&msg, &ignore, IGNORE_IGNORE) == -1) {
-				imsg_free(&msg);
-				goto msgbuf;
-			}
+			hv = handle_ignore(&msg, &ignore, IGNORE_IGNORE);
 			break;
 		case IMSG_CNT_LETTER:
-			if (handle_letter(&msgbuf, &msg, &ignore) == -1) {
-				imsg_free(&msg);
-				goto msgbuf;
-			}
+			hv = handle_letter(&msgbuf, &msg, &ignore);
 			break;
 		case IMSG_CNT_REPLY:
-			if (handle_reply(&msgbuf, &msg) == -1) {
-				imsg_free(&msg);
-				goto msgbuf;
-			}
+			hv = handle_reply(&msgbuf, &msg);
 			break;
 		case IMSG_CNT_RETAIN:
-			if (handle_ignore(&msg, &ignore, IGNORE_RETAIN) == -1) {
-				imsg_free(&msg);
-				goto msgbuf;
-			}
+			hv = handle_ignore(&msg, &ignore, IGNORE_RETAIN);
 			break;
 		case IMSG_CNT_SUMMARY:
-			if (handle_summary(&msgbuf, &msg) == -1) {
-				imsg_free(&msg);
-				goto msgbuf;
-			}
+			hv = handle_summary(&msgbuf, &msg);
 			break;
 		default:
-			imsg_free(&msg);
-			goto msgbuf;
+			hv = -1;
+			break;
 		}
 
 		imsg_free(&msg);
+		if (hv == -1)
+			goto msgbuf;
 	}
 
 	msgbuf:
