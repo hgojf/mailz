@@ -1,5 +1,6 @@
 %{
 #include <err.h>
+#include <errno.h>
 #include <limits.h>
 #include <pwd.h>
 #include <stdio.h>
@@ -112,8 +113,11 @@ configure(struct mailz_conf *c, const char *path)
 {
 	FILE *fp;
 
-	if ((fp = fopen(path, "r")) == NULL)
+	if ((fp = fopen(path, "r")) == NULL) {
+		if (errno != ENOENT)
+			return -1;
 		return 0;
+	}
 
 	conf = c;
 	filename = path;
