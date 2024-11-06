@@ -330,11 +330,6 @@ command_reply(struct letter *letter, struct command_args *args)
 	if (fprintf(fp, "From: %s\n", args->addr) < 0)
 		goto fp;
 
-	if (strlen(sm.message_id) != 0) {
-		if (fprintf(fp, "In-Reply-To: <%s>\n", sm.message_id) < 0)
-			goto fp;
-	}
-
 	if (strlen(sm.reply_to.addr) != 0) {
 		if (strlen(sm.reply_to.name) != 0) {
 			if (fprintf(fp, "To: %s <%s>\n",
@@ -364,6 +359,11 @@ command_reply(struct letter *letter, struct command_args *args)
 			sub += 4;
 
 		if (fprintf(fp, "Subject: Re: %s\n", sub) < 0)
+			goto fp;
+	}
+
+	if (strlen(sm.message_id) != 0) {
+		if (fprintf(fp, "In-Reply-To: <%s>\n", sm.message_id) < 0)
 			goto fp;
 	}
 
