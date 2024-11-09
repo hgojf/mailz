@@ -13,6 +13,7 @@ enum charset_type {
 
 struct charset {
 	enum charset_type type;
+	int error;
 
 	union {
 		struct charset_iso_8859_1 {
