@@ -395,7 +395,7 @@ string_valid(const char *s, size_t sz)
 			len -= 1;
 			break;
 		case 1:
-			ch = *s;
+			ch = (unsigned char)*s;
 			if (!isprint(ch) && !isspace(ch))
 				return 0;
 			/* FALLTHROUGH */

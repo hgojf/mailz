@@ -194,7 +194,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		if (n == 1) {
 			int ch;
 
-			ch = buf[0];
+			ch = (unsigned char)buf[0];
 			if (!isprint(ch) && !isspace(ch)) {
 				/* UTF-8 replacement character */
 				memcpy(buf, "\xEF\xBF\xBD", 3);
