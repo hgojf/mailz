@@ -6,6 +6,7 @@
 
 enum charset_type {
 	CHARSET_ASCII,
+	CHARSET_ISO_8859_1,
 	CHARSET_OTHER,
 	CHARSET_UTF8,
 };
@@ -14,6 +15,9 @@ struct charset {
 	enum charset_type type;
 
 	union {
+		struct charset_iso_8859_1 {
+			mbstate_t mbs;
+		} iso_8859_1;
 		struct charset_utf8 {
 			mbstate_t mbs;
 		} utf8;

@@ -1,4 +1,6 @@
+#include <stdlib.h>
 #include <string.h>
+#include <uchar.h>
 #include <wchar.h>
 
 #include "charset.h"
@@ -7,6 +9,8 @@
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 static int charset_raw(struct encoding *, FILE *, int, char [static 4]);
+static int charset_iso_8859_1(struct charset_iso_8859_1 *,
+			      struct encoding *, FILE *, char [static 4]);
 static int charset_utf8(struct charset_utf8 *, struct encoding *,
 			FILE *, char [static 4]);
 
@@ -17,6 +21,7 @@ static const struct {
 	enum charset_type type;
 } charsets[] = {
 	{ "us-ascii",	CHARSET_ASCII },
+	{ "iso-8859-1", CHARSET_ISO_8859_1 },
 	{ "utf-8",	CHARSET_UTF8 },
 };
 
@@ -42,6 +47,9 @@ charset_from_type(struct charset *c, enum charset_type type)
 	case CHARSET_ASCII:
 	case CHARSET_OTHER:
 		break;
+	case CHARSET_ISO_8859_1:
+		memset(&c->v.iso_8859_1, 0, sizeof(c->v.iso_8859_1));
+		break;
 	case CHARSET_UTF8:
 		memset(&c->v.utf8, 0, sizeof(c->v.utf8));
 		break;
@@ -57,6 +65,9 @@ charset_getc(struct charset *c, struct encoding *encoding, FILE *fp,
 	switch (c->type) {
 	case CHARSET_ASCII:
 		return charset_raw(encoding, fp, CTR_ASCII, buf);
+	case CHARSET_ISO_8859_1:
+		return charset_iso_8859_1(&c->v.iso_8859_1,
+					  encoding, fp, buf);
 	case CHARSET_OTHER:
 		return charset_raw(encoding, fp, 0, buf);
 	case CHARSET_UTF8:
@@ -64,6 +75,29 @@ charset_getc(struct charset *c, struct encoding *encoding, FILE *fp,
 	}
 
 	return -1;
+}
+
+static int
+charset_iso_8859_1(struct charset_iso_8859_1 *iso,
+		   struct encoding *encoding, FILE *fp,
+		   char buf[static 4])
+{
+	size_t n;
+	char32_t uc;
+	int ch;
+
+	if ((ch = encoding_getc(encoding, fp)) == ENCODING_ERR)
+		return -1;
+	if (ch == ENCODING_EOF)
+		return 0;
+	uc = ch;
+
+	if (MB_CUR_MAX > 4)
+		return -1;
+	if ((n = c32rtomb(buf, uc, &iso->mbs)) == (size_t)-1)
+		return -1;
+
+	return n;
 }
 
 static int
