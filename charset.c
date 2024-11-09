@@ -111,8 +111,13 @@ charset_raw(struct encoding *e, FILE *fp, int flags,
 	if (ch == ENCODING_EOF)
 		return 0;
 
-	if (flags & CTR_ASCII && ch > 127)
-		return -1;
+	if (ch > 127) {
+		if (flags & CTR_ASCII)
+			return -1;
+		/* UTF-8 replacement character */
+		memcpy(buf, "\xEF\xBF\xBD", 3);
+		return 3;
+	}
 
 	buf[0] = ch;
 	return 1;
