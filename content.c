@@ -27,6 +27,7 @@
 
 struct header_lex {
 	int cstate;
+	int qstate;
 	int skipws;
 	FILE *echo;
 };
@@ -423,6 +424,7 @@ header_date(FILE *fp)
 
 	lex.cstate = 0;
 	lex.echo = NULL;
+	lex.qstate = 0;
 	lex.skipws = 1;
 	fmt = "%d %b %Y %H:%M:%S %z";
 	n = 0;
@@ -468,6 +470,7 @@ header_content_type(FILE *in, FILE *out, int echo, struct charset *ct)
 
 	lex.cstate = 0;
 	lex.echo = echo ? out : NULL;
+	lex.qstate = 0;
 	lex.skipws = 1;
 
 	state = 0;
@@ -570,6 +573,7 @@ header_encoding(FILE *in, FILE *out, int echo, struct encoding *e)
 
 	lex.cstate = 0;
 	lex.echo = echo ? out : NULL;
+	lex.qstate = 0;
 	lex.skipws = 1;
 
 	n = 0;
@@ -622,6 +626,7 @@ header_from(FILE *fp, struct from *from)
 
 	lex.cstate = 0;
 	lex.echo = NULL;
+	lex.qstate = 0;
 	lex.skipws = 1;
 
 	n = 0;
@@ -757,6 +762,13 @@ header_lex(FILE *fp, struct header_lex *lex)
 			}
 		}
 
+		if (lex->qstate != -1) {
+			if (ch == '\"') {
+				lex->qstate = !lex->qstate;
+				continue;
+			}
+		}
+
 		if (lex->skipws) {
 			if (ch == ' ' || ch == '\t')
 				continue;
@@ -777,6 +789,8 @@ header_lex(FILE *fp, struct header_lex *lex)
 
 	if (lex->cstate != -1 && lex->cstate != 0)
 		return HL_ERR;
+	if (lex->qstate != -1 && lex->qstate != 0)
+		return HL_ERR;
 	return HL_EOF;
 }
 
@@ -791,8 +805,9 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 		return -1;
 
 	lex.cstate = 0;
-	lex.skipws = 0;
 	lex.echo = NULL;
+	lex.qstate = 0;
+	lex.skipws = 0;
 
 	n = 0;
 	state = 0;
@@ -870,6 +885,7 @@ header_references(FILE *fp, struct imsgbuf *msgbuf)
 
 	lex.cstate = 0;
 	lex.echo = NULL;
+	lex.qstate = 0;
 	lex.skipws = 1;
 
 	n = 0;
@@ -921,6 +937,7 @@ header_skip(FILE *in, FILE *out, int echo)
 
 	lex.cstate = -1;
 	lex.echo = echo ? out : NULL;
+	lex.qstate = 0;
 	lex.skipws = 0;
 
 	while ((ch = header_lex(in, &lex)) != HL_EOF) {
@@ -944,6 +961,7 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 
 	lex.cstate = -1;
 	lex.echo = NULL;
+	lex.qstate = -1;
 	lex.skipws = 1;
 
 	n = 0;
