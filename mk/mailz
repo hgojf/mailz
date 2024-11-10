@@ -11,10 +11,10 @@ clean-mailz:
 	rm -f mailz conf-parse.c conf-parse.h conf-lex.c \
 	      ${DEPS_MAILZ} ${OBJS_MAILZ}
 
-conf-parse.h conf-parse.c: parse.y
+conf-parse.h ${.OBJDIR}/conf-parse.c: parse.y
 	$(YACC) -d -o conf-parse.c ${.CURDIR}/parse.y
 
-conf-lex.c: lex.l
+${.OBJDIR}/conf-lex.c: lex.l
 	$(LEX) -o $@ ${.CURDIR}/lex.l
 
 conf-lex.o: conf-parse.h
