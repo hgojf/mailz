@@ -28,18 +28,18 @@
 "retain" { return RETAIN; }
 
 [a-zA-Z-]+ {
-	if (strlcpy(yylval.string, yytext, sizeof(yylval.string))
-		    >= sizeof(yylval.string))
+	if (yyleng >= sizeof(yylval.string))
 		return OVERLONG;
+	memcpy(yylval.string, yytext, yyleng);
+	yylval.string[yyleng] = '\0';
 	return STRING;
 }
 
 "\""[^\n\"]*"\"" {
-	yytext[yyleng - 1] = '\0';
-	if (strlcpy(yylval.string, yytext + 1,
-		    sizeof(yylval.string)) >= sizeof(yylval.string))
+	if (yyleng - 2 >= sizeof(yylval.string))
 		return OVERLONG;
-
+	memcpy(yylval.string, &yytext[1], yyleng - 2);
+	yylval.string[yyleng - 2] = '\0';
 	return STRING;
 }
 
