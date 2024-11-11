@@ -36,8 +36,8 @@ static const struct {
 	const char *ident;
 	enum charset_type type;
 } charsets[] = {
-	{ "us-ascii",	CHARSET_ASCII },
 	{ "iso-8859-1", CHARSET_ISO_8859_1 },
+	{ "us-ascii",	CHARSET_ASCII },
 	{ "utf-8",	CHARSET_UTF8 },
 };
 
