@@ -159,7 +159,7 @@ charset_utf8(struct charset_utf8 *utf8, struct encoding *e,
 {
 	int i;
 
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < 4; i++) {
 		int ch;
 		char cc;
 
