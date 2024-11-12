@@ -31,8 +31,6 @@ struct encoding {
 			int start;
 			int end;
 		} b64;
-		struct encoding_qp {
-		} qp;
 	} v;
 
 	enum encoding_type type;

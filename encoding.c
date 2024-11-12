@@ -25,7 +25,7 @@
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 static int encoding_b64(struct encoding_b64 *, FILE *);
-static int encoding_qp(struct encoding_qp *, FILE *);
+static int encoding_qp(FILE *);
 static int encoding_raw(FILE *, int);
 static int hexdigcaps(int);
 
@@ -102,11 +102,10 @@ encoding_from_type(struct encoding *e, enum encoding_type type)
 	case ENCODING_7BIT:
 	case ENCODING_8BIT:
 	case ENCODING_BINARY:
+	case ENCODING_QP:
 		break;
 	case ENCODING_BASE64:
 		memset(&e->v.b64, 0, sizeof(e->v.b64));
-	case ENCODING_QP:
-		memset(&e->v.qp, 0, sizeof(e->v.qp));
 		break;
 	}
 
@@ -126,14 +125,14 @@ encoding_getc(struct encoding *e, FILE *fp)
 	case ENCODING_BINARY:
 		return encoding_raw(fp, 0);
 	case ENCODING_QP:
-		return encoding_qp(&e->v.qp, fp);
+		return encoding_qp(fp);
 	}
 
 	return ENCODING_ERR;
 }
 
 static int
-encoding_qp(struct encoding_qp *qp, FILE *fp)
+encoding_qp(FILE *fp)
 {
 	for (;;) {
 		int ch, hi, lo;
