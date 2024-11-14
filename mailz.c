@@ -113,20 +113,26 @@ commands_run(struct letter *letters, size_t nletter, int cur,
 		printf("> ");
 
 		gotnl = 0;
-		if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1)
+		if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1) {
+			warnx("argument too long");
 			goto bad;
+		}
 
 		if (strlen(buf) == 0 && feof(stdin))
 			break;
 		if (strlen(buf) == 0 && gotnl)
 			continue;
 
-		if ((cmd = commands_search(buf)) == NULL)
+		if ((cmd = commands_search(buf)) == NULL) {
+			warnx("unknown command");
 			goto bad;
+		}
 
 		if (gotnl) {
-			if (letter == NULL)
+			if (letter == NULL) {
+				warnx("no current letter");
 				goto bad;
+			}
 			if (cmd->fn(letter, &args) == -1)
 				goto bad;
 		}
@@ -135,12 +141,16 @@ commands_run(struct letter *letters, size_t nletter, int cur,
 			const char *errstr;
 			size_t idx;
 
-			if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1)
+			if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1) {
+				warnx("argument too long");
 				goto bad;
+			}
 
 			idx = strtonum(buf, 1, nletter, &errstr);
-			if (errstr != NULL)
+			if (errstr != NULL) {
+				warnx("message number was %s", errstr);
 				goto bad;
+			}
 
 			letter = &letters[idx - 1];
 			if (cmd->fn(&letters[idx - 1], &args) == -1)
