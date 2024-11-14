@@ -498,13 +498,14 @@ command_reply(struct letter *letter, struct command_args *args)
 		goto lr;
 	}
 
+	lfd = fileno(fp);
+	if (lseek(lfd, 0, SEEK_SET) == -1)
+		goto lr;
 	switch (pid = fork()) {
 	case -1:
 		goto lr;
 	case 0:
-		if (lseek(fileno(fp), 0, SEEK_SET) == -1)
-			err(1, "lseek");
-		if (dup2(fileno(fp), STDIN_FILENO) == -1)
+		if (dup2(lfd, STDIN_FILENO) == -1)
 			err(1, "dup2");
 		execl(PATH_SENDMAIL, "sendmail", "-t", NULL);
 		err(1, "%s", PATH_SENDMAIL);
