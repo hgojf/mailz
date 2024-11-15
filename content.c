@@ -67,7 +67,8 @@ static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
 static int handle_reply(struct imsgbuf *, struct imsg *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
-static int header_content_type(FILE *, FILE *, int, struct charset *);
+static int header_content_type(FILE *, FILE *, int, struct charset *,
+			       struct encoding *);
 static time_t header_date(FILE *);
 static int header_encoding(FILE *, FILE *, int, struct encoding *);
 static int header_from(FILE *, struct from *);
@@ -178,7 +179,8 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		else if (!strcasecmp(buf, "content-type")) {
 			if (got_content_type)
 				goto in;
-			if ((hv = header_content_type(in, out, echo, &charset)) == -1)
+			if ((hv = header_content_type(in, out, echo,
+						      &charset, &encoding)) == -1)
 				goto in;
 			if (hv == 0)
 				goto done;
@@ -477,7 +479,8 @@ header_date(FILE *fp)
 }
 
 static int
-header_content_type(FILE *in, FILE *out, int echo, struct charset *ct)
+header_content_type(FILE *in, FILE *out, int echo, struct charset *ct,
+		    struct encoding *enc)
 {
 	char buf[19];
 	struct header_lex lex;
@@ -505,8 +508,10 @@ header_content_type(FILE *in, FILE *out, int echo, struct charset *ct)
 			if (ch == '/') {
 				buf[n] = '\0';
 
-				if (strcmp(buf, "text") != 0)
+				if (strcmp(buf, "text") != 0) {
 					charset_from_type(ct, CHARSET_OTHER);
+					encoding_from_type(enc, ENCODING_BINARY);
+				}
 				n = 0;
 				state = 1;
 				continue;
