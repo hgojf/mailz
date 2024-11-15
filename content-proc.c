@@ -56,7 +56,6 @@ content_letter_getc(struct content_letter *letter, char buf[static 4])
 		if ((ch = fgetc(letter->fp)) == EOF) {
 			if (i == 0)
 				return 0;
-			warnx("%d", i);
 			return -1;
 		}
 
