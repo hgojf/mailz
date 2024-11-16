@@ -24,6 +24,7 @@
 #include <locale.h>
 #include <time.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -807,6 +808,9 @@ read_letters(int ocur, int view_all, int null,
 
 		if (!view_all && maildir_get_flag(de->d_name, 'S'))
 			continue;
+
+		if (nletter == SIZE_MAX)
+			goto letters;
 
 		if ((fd = openat(curfd, de->d_name, O_RDONLY | O_CLOEXEC)) == -1)
 			goto letters;

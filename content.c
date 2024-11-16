@@ -23,6 +23,7 @@
 #include <imsg.h>
 #include <limits.h>
 #include <locale.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,6 +89,9 @@ handle_ignore(struct imsg *msg, struct ignore *ignore, int type)
 {
 	struct content_header header;
 	char *s, **t;
+
+	if (ignore->nheader == SIZE_MAX)
+		return -1;
 
 	if (imsg_get_data(msg, &header, sizeof(header)) == -1)
 		return -1;
