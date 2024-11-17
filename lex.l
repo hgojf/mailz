@@ -28,7 +28,7 @@
 "retain" { return RETAIN; }
 
 [a-zA-Z-]+ {
-	if (yyleng >= sizeof(yylval.string))
+	if ((size_t)yyleng >= sizeof(yylval.string))
 		return OVERLONG;
 	memcpy(yylval.string, yytext, yyleng);
 	yylval.string[yyleng] = '\0';
@@ -36,7 +36,7 @@
 }
 
 "\""[^\n\"]*"\"" {
-	if (yyleng - 2 >= sizeof(yylval.string))
+	if ((size_t)yyleng - 2 >= sizeof(yylval.string))
 		return OVERLONG;
 	memcpy(yylval.string, &yytext[1], yyleng - 2);
 	yylval.string[yyleng - 2] = '\0';
