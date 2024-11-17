@@ -16,7 +16,6 @@
 
 #include <sys/queue.h>
 
-#include <bitstring.h>
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
