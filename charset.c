@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <uchar.h>
 #include <wchar.h>
 
