@@ -46,7 +46,8 @@ struct {
 static int
 encoding_b64(struct encoding_b64 *b64, FILE *fp)
 {
-	char buf[5], obuf[3];
+	char buf[5];
+	unsigned char obuf[3];
 	int i, n;
 
 	if (b64->start != b64->end)
