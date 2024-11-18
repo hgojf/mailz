@@ -961,7 +961,7 @@ header_skip(FILE *in, FILE *out, int echo)
 
 	lex.cstate = -1;
 	lex.echo = echo ? out : NULL;
-	lex.qstate = 0;
+	lex.qstate = -1;
 	lex.skipws = 0;
 
 	while ((ch = header_lex(in, &lex)) != HL_EOF) {
