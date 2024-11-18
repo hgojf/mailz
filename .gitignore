@@ -1,1 +1,7 @@
 obj/
+
+*.[od]
+conf-lex.c
+conf-parse.[ch]
+mailz
+mailz-content
