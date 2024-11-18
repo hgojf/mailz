@@ -112,6 +112,7 @@ commands_run(struct letter *letters, size_t nletter, int cur,
 		int ch, gotnl;
 
 		printf("> ");
+		fflush(stdout);
 
 		gotnl = 0;
 		if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1) {
