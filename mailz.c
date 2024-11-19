@@ -778,7 +778,7 @@ read_letters(int ocur, int view_all, int null,
 
 	if ((curfd = dup(ocur)) == -1)
 		return -1;
-	if (fcntl(curfd, F_SETFD, 1) == -1) {
+	if (fcntl(curfd, F_SETFD, FD_CLOEXEC) == -1) {
 		close(curfd);
 		return -1;
 	}
