@@ -349,6 +349,7 @@ command_reply(struct letter *letter, struct command_args *args)
 	if ((fd = mkostemp(path, O_CLOEXEC)) == -1)
 		goto rpl;
 	if ((fp = fdopen(fd, "w")) == NULL) {
+		unlink(path);
 		close(fd);
 		goto rpl;
 	}
@@ -561,7 +562,7 @@ command_save(struct letter *letter, struct command_args *args)
 	if (n < 0 || (size_t)n >= sizeof(path))
 		goto lr;
 
-	if ((fd = mkstemp(path)) == -1)
+	if ((fd = mkostemp(path, O_CLOEXEC)) == -1)
 		goto lr;
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		unlink(path);
