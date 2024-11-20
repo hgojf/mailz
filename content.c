@@ -63,6 +63,8 @@ struct from {
 	size_t namesz;
 };
 
+#define nitems(a) (sizeof((a)) / sizeof(*(a)))
+
 static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
 static int handle_reply(struct imsgbuf *, struct imsg *);
@@ -78,10 +80,26 @@ static int header_name(FILE *, char *, size_t);
 static int header_references(FILE *, struct imsgbuf *);
 static int header_skip(FILE *, FILE *, int);
 static int header_subject(FILE *, char *, size_t);
+static int header_token(FILE *, struct header_lex *, char *, size_t, int *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
 static void strip_trailing(char *);
 static void usage(void);
+
+static const char *days[] = {
+	"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+};
+static const char *months[] = {
+	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+};
+
+static const struct {
+	const char *ident;
+	long off;
+} timezones[] = {
+	{ "GMT", 0 },
+};
 
 static int
 handle_ignore(struct imsg *msg, struct ignore *ignore, int type)
@@ -437,41 +455,136 @@ header_date(FILE *fp)
 {
 	struct header_lex lex;
 	struct tm tm;
-	char buf[100];
-	const char *end, *fmt;
-	size_t n;
+	char buf[100], *bufp, *e, *s;
+	const char *errstr;
+	size_t i;
 	time_t date;
 	long off;
+	int eof, n;
 
 	lex.cstate = 0;
 	lex.echo = NULL;
 	lex.qstate = 0;
 	lex.skipws = 1;
-	fmt = "%d %b %Y %H:%M:%S %z";
-	n = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(fp, &lex)) == HL_ERR)
-			return -1;
-		if (ch == HL_EOF)
-			break;
-
-		if (ch == ',')
-			fmt = "%a, %d %b %Y %H:%M:%S %z";
-
-		if (n == sizeof(buf) - 1)
-			return -1;
-		buf[n++] = ch;
-	}
-
-	buf[n] = '\0';
 
 	memset(&tm, 0, sizeof(tm));
-	if ((end = strptime(buf, fmt, &tm)) == NULL)
+
+	eof = 0;
+	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
 		return -1;
 
-	if (end[strspn(end, " \t")] != '\0')
+	if ((e = strchr(buf, ',')) != NULL) {
+		if (e[1] != '\0')
+			return -1;
+		*e = '\0';
+		tm.tm_wday = -1;
+		for (i = 0; i < nitems(days); i++) {
+			if (!strcmp(buf, days[i])) {
+				tm.tm_wday = i;
+				break;
+			}
+		}
+		if (tm.tm_wday == -1)
+			return -1;
+
+		if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
+			return -1;
+	}
+
+	tm.tm_mday = strtonum(buf, 1, 31, &errstr);
+	if (errstr != NULL)
+		return -1;
+
+	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
+		return -1;
+
+	tm.tm_mon = -1;
+	for (i = 0; i < nitems(months); i++) {
+		if (!strcmp(buf, months[i])) {
+			tm.tm_mon = i;
+			break;
+		}
+	}
+	if (tm.tm_mon == -1)
+		return -1;
+
+	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
+		return -1;
+
+	tm.tm_year = strtonum(buf, 0, 9999, &errstr);
+	if (errstr != NULL)
+		return -1;
+	if (tm.tm_year <= 49)
+		tm.tm_year += 2000;
+	else if (tm.tm_year <= 999)
+		tm.tm_year += 1900;
+
+	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
+		return -1;
+
+	bufp = buf;
+
+	if ((s = strsep(&bufp, ":")) == NULL)
+		return -1;
+	tm.tm_hour = strtonum(s, 0, 23, &errstr);
+	if (errstr != NULL)
+		return -1;
+
+	if ((s = strsep(&bufp, ":")) == NULL)
+		return -1;
+	tm.tm_min = strtonum(s, 0, 59, &errstr);
+	if (errstr != NULL)
+		return -1;
+
+	if ((s = bufp) != NULL) {
+		tm.tm_sec = strtonum(s, 0, 60, &errstr);
+		if (errstr != NULL)
+			return -1;
+	}
+
+	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
+		return -1;
+
+	/*
+	 * XXX: this timezone handling is incomplete, and only handles
+	 * common zones
+	 */
+	tm.tm_gmtoff = -1;
+	for (i = 0; i < nitems(timezones); i++) {
+		if (!strcmp(buf, timezones[i].ident)) {
+			tm.tm_gmtoff = timezones[i].off;
+			break;
+		}
+	}
+
+	if (tm.tm_gmtoff == -1) {
+		char nbuf[3];
+
+		if (strlen(buf) != 5)
+			return -1;
+
+		memcpy(nbuf, &buf[1], 2);
+		nbuf[2] = '\0';
+
+		tm.tm_gmtoff = strtonum(nbuf, 0, 99, &errstr) * 60 * 60;
+		if (errstr != NULL)
+			return -1;
+
+		memcpy(nbuf, &buf[3], 2);
+		nbuf[2] = '\0';
+		tm.tm_gmtoff += strtonum(nbuf, 0, 59, &errstr) * 60;
+		if (errstr != NULL)
+			return -1;
+
+		if (buf[0] == '-')
+			tm.tm_gmtoff = -tm.tm_gmtoff;
+		else if (buf[0] != '+')
+			return -1;
+	}
+
+	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1)
+		return -1;
+	if (n != 0)
 		return -1;
 
 	off = tm.tm_gmtoff;
@@ -1002,6 +1115,43 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 
 	buf[n] = '\0';
 	return 0;
+}
+
+static int
+header_token(FILE *fp, struct header_lex *lex, char *buf, size_t bufsz, int *eof)
+{
+	size_t n;
+
+	if (*eof)
+		return 0;
+
+	if (bufsz == 0)
+		return -1;
+	lex->skipws = 1;
+
+	n = 0;
+	for (;;) {
+		int ch;
+
+		if ((ch = header_lex(fp, lex)) == HL_ERR)
+			return -1;
+		if (ch == HL_EOF) {
+			*eof = 1;
+			if (n == 0)
+				return 0;
+			break;
+		}
+
+		if (ch == ' ' || ch == '\t')
+			break;
+
+		if (n == bufsz -1)
+			return -1;
+		buf[n++] = ch;
+	}
+
+	buf[n] = '\0';
+	return 1;
 }
 
 static int
