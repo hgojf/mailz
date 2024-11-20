@@ -185,7 +185,7 @@ commands_token(FILE *fp, char *buf, size_t buflen, int *gotnl)
 			break;
 		}
 
-		if (ch == ' ' || ch == '\t')
+		if (n != 0 && (ch == ' ' || ch == '\t'))
 			break;
 
 		if (n == buflen - 1)
