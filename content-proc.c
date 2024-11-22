@@ -101,7 +101,7 @@ content_letter_init(struct content_proc *pr,
 			 p[1], NULL, 0) == -1)
 		goto p1;
 
-	if (imsgbuf_flush_blocking(&pr->msgbuf) == -1)
+	if (imsgbuf_flush(&pr->msgbuf) == -1)
 		goto p0;
 
 	if ((letter->fp = fdopen(p[0], "r")) == NULL)
@@ -143,7 +143,7 @@ content_proc_ignore(struct content_proc *pr, const char *s, int type)
 			 &hdr, sizeof(hdr)) == -1)
 		return -1;
 
-	if (imsgbuf_flush_blocking(&pr->msgbuf) == -1)
+	if (imsgbuf_flush(&pr->msgbuf) == -1)
 		return -1;
 
 	return 0;
@@ -156,8 +156,8 @@ content_proc_init(struct content_proc *pr, const char *exe, int null)
 	int i, sv[2];
 
 	if (socketpair(AF_UNIX,
-		       SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
-		       PF_UNSPEC, sv) == -1)
+		       SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
+		       sv) == -1)
 		return -1;
 
 	switch (pid = fork()) {
@@ -222,7 +222,7 @@ content_proc_summary(struct content_proc *pr,
 		return -1;
 	}
 
-	if (imsgbuf_flush_blocking(&pr->msgbuf) == -1)
+	if (imsgbuf_flush(&pr->msgbuf) == -1)
 		return -1;
 
 	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
@@ -307,7 +307,7 @@ content_reply_init(struct content_proc *pr, struct content_reply *rpl,
 		return -1;
 	}
 
-	if (imsgbuf_flush_blocking(&pr->msgbuf) == -1)
+	if (imsgbuf_flush(&pr->msgbuf) == -1)
 		return -1;
 
 	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)

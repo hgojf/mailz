@@ -359,7 +359,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 			 NULL, 0) == -1)
 		goto fp;
 
-	if (imsgbuf_flush_blocking(msgbuf) == -1)
+	if (imsgbuf_flush(msgbuf) == -1)
 		goto fp;
 
 	rv = 0;
@@ -441,7 +441,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 	if (imsg_compose(msgbuf, IMSG_CNT_SUMMARY, 0, -1, -1,
 			 &sm, sizeof(sm)) == -1)
 		goto fp;
-	if (imsgbuf_flush_blocking(msgbuf) == -1)
+	if (imsgbuf_flush(msgbuf) == -1)
 		goto fp;
 
 	rv = 0;
