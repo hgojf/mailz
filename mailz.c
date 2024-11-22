@@ -30,6 +30,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "_err.h"
 #include "conf.h"
 #include "content-proc.h"
 #include "maildir.h"
@@ -249,9 +250,9 @@ command_more(struct letter *letter, struct command_args *args)
 		goto lr;
 	case 0:
 		if (dup2(p[0], STDIN_FILENO) == -1)
-			err(1, "dup2");
+			_err(1, "dup2");
 		execl(PATH_LESS, "less", NULL);
-		err(1, "%s", PATH_LESS);
+		_err(1, "%s", PATH_LESS);
 	default:
 		break;
 	}
@@ -509,9 +510,9 @@ command_reply(struct letter *letter, struct command_args *args)
 		goto lr;
 	case 0:
 		if (dup2(lfd, STDIN_FILENO) == -1)
-			err(1, "dup2");
+			_err(1, "dup2");
 		execl(PATH_SENDMAIL, "sendmail", "-t", NULL);
-		err(1, "%s", PATH_SENDMAIL);
+		_err(1, "%s", PATH_SENDMAIL);
 	default:
 		break;
 	}

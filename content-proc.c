@@ -19,11 +19,9 @@
 #include <sys/wait.h>
 
 #include <ctype.h>
-#include <err.h>
 #include <fcntl.h>
 #include <imsg.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -31,12 +29,11 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#include "_err.h"
 #include "content.h"
 #include "content-proc.h"
 #include "imsg-blocking.h"
 
-static __dead void _err(int, const char *, ...)
-	__attribute__((__format__(printf, 2, 3)));
 static int string_valid(const char *, size_t);
 
 void
@@ -376,18 +373,6 @@ content_reply_reference(struct content_reply *rpl,
 	bad:
 	imsg_free(&msg);
 	return rv;
-}
-
-static void
-_err(int eval, const char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	vwarn(fmt, ap);
-	_exit(eval);
-	/* NOTREACHED */
-	va_end(ap);
 }
 
 /*
