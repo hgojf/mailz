@@ -487,6 +487,8 @@ command_reply(struct letter *letter, struct command_args *args)
 	if (printf("message located at %s\n"
 		   "press enter to send or q to cancel: ", path) < 0)
 		goto lr;
+	if (fflush(stdout) == EOF)
+		goto lr;
 
 	if ((ch = fgetc(stdin)) == EOF)
 		goto lr;
