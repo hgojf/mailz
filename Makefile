@@ -15,8 +15,9 @@ TIDYFLAGS += -checks=-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBuff
 
 all: mailz mailz-content
 clean: clean-content clean-mailz
-install: install-content install-mailz
+install: install-content install-mailz install-man
 tidy: tidy-content tidy-mailz
 
 include mk/content
 include mk/mailz
+include mk/man
