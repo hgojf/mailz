@@ -1,0 +1,100 @@
+.Dd $Mdocdate: Nov 19 2024$
+.Dt MAILZ 1
+.Os
+.Sh NAME
+.Nm mailz
+.Nd view and reply to email
+.Sh SYNOPSIS
+.Nm mailz
+.Op Fl a
+.Ar mailbox
+.Sh DESCRIPTION
+The
+.Nm
+utility provides a command line interface to interact with mail located
+in a directory.
+The
+.Ar mailbox
+operand names a directory storing mail in the maildir format.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl a
+Display mail that has already been read.
+.El
+.Pp
+Upon startup,
+.Nm
+will display a listing of all mail received sorted by date in
+ascending order.
+The message number that identifies the mail,
+the date it was sent, the email address it was sent by,
+and the subject of the mail are all presented in this listing.
+.Pp
+Commands can then be entered in a
+.Xr sh 1
+like interface.
+Command arguments are seperated by space or tab characters,
+and each command is terminated by a newline.
+Each command accepts zero or more message numbers to operate on.
+If a message number is not provided, the last message interacted with
+will be used (if any).
+.Pp
+The available commands are as follows:
+.Bl -tag -width Ds
+.It Ic more
+Open each message in the
+.Xr less 1
+pager, and mark them as having been read.
+.It Ic read (r)
+Mark each message as having been read.
+.It Ic reply
+Reply to each message.
+A temporary file containing the message contents quoted is created
+and presented for editing, and a prompt is presented to confirm the
+sending of the reply.
+.It Ic save (s)
+Save each message to a temporary file and print its location.
+.It Ic thread (t)
+For each message, list all messages in the same thread sorted by date
+in ascending order.
+.It Ic unread (x)
+Mark each message as not having been read.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev MAILZ_CONF
+Path to the configuration file to be used instead of the default.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa ~/.mailz.conf
+Default configuration file.
+.It Pa /tmp/mailz.*
+Temporary directories used by
+.Nm .
+.It Pa /tmp/mailz.*/reply.*
+Messages to be sent by the
+.Ic reply
+command.
+.It Pa /tmp/mailz.*/save.*
+Messages saved by the
+.Ic save
+command.
+.El
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, 1 on error, and 2 on invalid usage.
+.Sh SEE ALSO
+.Xr mailz.conf 5
+.Sh AUTHORS
+The
+.Nm
+utility was written by
+.An Henry Ford Aq Mt fordhenry2299@gmail.com
+.Sh BUGS
+The
+.Ic thread
+command cannot cope with email threads where the subject is
+changed, or with multiple email threads with the same subject.

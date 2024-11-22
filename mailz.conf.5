@@ -1,0 +1,71 @@
+.Dd $Mdocdate: Nov 21 2024$
+.Dt MAILZ.CONF 5
+.Os
+.Sh NAME
+.Nm mailz.conf
+.Nd configuration file for the
+.Xr mailz 1
+.Sh DESCRIPTION
+.Nm
+is the configuration file for the
+.Xr mailz 1
+mail client.
+.Pp
+The file is made up directives each placed on their own line.
+Empty lines are ignored.
+A single logical line can be extended over multiple physical lines
+by ending a line with a single '\e' character.
+Comments begin with a '#' character, and extend until the end of
+the current physical line.
+.Pp
+The available directives are as follows:
+.Bl -tag -width Ds
+.It Ic address Ar addr
+Set the sending address used by the
+.Ic reply
+command.
+If this directive is not present, the local username is used.
+.It Ic ignore Ar header ...
+When displaying mail with the
+.Ic more
+or
+.Ic save
+commands, do not display the listed headers.
+Use of the
+.Ic ignore
+directive overrides any previous
+.Ic ignore
+or
+.Ic retain
+directives.
+.It Ic retain Ar header ...
+When displaying mail with the
+.Ic more
+or
+.Ic save
+commands, only display the listed headers.
+Use of the
+.Ic retain
+directive overrides any previous
+.Ic ignore
+or
+.Ic retain
+directives.
+.El
+.Sh EXAMPLES
+A simple configuration could appear as follows:
+.Bd -literal -offset indent
+address "Henry Ford <henryford@nota.domain>"
+retain From To Cc Subject
+
+# For debugging
+#retain From To Cc Subject Message-ID References Content-Type \e
+#	Content-Transfer-Encoding
+.Ed
+.Sh SEE ALSO
+.Xr mailz 1
+.Sh AUTHORS
+The
+.Nm mailz
+utility was written by
+.An Henry Ford Aq Mt fordhenry2299@gmail.com
