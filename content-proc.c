@@ -22,6 +22,7 @@
 #include <err.h>
 #include <fcntl.h>
 #include <imsg.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -100,7 +101,7 @@ content_letter_init(struct content_proc *pr,
 			 p[1], NULL, 0) == -1)
 		goto p1;
 
-	if (imsg_flush_blocking(&pr->msgbuf) == -1)
+	if (imsgbuf_flush_blocking(&pr->msgbuf) == -1)
 		goto p0;
 
 	if ((letter->fp = fdopen(p[0], "r")) == NULL)
@@ -142,7 +143,7 @@ content_proc_ignore(struct content_proc *pr, const char *s, int type)
 			 &hdr, sizeof(hdr)) == -1)
 		return -1;
 
-	if (imsg_flush_blocking(&pr->msgbuf) == -1)
+	if (imsgbuf_flush_blocking(&pr->msgbuf) == -1)
 		return -1;
 
 	return 0;
@@ -178,7 +179,13 @@ content_proc_init(struct content_proc *pr, const char *exe, int null)
 
 	close(sv[1]);
 
-	imsg_init(&pr->msgbuf, sv[0]);
+	if (imsgbuf_init(&pr->msgbuf, sv[0]) == -1) {
+		close(sv[0]);
+		kill(pid, SIGKILL);
+		waitpid(pid, NULL, 0);
+		return -1;
+	}
+	imsgbuf_allow_fdpass(&pr->msgbuf);
 	pr->pid = pid;
 	return 0;
 }
@@ -189,7 +196,7 @@ content_proc_kill(struct content_proc *pr)
 	int status;
 
 	close(pr->msgbuf.fd);
-	imsg_clear(&pr->msgbuf);
+	imsgbuf_clear(&pr->msgbuf);
 
 	if (waitpid(pr->pid, &status, 0) == -1)
 		return -1;
@@ -215,7 +222,7 @@ content_proc_summary(struct content_proc *pr,
 		return -1;
 	}
 
-	if (imsg_flush_blocking(&pr->msgbuf) == -1)
+	if (imsgbuf_flush_blocking(&pr->msgbuf) == -1)
 		return -1;
 
 	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
@@ -300,7 +307,7 @@ content_reply_init(struct content_proc *pr, struct content_reply *rpl,
 		return -1;
 	}
 
-	if (imsg_flush_blocking(&pr->msgbuf) == -1)
+	if (imsgbuf_flush_blocking(&pr->msgbuf) == -1)
 		return -1;
 
 	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)

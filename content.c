@@ -359,7 +359,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 			 NULL, 0) == -1)
 		goto fp;
 
-	if (imsg_flush_blocking(msgbuf) == -1)
+	if (imsgbuf_flush_blocking(msgbuf) == -1)
 		goto fp;
 
 	rv = 0;
@@ -441,7 +441,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 	if (imsg_compose(msgbuf, IMSG_CNT_SUMMARY, 0, -1, -1,
 			 &sm, sizeof(sm)) == -1)
 		goto fp;
-	if (imsg_flush_blocking(msgbuf) == -1)
+	if (imsgbuf_flush_blocking(msgbuf) == -1)
 		goto fp;
 
 	rv = 0;
@@ -1244,7 +1244,9 @@ main(int argc, char *argv[])
 		err(1, "pledge");
 
 	memset(&ignore, 0, sizeof(ignore));
-	imsg_init(&msgbuf, CNT_PFD);
+	if (imsgbuf_init(&msgbuf, CNT_PFD) == -1)
+		err(1, "imsgbuf_init");
+	imsgbuf_allow_fdpass(&msgbuf);
 	for (;;) {
 		struct imsg msg;
 		ssize_t n;
@@ -1282,7 +1284,7 @@ main(int argc, char *argv[])
 	}
 
 	msgbuf:
-	imsg_clear(&msgbuf);
+	imsgbuf_clear(&msgbuf);
 	for (i = 0; i < ignore.nheader; i++)
 		free(ignore.headers[i]);
 	free(ignore.headers);

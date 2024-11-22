@@ -23,7 +23,7 @@
 #include "imsg-blocking.h"
 
 int
-imsg_flush_blocking(struct imsgbuf *msgbuf)
+imsgbuf_flush_blocking(struct imsgbuf *msgbuf)
 {
 	struct pollfd pollfd;
 	int n;
@@ -31,7 +31,7 @@ imsg_flush_blocking(struct imsgbuf *msgbuf)
 	pollfd.fd = msgbuf->fd;
 	pollfd.events = POLLOUT;
 
-	while ((n = imsg_flush(msgbuf)) == -1 && errno == EAGAIN) {
+	while ((n = imsgbuf_flush(msgbuf)) == -1 && errno == EAGAIN) {
 		if (poll(&pollfd, 1, -1) == -1)
 			return -1;
 		if (pollfd.revents & (POLLERR | POLLNVAL | POLLHUP))
@@ -51,7 +51,7 @@ imsg_get_blocking(struct imsgbuf *msgbuf, struct imsg *msg)
 	pollfd.events = POLLIN;
 
 	while ((n = imsg_get(msgbuf, msg)) == 0) {
-		if ((n = imsg_read(msgbuf)) == -1) {
+		if ((n = imsgbuf_read(msgbuf)) == -1) {
 			if (errno != EAGAIN)
 				return -1;
 			if (poll(&pollfd, 1, -1) == -1)
