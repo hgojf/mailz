@@ -80,7 +80,8 @@ static int header_name(FILE *, char *, size_t);
 static int header_references(FILE *, struct imsgbuf *);
 static int header_skip(FILE *, FILE *, int);
 static int header_subject(FILE *, char *, size_t);
-static int header_token(FILE *, struct header_lex *, char *, size_t, int *);
+static int header_token(FILE *, struct header_lex *, char *, size_t,
+			int *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
 static void strip_trailing(char *);
@@ -1118,7 +1119,8 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 }
 
 static int
-header_token(FILE *fp, struct header_lex *lex, char *buf, size_t bufsz, int *eof)
+header_token(FILE *fp, struct header_lex *lex, char *buf,
+	     size_t bufsz, int *eof)
 {
 	size_t n;
 
