@@ -958,6 +958,8 @@ main(int argc, char *argv[])
 	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
 		goto tmpdir;
 
+	if (unveil(tmpdir, "rwc") == -1)
+		goto null;
 	if (unveil(argv[0], "rc") == -1)
 		goto null;
 	if (unveil(PATH_LESS, "x") == -1)
@@ -965,8 +967,6 @@ main(int argc, char *argv[])
 	if (unveil(PATH_MAILZ_CONTENT, "x") == -1)
 		goto null;
 	if (unveil(PATH_SENDMAIL, "x") == -1)
-		goto null;
-	if (unveil(tmpdir, "rwc") == -1)
 		goto null;
 	if (pledge("stdio rpath cpath wpath proc exec sendfd", NULL) == -1)
 		err(1, "pledge");
