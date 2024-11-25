@@ -60,6 +60,8 @@ static void commands_run(struct letter *, size_t, int, int,
 			 struct mailz_ignore *);
 static int commands_token(FILE *, char *, size_t, int *);
 static const struct command *commands_search(const char *);
+static int command_flag(struct letter *, struct command_args *, int,
+			int);
 static int command_more(struct letter *, struct command_args *);
 static int command_read(struct letter *, struct command_args *);
 static int command_reply(struct letter *, struct command_args *);
@@ -213,6 +215,42 @@ commands_search(const char *s)
 }
 
 static int
+command_flag(struct letter *letter, struct command_args *args,
+	     int flag, int set)
+{
+	const char *bufp;
+	char buf[NAME_MAX], *new;
+
+	if (set) {
+		bufp = maildir_set_flag(letter->path, flag, buf,
+					sizeof(buf));
+	}
+	else {
+		bufp = maildir_unset_flag(letter->path, flag, buf,
+					sizeof(buf));
+	}
+
+	if (bufp == NULL)
+		return -1;
+	if (bufp == letter->path)
+		return 0;
+
+	if ((new = strdup(bufp)) == NULL)
+		return -1;
+
+	if (renameat(args->cur, letter->path, args->cur, new) == -1) {
+		free(new);
+		return -1;
+	}
+
+	free(letter->path);
+	letter->path = new;
+
+	return 0;
+}
+
+
+static int
 command_more(struct letter *letter, struct command_args *args)
 {
 	struct content_proc pr;
@@ -288,34 +326,10 @@ command_more(struct letter *letter, struct command_args *args)
 	return rv;
 }
 
-/*
- * XXX: this and command_unread are effectively the same,
- * should probably be merged into command_read1(letter, args, read)
- */
 static int
 command_read(struct letter *letter, struct command_args *args)
 {
-	const char *bufp;
-	char buf[NAME_MAX], *new;
-
-	if ((bufp = maildir_set_flag(letter->path, 'S',
-				     buf, sizeof(buf))) == NULL)
-		return -1;
-	if (bufp == letter->path)
-		return 0;
-
-	if ((new = strdup(bufp)) == NULL)
-		return -1;
-
-	if (renameat(args->cur, letter->path, args->cur, new) == -1) {
-		free(new);
-		return -1;
-	}
-
-	free(letter->path);
-	letter->path = new;
-
-	return 0;
+	return command_flag(letter, args, 'S', 1);
 }
 
 static int
@@ -654,27 +668,7 @@ command_thread(struct letter *letter, struct command_args *args)
 static int
 command_unread(struct letter *letter, struct command_args *args)
 {
-	const char *bufp;
-	char buf[NAME_MAX], *new;
-
-	if ((bufp = maildir_unset_flag(letter->path, 'S',
-				       buf, sizeof(buf))) == NULL)
-		return -1;
-	if (bufp == letter->path)
-		return 0;
-
-	if ((new = strdup(bufp)) == NULL)
-		return -1;
-
-	if (renameat(args->cur, letter->path, args->cur, new) == -1) {
-		free(new);
-		return -1;
-	}
-
-	free(letter->path);
-	letter->path = new;
-
-	return 0;
+	return command_flag(letter, args, 'S', 0);
 }
 
 static int
