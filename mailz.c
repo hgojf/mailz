@@ -71,7 +71,7 @@ static int content_proc_ex_ignore(struct content_proc *,
 static int letter_cmp(const void *, const void *);
 static void letter_free(struct letter *);
 static int letter_from_summary(struct letter *, const char *,
-	const struct content_summary *);
+			       const struct content_summary *);
 static int letter_print(size_t, struct letter *);
 static int read_letters(int, int, int, struct letter **, size_t *);
 static void usage(void);
