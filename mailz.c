@@ -478,7 +478,7 @@ command_reply(struct letter *letter, struct command_args *args)
 		goto fp;
 
 	if (fprintf(fp, "> ") < 0)
-		goto fp;
+		goto lr;
 	for (;;) {
 		char buf[4];
 		int n;
