@@ -15,4 +15,3 @@ _err(int eval, const char *fmt, ...)
 	/* NOTREACHED */
 	va_end(ap);
 }
-
