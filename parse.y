@@ -135,6 +135,9 @@ static int
 configure(struct mailz_conf *c, const char *path)
 {
 	FILE *fp;
+	int rv;
+
+	rv = -1;
 
 	if ((fp = fopen(path, "r")) == NULL) {
 		if (errno != ENOENT)
@@ -146,13 +149,17 @@ configure(struct mailz_conf *c, const char *path)
 	filename = path;
 	yyin = fp;
 
-	if (yyparse() != 0) {
-		fclose(fp);
-		return -1;
-	}
+	if (yyparse() != 0)
+		goto fp;
 
+	rv = 0;
+	fp:
 	fclose(fp);
-	return 0;
+
+	conf = NULL;
+	filename = NULL;
+	yyin = NULL;
+	return rv;
 }
 
 void
