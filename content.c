@@ -35,7 +35,12 @@
 #include "encoding.h"
 #include "imsg-blocking.h"
 
-#define HEADER_NAME_LEN 996
+/*
+ * Email lines should be at max 998 bytes.
+ * One byte is used for the ':', 2 bytes for the CRLF, the rest are
+ * available for header identifiers.
+ */
+#define HEADER_NAME_LEN 995
 
 #define HL_EOF -129
 #define HL_ERR -130
