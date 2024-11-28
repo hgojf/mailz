@@ -525,6 +525,7 @@ header_date(FILE *fp)
 		tm.tm_year += 2000;
 	else if (tm.tm_year <= 999)
 		tm.tm_year += 1900;
+	tm.tm_year -= 1900;
 
 	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
 		return -1;
