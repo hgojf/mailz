@@ -39,8 +39,9 @@
  * Email lines should be at max 998 bytes.
  * One byte is used for the ':', 2 bytes for the CRLF, the rest are
  * available for header identifiers.
+ * This length includes the terminating NUL byte.
  */
-#define HEADER_NAME_LEN 995
+#define HEADER_NAME_LEN 996
 
 #define HL_EOF -129
 #define HL_ERR -130
