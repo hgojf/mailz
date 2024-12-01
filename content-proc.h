@@ -34,6 +34,7 @@ struct content_proc {
 int content_proc_ignore(struct content_proc *, const char *, int);
 int content_proc_init(struct content_proc *, const char *, int);
 int content_proc_kill(struct content_proc *);
+int content_proc_reply(struct content_proc *, FILE *, const char *, int, int);
 int content_proc_summary(struct content_proc *, struct content_summary *, int);
 
 struct content_letter {
@@ -43,16 +44,5 @@ struct content_letter {
 
 void content_letter_close(struct content_letter *);
 int content_letter_getc(struct content_letter *, char [static 4]);
-int content_letter_init(struct content_proc *, struct content_letter *, int, int);
-
-struct content_reply {
-	struct content_proc *pr;
-	int eof;
-};
-
-int content_reply_close(struct content_reply *);
-int content_reply_init(struct content_proc *, struct content_reply *,
-		       struct content_reply_summary *, int);
-int content_reply_reference(struct content_reply *,
-				 struct content_reference *);
+int content_letter_init(struct content_proc *, struct content_letter *, int);
 #endif /* MAILZ_CONTENT_PROC_H */

@@ -81,7 +81,7 @@ content_letter_getc(struct content_letter *letter, char buf[static 4])
 
 int
 content_letter_init(struct content_proc *pr,
-		    struct content_letter *letter, int fd, int flags)
+		    struct content_letter *letter, int fd)
 {
 	int p[2];
 
@@ -91,7 +91,7 @@ content_letter_init(struct content_proc *pr,
 	}
 
 	if (imsg_compose(&pr->msgbuf, IMSG_CNT_LETTER, 0, -1, fd,
-			 &flags, sizeof(flags)) == -1)
+			 NULL, 0) == -1)
 		goto fd;
 
 	if (imsg_compose(&pr->msgbuf, IMSG_CNT_LETTERPIPE, 0, -1,
@@ -203,6 +203,97 @@ content_proc_kill(struct content_proc *pr)
 }
 
 int
+content_proc_reply(struct content_proc *pr, FILE *out,
+		   const char *from, int group, int lfd)
+{
+	struct imsg msg;
+	mbstate_t mbs;
+	struct content_reply_setup setup;
+	FILE *in;
+	ssize_t n;
+	int i, p[2], rv;
+
+	rv = -1;
+
+	memset(&setup, 0, sizeof(setup));
+	if (strlcpy(setup.addr, from, sizeof(setup.addr))
+		    >= sizeof(setup.addr))
+		goto lfd;
+	setup.group = group;
+	if (imsg_compose(&pr->msgbuf, IMSG_CNT_REPLY, 0, -1, lfd,
+			 &setup, sizeof(setup)) == -1)
+		goto lfd;
+
+	if (pipe2(p, O_CLOEXEC) == -1)
+		return -1;
+	if ((in = fdopen(p[0], "r")) == NULL) {
+		close(p[0]);
+		close(p[1]);
+		return -1;
+	}
+
+	if (imsg_compose(&pr->msgbuf, IMSG_CNT_REPLYPIPE, 0, -1, p[1],
+			 NULL, 0) == -1) {
+		close(p[1]);
+		fclose(in);
+		return -1;
+	}
+
+	if (imsgbuf_flush(&pr->msgbuf) == -1)
+		goto in;
+
+	i = 0;
+	memset(&mbs, 0, sizeof(mbs));
+	for (;;) {
+		int ch;
+		char cc;
+
+		if ((ch = fgetc(in)) == EOF) {
+			if (i == 0)
+				break;
+			goto in;
+		}
+
+		cc = ch;
+		switch (mbrtowc(NULL, &cc, 1, &mbs)) {
+		case -1:
+		case -3:
+		case 0:
+			goto in;
+		case -2:
+			i++;
+			break;
+		default:
+			if (i == 0 && !isprint(ch) && !isspace(ch))
+				goto in;
+			i = 0;
+			break;
+		}
+
+		if (fputc(ch, out) == EOF)
+			goto in;
+	}
+
+	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
+		goto in;
+	if (n == 0)
+		goto in;
+	if (imsg_get_type(&msg) != IMSG_CNT_REPLY)
+		goto msg;
+
+	rv = 0;
+	msg:
+	imsg_free(&msg);
+	in:
+	fclose(in);
+	return rv;
+
+	lfd:
+	close(lfd);
+	return -1;
+}
+
+int
 content_proc_summary(struct content_proc *pr,
 		     struct content_summary *sm, int fd)
 {
@@ -253,123 +344,6 @@ content_proc_summary(struct content_proc *pr,
 	}
 
 	rv = 0;
-	bad:
-	imsg_free(&msg);
-	return rv;
-}
-
-int
-content_reply_close(struct content_reply *rpl)
-{
-	if (!rpl->eof) {
-		for (;;) {
-			struct imsg msg;
-			ssize_t n;
-
-			if ((n = imsg_get_blocking(&rpl->pr->msgbuf, &msg)) == -1)
-				return -1;
-			if (n == 0)
-				return -1;
-
-			if (imsg_get_type(&msg) == IMSG_CNT_REFERENCEOVER) {
-				imsg_free(&msg);
-				break;
-			}
-
-			if (imsg_get_type(&msg) != IMSG_CNT_REFERENCE) {
-				imsg_free(&msg);
-				return -1;
-			}
-
-			imsg_free(&msg);
-		}
-	}
-
-	return 0;
-}
-
-int
-content_reply_init(struct content_proc *pr, struct content_reply *rpl,
-		   struct content_reply_summary *sm, int fd)
-{
-	struct imsg msg;
-	ssize_t n;
-	int rv;
-
-	rv = -1;
-
-	if (imsg_compose(&pr->msgbuf, IMSG_CNT_REPLY, 0, -1, fd,
-			 NULL, 0) == -1) {
-		close(fd);
-		return -1;
-	}
-
-	if (imsgbuf_flush(&pr->msgbuf) == -1)
-		return -1;
-
-	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
-		return -1;
-	if (n == 0)
-		return -1;
-
-	if (imsg_get_type(&msg) != IMSG_CNT_REPLY)
-		goto bad;
-	if (imsg_get_data(&msg, sm, sizeof(*sm)) == -1)
-		goto bad;
-
-	if (!string_valid(sm->name, sizeof(sm->name)))
-		goto bad;
-
-	if (!string_valid(sm->reply_to.addr, sizeof(sm->reply_to.addr)))
-		goto bad;
-	if (!string_valid(sm->reply_to.name, sizeof(sm->reply_to.name)))
-		goto bad;
-
-	if (!string_valid(sm->message_id, sizeof(sm->message_id)))
-		goto bad;
-
-	if (!string_valid(sm->in_reply_to, sizeof(sm->in_reply_to)))
-		goto bad;
-
-	rpl->pr = pr;
-	rpl->eof = 0;
-
-	rv = 0;
-	bad:
-	imsg_free(&msg);
-	return rv;
-}
-
-int
-content_reply_reference(struct content_reply *rpl,
-			struct content_reference *ref)
-{
-	struct imsg msg;
-	ssize_t n;
-	int rv;
-
-	rv = -1;
-
-	if ((n = imsg_get_blocking(&rpl->pr->msgbuf, &msg)) == -1)
-		return -1;
-	if (n == 0)
-		return -1;
-
-	if (imsg_get_type(&msg) == IMSG_CNT_REFERENCEOVER) {
-		imsg_free(&msg);
-		rpl->eof = 1;
-		return 0;
-	}
-
-	if (imsg_get_type(&msg) != IMSG_CNT_REFERENCE)
-		goto bad;
-	if (imsg_get_data(&msg, ref->id, sizeof(ref->id)) == -1)
-		goto bad;
-
-	if (!string_valid(ref->id, sizeof(ref->id)))
-		goto bad;
-
-	rv = 1;
 	bad:
 	imsg_free(&msg);
 	return rv;

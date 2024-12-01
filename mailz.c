@@ -64,7 +64,9 @@ static int command_flag(struct letter *, struct command_args *, int,
 			int);
 static int command_more(struct letter *, struct command_args *);
 static int command_read(struct letter *, struct command_args *);
+static int command_reply1(struct letter *, struct command_args *, int);
 static int command_reply(struct letter *, struct command_args *);
+static int command_respond(struct letter *, struct command_args *);
 static int command_save(struct letter *, struct command_args *);
 static int command_thread(struct letter *, struct command_args *);
 static int command_unread(struct letter *, struct command_args *);
@@ -87,6 +89,7 @@ static const struct command {
 	{ "more",	CMD_NOALIAS,	command_more },
 	{ "read",	'r',		command_read },
 	{ "reply",	CMD_NOALIAS,	command_reply },
+	{ "respond",	CMD_NOALIAS,	command_respond },
 	{ "save",	's',		command_save },
 	{ "thread",	't',		command_thread },
 	{ "unread",	'x',		command_unread },
@@ -270,7 +273,7 @@ command_more(struct letter *letter, struct command_args *args)
 	if ((fd = openat(args->cur, letter->path,
 			 O_RDONLY | O_CLOEXEC)) == -1)
 		goto pr;
-	if (content_letter_init(&pr, &lr, fd, 0) == -1)
+	if (content_letter_init(&pr, &lr, fd) == -1)
 		goto pr;
 
 	if (pipe2(p, O_CLOEXEC) == -1)
@@ -335,177 +338,51 @@ command_read(struct letter *letter, struct command_args *args)
 static int
 command_reply(struct letter *letter, struct command_args *args)
 {
+	return command_reply1(letter, args, 1);
+}
+
+static int
+command_reply1(struct letter *letter, struct command_args *args, int group)
+{
 	struct content_proc pr;
-	struct content_letter lr;
-	struct content_reply rpl;
-	struct content_reply_summary sm;
-	struct tm tm;
-	char date[39], path[PATH_MAX];
+	char path[PATH_MAX];
 	FILE *fp;
 	pid_t pid;
-	int ch, fd, lfd, n, putref, rpldone, rv, status;
+	int ch, fd, lfd, n, rv, status;
 
 	rv = -1;
 
 	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, args->null) == -1)
 		return -1;
 
-	if ((lfd = openat(args->cur, letter->path, O_RDONLY | O_CLOEXEC)) == -1)
-		goto pr;
-	if (content_reply_init(&pr, &rpl, &sm, lfd) == -1)
-		goto pr;
-
-	rpldone = 0;
-
 	n = snprintf(path, sizeof(path), "%s/reply.XXXXXX", args->tmpdir);
 	if (n < 0 || (size_t)n >= sizeof(path))
-		goto rpl;
+		goto pr;
 
 	if ((fd = mkostemp(path, O_CLOEXEC)) == -1)
-		goto rpl;
+		goto pr;
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		unlink(path);
 		close(fd);
-		goto rpl;
+		goto pr;
 	}
 
-	if (fprintf(fp, "From: %s\n", args->addr) < 0)
+	if ((lfd = openat(args->cur, letter->path, O_RDONLY | O_CLOEXEC)) == -1)
 		goto fp;
-
-	if (strlen(sm.reply_to.addr) != 0) {
-		if (strlen(sm.reply_to.name) != 0) {
-			if (fprintf(fp, "To: %s <%s>\n",
-				    sm.reply_to.name, sm.reply_to.addr) < 0)
-				goto fp;
-		}
-		else
-			if (fprintf(fp, "To: %s\n", sm.reply_to.addr) < 0)
-				goto fp;
-	}
-	else {
-		if (strlen(sm.name) != 0) {
-			if (fprintf(fp, "To: %s <%s>\n", sm.name,
-				    letter->from) < 0)
-				goto fp;
-		}
-		else
-			if (fprintf(fp, "To: %s\n", letter->from) < 0)
-				goto fp;
-	}
-
-	if (letter->subject != NULL) {
-		const char *sub;
-
-		sub = letter->subject;
-		if (!strncmp(sub, "Re: ", 4))
-			sub += 4;
-
-		if (fprintf(fp, "Subject: Re: %s\n", sub) < 0)
-			goto fp;
-	}
-
-	if (strlen(sm.message_id) != 0) {
-		if (fprintf(fp, "In-Reply-To: <%s>\n", sm.message_id) < 0)
-			goto fp;
-	}
-
-	putref = 0;
-	for (;;) {
-		struct content_reference ref;
-
-		if ((n = content_reply_reference(&rpl, &ref)) == -1)
-			goto fp;
-		if (n == 0)
-			break;
-
-		if (!putref) {
-			if (fprintf(fp, "References:") < 0)
-				goto fp;
-			putref = 1;
-		}
-		if (fprintf(fp, " <%s>", ref.id) < 0)
-			goto fp;
-	}
-
-	if (!putref && strlen(sm.in_reply_to) != 0) {
-		if (fprintf(fp, "References: <%s>",
-			    sm.in_reply_to) < 0)
-			goto fp;
-		putref = 1;
-	}
-
-	if (strlen(sm.message_id) != 0) {
-		if (!putref) {
-			if (fprintf(fp, "References:") < 0)
-				goto fp;
-			putref = 1;
-		}
-
-		if (fprintf(fp, " <%s>", sm.message_id) < 0)
-			goto fp;
-	}
-
-	if (putref)
-		if (fprintf(fp, "\n") < 0)
-			goto fp;
-
-	if (fprintf(fp, "\n") < 0)
+	if (content_proc_reply(&pr, fp, args->addr, group, lfd) == -1)
 		goto fp;
-
-	content_reply_close(&rpl);
-	rpldone = 1;
-
-	if (localtime_r(&letter->date, &tm) == NULL)
-		goto fp;
-	if (strftime(date, sizeof(date), "%a, %b %d, %Y at %H:%M:%S %p %z", &tm) == 0)
-		goto fp;
-
-	if (strlen(sm.name) != 0) {
-		if (fprintf(fp, "On %s, %s <%s> wrote:\n",
-			    date, sm.name, letter->from) < 0)
-			goto fp;
-	}
-	else {
-		if (fprintf(fp, "On %s, %s wrote:\n",
-			    date, letter->from) < 0)
-			goto fp;
-	}
-
-	if ((lfd = openat(args->cur, letter->path,
-			  O_RDONLY | O_CLOEXEC)) == -1)
-		goto fp;
-	if (content_letter_init(&pr, &lr, lfd, CNT_LR_NOHDR) == -1)
-		goto fp;
-
-	if (fprintf(fp, "> ") < 0)
-		goto lr;
-	for (;;) {
-		char buf[4];
-		int n;
-
-		if ((n = content_letter_getc(&lr, buf)) == -1)
-			goto lr;
-		if (n == 0)
-			break;
-
-		if (fwrite(buf, n, 1, fp) != 1)
-			goto lr;
-		if (n == 1 && buf[0] == '\n')
-			if (fprintf(fp, "> ") < 0)
-				goto lr;
-	}
 
 	if (fflush(fp) == EOF)
-		goto lr;
+		goto fp;
 
 	if (printf("message located at %s\n"
 		   "press enter to send or q to cancel: ", path) < 0)
-		goto lr;
+		goto fp;
 	if (fflush(stdout) == EOF)
-		goto lr;
+		goto fp;
 
 	if ((ch = fgetc(stdin)) == EOF)
-		goto lr;
+		goto fp;
 
 	if (ch != '\n') {
 		int any, c;
@@ -515,15 +392,15 @@ command_reply(struct letter *letter, struct command_args *args)
 			any = 1;
 		if (ch == 'q' && !any)
 			rv = 0;
-		goto lr;
+		goto fp;
 	}
 
 	lfd = fileno(fp);
 	if (lseek(lfd, 0, SEEK_SET) == -1)
-		goto lr;
+		goto fp;
 	switch (pid = fork()) {
 	case -1:
-		goto lr;
+		goto fp;
 	case 0:
 		if (dup2(lfd, STDIN_FILENO) == -1)
 			_err(1, "dup2");
@@ -534,22 +411,23 @@ command_reply(struct letter *letter, struct command_args *args)
 	}
 
 	if (waitpid(pid, &status, 0) == -1)
-		goto lr;
+		goto fp;
 	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-		goto lr;
+		goto fp;
 
 	rv = 0;
-	lr:
-	content_letter_close(&lr);
 	fp:
 	fclose(fp);
 	unlink(path);
-	rpl:
-	if (!rpldone)
-		content_reply_close(&rpl);
 	pr:
 	content_proc_kill(&pr);
 	return rv;
+}
+
+static int
+command_respond(struct letter *letter, struct command_args *args)
+{
+	return command_reply1(letter, args, 0);
 }
 
 static int
@@ -572,7 +450,7 @@ command_save(struct letter *letter, struct command_args *args)
 	if ((lfd = openat(args->cur, letter->path,
 			  O_RDONLY | O_CLOEXEC)) == -1)
 		goto pr;
-	if (content_letter_init(&pr, &lr, lfd, 0) == -1)
+	if (content_letter_init(&pr, &lr, lfd) == -1)
 		goto pr;
 
 	n = snprintf(path, sizeof(path), "%s/save.XXXXXX", args->tmpdir);

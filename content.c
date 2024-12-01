@@ -43,6 +43,15 @@
  */
 #define HEADER_NAME_LEN 996
 
+/*
+ * Email lines should be at max 998 bytes.
+ * One byte (at minimum) is used for the header identifier,
+ * another is used for the ':', 2 are used for the opening and closing
+ * '<', 2 are used for the CRLF.
+ * This length includes the terminating NUL byte.
+ */
+#define MSGID_LEN 993
+
 #define HL_EOF -129
 #define HL_ERR -130
 #define HL_PIPE -131
@@ -73,8 +82,18 @@ struct from {
 
 static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
+static int handle_letter_under(FILE *, FILE *, struct ignore *, int);
 static int handle_reply(struct imsgbuf *, struct imsg *);
+static int handle_reply_body(FILE *, FILE *, time_t, const char *,
+			     const char *);
+static int handle_reply_references(FILE *, FILE *, const char *,
+				   const char *, off_t);
+static int handle_reply_to(FILE *, FILE *, char *, off_t, off_t, off_t);
+static int header_subject_reply(FILE *, FILE *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
+static int header_address(FILE *, struct from *, int *);
+static int header_copy(FILE *, FILE *);
+static int header_copy_addresses(FILE *, FILE *, const char *);
 static int header_content_type(FILE *, FILE *, int, struct charset *,
 			       struct encoding *);
 static time_t header_date(FILE *);
@@ -83,7 +102,6 @@ static int header_from(FILE *, struct from *);
 static int header_lex(FILE *, struct header_lex *);
 static int header_message_id(FILE *, char *, size_t);
 static int header_name(FILE *, char *, size_t);
-static int header_references(FILE *, struct imsgbuf *);
 static int header_skip(FILE *, FILE *, int);
 static int header_subject(FILE *, char *, size_t);
 static int header_token(FILE *, struct header_lex *, char *, size_t,
@@ -145,16 +163,11 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	      struct ignore *ignore)
 {
 	struct imsg msg2;
-	struct charset charset;
-	struct encoding encoding;
 	FILE *in, *out;
 	ssize_t n;
-	int flags, got_content_type, got_encoding, rv;
+	int rv;
 
 	rv = -1;
-
-	if (imsg_get_data(msg, &flags, sizeof(flags)) == -1)
-		return -1;
 
 	if ((n = imsg_get_blocking(msgbuf, &msg2)) == -1)
 		return -1;
@@ -169,6 +182,26 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	if ((in = imsg_get_fp(msg, "r")) == NULL)
 		goto out;
 
+	if (handle_letter_under(in, out, ignore, 0) == -1)
+		goto in;
+
+	in:
+	fclose(in);
+	out:
+	fclose(out);
+	msg2:
+	imsg_free(&msg2);
+	return rv;
+}
+
+static int
+handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
+		    int reply)
+{
+	struct charset charset;
+	struct encoding encoding;
+	int got_content_type, got_encoding;
+
 	charset_from_type(&charset, CHARSET_ASCII);
 	encoding_from_type(&encoding, ENCODING_7BIT);
 	got_content_type = 0;
@@ -178,11 +211,11 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		int echo, hv;
 
 		if ((hv = header_name(in, buf, sizeof(buf))) == -1)
-			goto in;
+			return -1;
 		if (hv == 0)
 			break;
 
-		if (flags & CNT_LR_NOHDR || ignore_header(buf, ignore))
+		if (reply || (ignore != NULL && ignore_header(buf, ignore)))
 			echo = 0;
 		else
 			echo = 1;
@@ -190,42 +223,47 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		if (echo) {
 			if (fprintf(out, "%s:", buf) < 0) {
 				if (ferror(out) && errno == EPIPE)
-					goto done;
-				goto in;
+					return 0;
+				return -1;
 			}
 		}
 
 		if (!strcasecmp(buf, "content-transfer-encoding")) {
 			if (got_encoding)
-				goto in;
+				return -1;
 			if ((hv = header_encoding(in, out, echo, &encoding)) == -1)
-				goto in;
+				return -1;
 			if (hv == 0)
-				goto done;
+				return -1;
 			got_encoding = 1;
 		}
 		else if (!strcasecmp(buf, "content-type")) {
 			if (got_content_type)
-				goto in;
+				return -1;
 			if ((hv = header_content_type(in, out, echo,
 						      &charset, &encoding)) == -1)
-				goto in;
+				return -1;
 			if (hv == 0)
-				goto done;
+				return -1;
 
 			got_content_type = 1;
 		}
 		else {
 			if ((hv = header_skip(in, out, echo)) == -1)
-				goto in;
+				return -1;
 			if (hv == 0)
-				goto done;
+				return -1;
 		}
 	}
 
-	if (fputc('\n', out) == EOF) {
-		if (ferror(out) && errno == EPIPE)
-			goto done;
+	if (reply) {
+		if (fprintf(out, "> ") < 0)
+			return -1;
+	}
+	else {
+		if (fputc('\n', out) == EOF)
+			if (ferror(out) && errno == EPIPE)
+				return -1;
 	}
 
 	for (;;) {
@@ -234,7 +272,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 
 		if ((n = charset_getc(&charset, &encoding, in,
 				      buf)) == -1)
-			goto in;
+			return -1;
 		if (n == 0)
 			break;
 
@@ -251,128 +289,295 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 
 		if (fwrite(buf, n, 1, out) != 1) {
 			if (ferror(out) && errno == EPIPE)
-				goto done;
-			goto in;
+				return 0;
+			return -1;
 		}
+
+		if (reply && n == 1 && buf[0] == '\n')
+			if (fprintf(out, "> ") < 0)
+				return -1;
 	}
 
-	done:
-	rv = 0;
-	in:
-	fclose(in);
-	out:
-	fclose(out);
-	msg2:
-	imsg_free(&msg2);
-	return rv;
+	return 0;
 }
 
 static int
 handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 {
-	struct content_reply_summary sm;
-	FILE *fp;
-	off_t ref;
+	struct content_reply_setup setup;
+	struct imsg msg2;
+	FILE *in, *out;
+	char in_reply_to[MSGID_LEN], msgid[MSGID_LEN];
+	char from_addr[255], from_name[65];
+	ssize_t n;
+	time_t date;
+	off_t from, references, reply_to, to;
 	int rv;
 
 	rv = -1;
 
-	if ((fp = imsg_get_fp(msg, "r")) == NULL)
+	if ((in = imsg_get_fp(msg, "r")) == NULL)
 		return -1;
 
-	memset(&sm, 0, sizeof(sm));
-	ref = -1;
+	if (imsg_get_data(msg, &setup, sizeof(setup)) == -1)
+		goto in;
+	if (memchr(setup.addr, '\0', sizeof(setup.addr)) == NULL)
+		goto in;
+
+	if ((n = imsg_get_blocking(msgbuf, &msg2)) == -1)
+		goto in;
+	if (n == 0)
+		goto in;
+
+	if (imsg_get_type(&msg2) != IMSG_CNT_REPLYPIPE)
+		goto msg2;
+	if ((out = imsg_get_fp(&msg2, "w")) == NULL)
+		goto msg2;
+
+	date = -1;
+	from = -1;
+	in_reply_to[0] = '\0';
+	msgid[0] = '\0';
+	references = -1;
+	reply_to = -1;
+	to = -1;
 	for (;;) {
 		char buf[HEADER_NAME_LEN];
 		int hv;
 
-		if ((hv = header_name(fp, buf, sizeof(buf))) == -1)
-			goto fp;
+		if ((hv = header_name(in, buf, sizeof(buf))) == -1)
+			goto out;
 		if (hv == 0)
 			break;
 
-		if (!strcasecmp(buf, "from")) {
-			struct from from;
-
-			if (strlen(sm.name) != 0)
-				goto fp;
-
-			from.addr = NULL;
-			from.addrsz = 0;
-
-			from.name = sm.name;
-			from.namesz = sizeof(sm.name);
-
-			if (header_from(fp, &from) == -1)
-				goto fp;
+		if (setup.group && !strcasecmp(buf, "cc")) {
+			if (fprintf(out, "Cc:") < 0)
+				goto out;
+			if (header_copy(in, out) == -1)
+				goto out;
+			if (fprintf(out, "\n") < 0)
+				goto out;
 		}
-		if (!strcasecmp(buf, "in-reply-to")) {
-			if (strlen(sm.in_reply_to) != 0)
-				goto fp;
-			if (header_message_id(fp, sm.in_reply_to,
-					      sizeof(sm.in_reply_to)) == -1)
-				goto fp;
+		else if (!strcasecmp(buf, "date")) {
+			if (date != -1)
+				goto out;
+			if ((date = header_date(in)) == -1)
+				goto out;
+		}
+		else if (!strcasecmp(buf, "from")) {
+			struct from from_p;
+
+			if (from != -1)
+				goto out;
+			if ((from = ftello(in)) == -1)
+				goto out;
+
+			from_p.addr = from_addr;
+			from_p.addrsz = sizeof(from_addr);
+
+			from_p.name = from_name;
+			from_p.namesz = sizeof(from_name);
+
+			if (header_from(in, &from_p) == -1)
+				goto out;
+		}
+		else if (!strcasecmp(buf, "in-reply-to")) {
+			if (strlen(in_reply_to) != 0)
+				goto out;
+			if (header_message_id(in, in_reply_to,
+					      sizeof(in_reply_to)) == -1)
+				goto out;
 		}
 		else if (!strcasecmp(buf, "message-id")) {
-			if (strlen(sm.message_id) != 0)
-				goto fp;
-			if (header_message_id(fp, sm.message_id,
-					      sizeof(sm.message_id)) == -1)
-				goto fp;
+			if (strlen(msgid) != 0)
+				goto out;
+			if (header_message_id(in, msgid,
+					      sizeof(msgid)) == -1)
+				goto out;
 		}
 		else if (!strcasecmp(buf, "references")) {
-			if (ref != -1)
-				goto fp;
-			if ((ref = ftello(fp)) == -1)
-				goto fp;
-			if (header_skip(fp, NULL, 0) == -1)
-				goto fp;
+			if (references != -1)
+				goto out;
+			if ((references = ftello(in)) == -1)
+				goto out;
+			if (header_skip(in, NULL, 0) == -1)
+				goto out;
 		}
 		else if (!strcasecmp(buf, "reply-to")) {
-			struct from from;
-
-			if (strlen(sm.reply_to.addr) != 0)
-				goto fp;
-
-			from.addr = sm.reply_to.addr;
-			from.addrsz = sizeof(sm.reply_to.addr);
-
-			from.name = sm.reply_to.name;
-			from.namesz = sizeof(sm.reply_to.name);
-
-			if (header_from(fp, &from) == -1)
-				goto fp;
-			if (strlen(sm.reply_to.addr) == 0)
-				goto fp;
+			if (reply_to != -1)
+				goto out;
+			if ((reply_to = ftello(in)) == -1)
+				goto out;
+			if (header_skip(in, NULL, 0) == -1)
+				goto out;
+		}
+		else if (!strcasecmp(buf, "subject")) {
+			if (header_subject_reply(in, out) == -1)
+				goto out;
+		}
+		else if (setup.group && !strcasecmp(buf, "to")) {
+			if (to != -1)
+				goto out;
+			if ((to = ftello(in)) == -1)
+				goto out;
+			if (header_skip(in, NULL, 0) == -1)
+				goto out;
 		}
 		else {
-			if (header_skip(fp, NULL, 0) == -1)
-				goto fp;
+			if (header_skip(in, NULL, 0) == -1)
+				goto out;
 		}
 	}
 
+	if (date == -1 || from == -1)
+		goto out;
+
+	if (fprintf(out, "From: %s\n", setup.addr) < 0)
+		goto out;
+
+	if (handle_reply_to(in, out, setup.addr, from, to, reply_to) == -1)
+		goto out;
+	if (handle_reply_references(in, out, msgid, in_reply_to,
+				    references) == -1)
+		goto out;
+
+	if (handle_reply_body(in, out, date, from_addr, from_name) == -1)
+		goto out;
+
 	if (imsg_compose(msgbuf, IMSG_CNT_REPLY, 0, -1, -1,
-			 &sm, sizeof(sm)) == -1)
-		goto fp;
-
-	if (ref != -1) {
-		if (fseeko(fp, ref, SEEK_SET) == EOF)
-			goto fp;
-		if (header_references(fp, msgbuf) == -1)
-			goto fp;
-	}
-
-	if (imsg_compose(msgbuf, IMSG_CNT_REFERENCEOVER, 0, -1, -1,
 			 NULL, 0) == -1)
-		goto fp;
-
+		goto out;
 	if (imsgbuf_flush(msgbuf) == -1)
-		goto fp;
+		goto out;
 
 	rv = 0;
-	fp:
-	fclose(fp);
+	out:
+	fclose(out);
+	msg2:
+	imsg_free(&msg2);
+	in:
+	fclose(in);
 	return rv;
+}
+
+static int
+handle_reply_body(FILE *in, FILE *out, time_t date, const char *addr,
+		  const char *name)
+{
+	char datebuf[39];
+	struct tm tm;
+
+	if (fprintf(out, "\n") < 0)
+		return -1;
+
+	if (localtime_r(&date, &tm) == NULL)
+		return -1;
+
+	if (strftime(datebuf, sizeof(datebuf),
+		     "%a, %b %d, %Y at %H:%M:%S %p %z", &tm) == 0)
+		return -1;
+
+	if (strlen(name) != 0) {
+		if (fprintf(out, "On %s, %s <%s> wrote:\n",
+			    datebuf, name, addr) < 0)
+			return -1;
+	}
+	else {
+		if (fprintf(out, "On %s, %s wrote:\n",
+			    datebuf, addr) < 0)
+			return -1;
+	}
+
+	if (fseeko(in, 0, SEEK_SET) == -1)
+		return -1;
+	return handle_letter_under(in, out, NULL, 1);
+}
+
+static int
+handle_reply_references(FILE *in, FILE *out, const char *msgid,
+			const char *in_reply_to, off_t refs)
+{
+	int putref;
+
+	if (strlen(msgid) != 0) {
+		if (fprintf(out, "In-Reply-To: <%s>\n", msgid) < 0)
+			return -1;
+	}
+
+	putref = 0;
+	if (refs != -1) {
+		if (fseeko(in, refs, SEEK_SET) == -1)
+			return -1;
+		if (fprintf(out, "References:") < 0)
+			return -1;
+		if (header_copy(in, out) == -1)
+			return -1;
+		putref = 1;
+	}
+	else if (strlen(in_reply_to) != 0) {
+		if (fprintf(out, "References: <%s>", in_reply_to) < 0)
+			return -1;
+		putref = 1;
+	}
+
+	if (strlen(msgid) != 0) {
+		if (!putref) {
+			if (fprintf(out, "References:") < 0)
+				return -1;
+			putref = 1;
+		}
+		if (fprintf(out, " <%s>", msgid) < 0)
+			return -1;
+	}
+
+	if (putref)
+		if (fprintf(out, "\n") < 0)
+			return -1;
+
+	return 0;
+}
+
+static int
+handle_reply_to(FILE *in, FILE *out, char *from_addr, off_t from,
+		off_t to, off_t reply_to)
+{
+	char *addr;
+
+	if (fprintf(out, "To:") < 0)
+		return -1;
+
+	if ((addr = strchr(from_addr, '<')) != NULL) {
+		addr++;
+		addr[strcspn(addr, ">")] = '\0';
+	}
+	else
+		addr = from_addr;
+
+	if (reply_to != -1) {
+		if (fseeko(in, reply_to, SEEK_SET) == -1)
+			return -1;
+		if (header_copy_addresses(in, out, addr) == -1)
+			return -1;
+	}
+	else {
+		if (fseeko(in, from, SEEK_SET) == -1)
+			return -1;
+		if (header_copy_addresses(in, out, addr) == -1)
+			return -1;
+	}
+
+	if (to != -1) {
+		if (fseeko(in, to, SEEK_SET) == -1)
+			return -1;
+		if (fprintf(out, ",") == -1)
+			return -1;
+		if (header_copy_addresses(in, out, addr) == -1)
+			return -1;
+	}
+
+	if (fprintf(out, "\n") < 0)
+		return -1;
+	return 0;
 }
 
 static int
@@ -455,6 +660,90 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 	fp:
 	fclose(fp);
 	return rv;
+}
+
+static int
+header_address(FILE *fp, struct from *from, int *eof)
+{
+	struct header_lex lex;
+	size_t n;
+	int state;
+
+	if (*eof)
+		return 0;
+
+	if (from->addrsz == 0)
+		return -1;
+
+	lex.cstate = 0;
+	lex.echo = NULL;
+	lex.qstate = 0;
+	lex.skipws = 1;
+
+	n = 0;
+	state = 0;
+	for (;;) {
+		int ch;
+
+		if ((ch = header_lex(fp, &lex)) == HL_ERR)
+			return -1;
+
+		if (state == 0) {
+			if (ch == HL_EOF || ch == ',') {
+				from->addr[n] = '\0';
+				if (from->name != NULL)
+					from->name[0] = '\0';
+
+				if (ch == HL_EOF) {
+					*eof = 1;
+					if (n == 0)
+						return 0;
+				}
+
+				return 1;
+			}
+
+			if (ch == '<') {
+				if (from->name != NULL) {
+					if (n >= from->namesz)
+						return -1;
+					memcpy(from->name, from->addr, n);
+					from->name[n] = '\0';
+					strip_trailing(from->name);
+				}
+				n = 0;
+				state = 1;
+				continue;
+			}
+
+			if (n == from->addrsz - 1)
+				return -1;
+			from->addr[n++] = ch;
+		}
+
+		if (state == 1) {
+			if (ch == HL_EOF)
+				return -1;
+			if (ch == '>') {
+				state = 2;
+				continue;
+			}
+
+			if (n == from->addrsz - 1)
+				return -1;
+			from->addr[n++] = ch;
+		}
+
+		if (state == 2) {
+			if (ch == HL_EOF || ch == ',') {
+				from->addr[n] = '\0';
+
+				if (ch == HL_EOF)
+					*eof = 1;
+				return 1;
+			}
+		}
+	}
 }
 
 static time_t
@@ -600,6 +889,66 @@ header_date(FILE *fp)
 		return -1;
 
 	return date - off;
+}
+
+static int
+header_copy(FILE *in, FILE *out)
+{
+	struct header_lex lex;
+	int ch;
+
+	lex.cstate = -1;
+	lex.echo = NULL;
+	lex.qstate = -1;
+	lex.skipws = 0;
+
+	while ((ch = header_lex(in, &lex)) != HL_EOF) {
+		if (ch == HL_ERR)
+			return -1;
+		if (fputc(ch, out) == EOF)
+			return -1;
+	}
+
+	return 0;
+}
+
+static int
+header_copy_addresses(FILE *in, FILE *out, const char *exclude)
+{
+	char addr[255], name[65];
+	struct from from;
+	int any, eof, n;
+
+	from.addr = addr;
+	from.addrsz = sizeof(addr);
+
+	from.name = name;
+	from.namesz = sizeof(name);
+
+	any = 0;
+	eof = 0;
+	while ((n = header_address(in, &from, &eof)) != 0) {
+		if (n == -1)
+			return -1;
+		if (!strcmp(addr, exclude))
+			continue;
+
+		if (any)
+			if (fprintf(out, ",") < 0)
+				return -1;
+
+		if (strlen(name) != 0) {
+			if (fprintf(out, " %s <%s>", name, addr) < 0)
+				return -1;
+		}
+		else {
+			if (fprintf(out, " %s", addr) < 0)
+				return -1;
+		}
+		any = 1;
+	}
+
+	return 0;
 }
 
 static int
@@ -760,109 +1109,17 @@ header_encoding(FILE *in, FILE *out, int echo, struct encoding *e)
 static int
 header_from(FILE *fp, struct from *from)
 {
-	struct header_lex lex;
-	size_t n;
-	int state;
+	int eof, n;
 
-	if (from->addr != NULL && from->addrsz == 0)
+	eof = 0;
+	if ((n = header_address(fp, from, &eof)) == -1)
 		return -1;
-	if (from->name != NULL && from->namesz == 0)
+	if (n == 0)
 		return -1;
 
-	lex.cstate = 0;
-	lex.echo = NULL;
-	lex.qstate = 0;
-	lex.skipws = 1;
-
-	n = 0;
-	state = 1;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(fp, &lex)) == HL_ERR)
+	if (!eof)
+		if (header_skip(fp, NULL, 0) == -1)
 			return -1;
-		if (ch == HL_EOF)
-			break;
-
-		if (state == 1) {
-			if (from->addr != NULL) {
-				if (ch == '<') {
-					if (from->name != NULL) {
-						if (n >= from->namesz)
-							return -1;
-						memcpy(from->name, from->addr, n);
-						from->name[n] = '\0';
-						strip_trailing(from->name);
-					}
-
-					from->addr[n] = '\0';
-					state = 2;
-					n = 0;
-					continue;
-				}
-
-				if (n == from->addrsz - 1)
-					return -1;
-				from->addr[n++] = ch;
-			}
-			else if (from->name != NULL) {
-				if (ch == '<') {
-					state = 3;
-					from->name[n] = '\0';
-					strip_trailing(from->name);
-					n = 0;
-					continue;
-				}
-				if (n == from->namesz - 1) {
-					state = 4;
-					continue;
-				}
-				from->name[n++] = ch;
-			}
-			else
-				return -1;
-		}
-
-		if (state == 2) {
-			if (ch == '>') {
-				if (from->addr != NULL)
-					from->addr[n] = '\0';
-				state = 5;
-				continue;
-			}
-			if (from->addr != NULL) {
-				if (n == from->addrsz - 1)
-					return -1;
-				from->addr[n++] = ch;
-			}
-		}
-
-		if (state == 3)
-			continue;
-
-		if (state == 4) {
-			if (ch == '<')
-				state = 5;
-			continue;
-		}
-
-		if (state == 5)
-			continue;
-	}
-
-	if (state == 1) {
-		if (from->addr != NULL)
-			from->addr[n] = '\0';
-		else if (from->name != NULL)
-			from->name[0] = '\0';
-	}
-
-	if (state == 2)
-		return -1;
-
-	if (state == 4)
-		return -1;
-
 	return 0;
 }
 
@@ -1021,60 +1278,6 @@ header_name(FILE *fp, char *buf, size_t bufsz)
 }
 
 static int
-header_references(FILE *fp, struct imsgbuf *msgbuf)
-{
-	struct header_lex lex;
-	char buf[CNT_MSGID_LEN];
-	size_t n;
-	int state;
-
-	lex.cstate = 0;
-	lex.echo = NULL;
-	lex.qstate = 0;
-	lex.skipws = 1;
-
-	n = 0;
-	state = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(fp, &lex)) == HL_ERR)
-			return -1;
-		if (ch == HL_EOF)
-			break;
-
-		if (state == 0) {
-			if (ch == '<')
-				state = 1;
-			continue;
-		}
-
-		if (ch == '>') {
-			memset(&buf[n], 0, sizeof(buf) - n);
-			if (imsg_compose(msgbuf,
-					 IMSG_CNT_REFERENCE,
-					 0, -1, -1,
-					 buf, sizeof(buf)) == -1)
-				return -1;
-			state = 0;
-			n = 0;
-			continue;
-		}
-
-		if (!isprint(ch) && !isspace(ch))
-			return -1;
-
-		if (n == sizeof(buf) - 1)
-			return -1;
-		buf[n++] = ch;
-	}
-
-	if (state != 0)
-		return -1;
-	return 0;
-}
-
-static int
 header_skip(FILE *in, FILE *out, int echo)
 {
 	struct header_lex lex;
@@ -1122,6 +1325,52 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 	}
 
 	buf[n] = '\0';
+	return 0;
+}
+
+static int
+header_subject_reply(FILE *in, FILE *out)
+{
+	struct header_lex lex;
+	const char *re;
+	size_t i;
+	int ch;
+
+	lex.cstate = -1;
+	lex.echo = NULL;
+	lex.qstate = -1;
+	lex.skipws = 1;
+
+	if (fprintf(out, "Subject: Re: ") < 0)
+		return -1;
+
+	re = "Re: ";
+	i = 0;
+	while ((ch = header_lex(in, &lex)) != HL_EOF) {
+		if (ch == HL_ERR)
+			return -1;
+
+		if (re[i] != '\0') {
+			if (re[i] == ch) {
+				i++;
+				continue;
+			}
+
+			if (i != 0) {
+				if (fwrite(re, i, 1, out) != 1)
+					return -1;
+			}
+			re = "";
+			i = 0;
+		}
+
+		if (fputc(ch, out) == EOF)
+			return -1;
+	}
+
+	if (fprintf(out, "\n") < 0)
+		return -1;
+
 	return 0;
 }
 
