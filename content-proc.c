@@ -84,33 +84,34 @@ content_letter_init(struct content_proc *pr,
 {
 	int p[2];
 
-	if (pipe2(p, O_CLOEXEC) == -1) {
-		close(fd);
-		return -1;
-	}
+	if (pipe2(p, O_CLOEXEC) == -1)
+		goto fd;
 
 	if (imsg_compose(&pr->msgbuf, IMSG_CNT_LETTER, 0, -1, fd,
 			 NULL, 0) == -1)
-		goto fd;
+		goto p;
+	fd = -1;
 
 	if (imsg_compose(&pr->msgbuf, IMSG_CNT_LETTERPIPE, 0, -1,
 			 p[1], NULL, 0) == -1)
-		goto p1;
+		goto p;
+	p[1] = -1;
 
 	if (imsgbuf_flush(&pr->msgbuf) == -1)
-		goto p0;
+		goto p;
 
 	if ((letter->fp = fdopen(p[0], "r")) == NULL)
-		goto p0;
+		goto p;
 	memset(&letter->mbs, 0, sizeof(letter->mbs));
 	return 0;
 
-	fd:
-	close(fd);
-	p1:
-	close(p[1]);
-	p0:
+	p:
 	close(p[0]);
+	if (p[1] != -1)
+		close(p[1]);
+	fd:
+	if (fd != -1)
+		close(fd);
 	return -1;
 }
 
