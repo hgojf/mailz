@@ -1064,7 +1064,7 @@ header_encoding(FILE *in, FILE *echo, struct encoding *e)
 	struct header_lex lex;
 	char buf[17];
 	size_t n;
-	int state;
+	int toolong;
 
 	lex.cstate = 0;
 	lex.echo = echo;
@@ -1072,7 +1072,7 @@ header_encoding(FILE *in, FILE *echo, struct encoding *e)
 	lex.skipws = 1;
 
 	n = 0;
-	state = 0;
+	toolong = 0;
 	for (;;) {
 		int ch;
 
@@ -1083,19 +1083,16 @@ header_encoding(FILE *in, FILE *echo, struct encoding *e)
 		if (ch == HL_PIPE)
 			return 0;
 
-		if (state == 0) {
+		if (!toolong) {
 			if (n == sizeof(buf) - 1) {
-				state = 1;
+				toolong = 1;
 				continue;
 			}
 			buf[n++] = ch;
 		}
-
-		if (state == 1)
-			continue;
 	}
 
-	if (state == 0) {
+	if (!toolong) {
 		buf[n] = '\0';
 
 		if (encoding_from_name(e, buf) == -1)
