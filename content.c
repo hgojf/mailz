@@ -97,6 +97,9 @@ static int header_copy_addresses(FILE *, FILE *, const char *);
 static int header_content_type(FILE *, FILE *, struct charset *,
 			       struct encoding *);
 static time_t header_date(FILE *);
+static long header_date_timezone(const char *);
+static long header_date_timezone_std(const char *, size_t);
+static long header_date_timezone_usa(const char *, size_t);
 static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
 static int header_lex(FILE *, struct header_lex *);
@@ -117,13 +120,6 @@ static const char *days[] = {
 static const char *months[] = {
 	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-};
-
-static const struct {
-	const char *ident;
-	long off;
-} timezones[] = {
-	{ "GMT", 0 },
 };
 
 static int
@@ -842,43 +838,8 @@ header_date(FILE *fp)
 
 	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
 		return -1;
-
-	/*
-	 * XXX: this timezone handling is incomplete, and only handles
-	 * common zones
-	 */
-	tm.tm_gmtoff = -1;
-	for (i = 0; i < nitems(timezones); i++) {
-		if (!strcmp(buf, timezones[i].ident)) {
-			tm.tm_gmtoff = timezones[i].off;
-			break;
-		}
-	}
-
-	if (tm.tm_gmtoff == -1) {
-		char nbuf[3];
-
-		if (strlen(buf) != 5)
-			return -1;
-
-		memcpy(nbuf, &buf[1], 2);
-		nbuf[2] = '\0';
-
-		tm.tm_gmtoff = strtonum(nbuf, 0, 99, &errstr) * 60 * 60;
-		if (errstr != NULL)
-			return -1;
-
-		memcpy(nbuf, &buf[3], 2);
-		nbuf[2] = '\0';
-		tm.tm_gmtoff += strtonum(nbuf, 0, 59, &errstr) * 60;
-		if (errstr != NULL)
-			return -1;
-
-		if (buf[0] == '-')
-			tm.tm_gmtoff = -tm.tm_gmtoff;
-		else if (buf[0] != '+')
-			return -1;
-	}
+	if ((tm.tm_gmtoff = header_date_timezone(buf)) == -1)
+		return -1;
 
 	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1)
 		return -1;
@@ -890,6 +851,93 @@ header_date(FILE *fp)
 		return -1;
 
 	return date - off;
+}
+
+static long
+header_date_timezone(const char *s)
+{
+	size_t len;
+	long rv;
+
+	len = strlen(s);
+
+	if ((rv = header_date_timezone_std(s, len)) != -1)
+		return rv;
+	if ((rv = header_date_timezone_usa(s, len)) != -1)
+		return rv;
+
+	if (!strcmp(s, "UT") || !strcmp(s, "GMT"))
+		return 0;
+
+	return -1;
+}
+
+static long
+header_date_timezone_std(const char *s, size_t len)
+{
+	const char *errstr;
+	char nbuf[3];
+	long rv;
+
+	if (len != 5)
+		return -1;
+
+	memcpy(nbuf, &s[1], 2);
+	nbuf[2] = '\0';
+
+	rv = strtonum(nbuf, 0, 99, &errstr) * 60 * 60;
+	if (errstr != NULL)
+		return -1;
+
+	memcpy(nbuf, &s[3], 2);
+	nbuf[2] = '\0';
+
+	rv += strtonum(nbuf, 0, 59, &errstr) * 60;
+	if (errstr != NULL)
+		return -1;
+
+	if (s[0] == '-')
+		rv = -rv;
+	else if (s[0] != '+')
+		return -1;
+
+	return rv;
+}
+
+static long
+header_date_timezone_usa(const char *s, size_t len)
+{
+	long hr;
+
+	if (len != 3)
+		return -1;
+
+	switch (s[0]) {
+	case 'E':
+		hr = -5;
+		break;
+	case 'C':
+		hr = -6;
+		break;
+	case 'M':
+		hr = -7;
+		break;
+	case 'P':
+		hr = -8;
+		break;
+	default:
+		return -1;
+	}
+
+	if (s[1] == 'D')
+		hr -= 1;
+	else if (s[1] != 'S')
+		return -1;
+
+	if (s[2] != 'T')
+		return -1;
+
+	return hr * 60 * 60;
 }
 
 static int
