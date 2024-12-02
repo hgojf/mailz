@@ -94,15 +94,15 @@ static int handle_summary(struct imsgbuf *, struct imsg *);
 static int header_address(FILE *, struct from *, int *);
 static int header_copy(FILE *, FILE *);
 static int header_copy_addresses(FILE *, FILE *, const char *);
-static int header_content_type(FILE *, FILE *, int, struct charset *,
+static int header_content_type(FILE *, FILE *, struct charset *,
 			       struct encoding *);
 static time_t header_date(FILE *);
-static int header_encoding(FILE *, FILE *, int, struct encoding *);
+static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
 static int header_lex(FILE *, struct header_lex *);
 static int header_message_id(FILE *, char *, size_t);
 static int header_name(FILE *, char *, size_t);
-static int header_skip(FILE *, FILE *, int);
+static int header_skip(FILE *, FILE *);
 static int header_subject(FILE *, char *, size_t);
 static int header_token(FILE *, struct header_lex *, char *, size_t,
 			int *);
@@ -208,7 +208,8 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 	got_encoding = 0;
 	for (;;) {
 		char buf[HEADER_NAME_LEN];
-		int echo, hv;
+		FILE *echo;
+		int hv;
 
 		if ((hv = header_name(in, buf, sizeof(buf))) == -1)
 			return -1;
@@ -216,9 +217,9 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			break;
 
 		if (reply || (ignore != NULL && ignore_header(buf, ignore)))
-			echo = 0;
+			echo = NULL;
 		else
-			echo = 1;
+			echo = out;
 
 		if (echo) {
 			if (fprintf(out, "%s:", buf) < 0) {
@@ -231,7 +232,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 		if (!strcasecmp(buf, "content-transfer-encoding")) {
 			if (got_encoding)
 				return -1;
-			if ((hv = header_encoding(in, out, echo, &encoding)) == -1)
+			if ((hv = header_encoding(in, echo, &encoding)) == -1)
 				return -1;
 			if (hv == 0)
 				return -1;
@@ -240,7 +241,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 		else if (!strcasecmp(buf, "content-type")) {
 			if (got_content_type)
 				return -1;
-			if ((hv = header_content_type(in, out, echo,
+			if ((hv = header_content_type(in, echo,
 						      &charset, &encoding)) == -1)
 				return -1;
 			if (hv == 0)
@@ -249,7 +250,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			got_content_type = 1;
 		}
 		else {
-			if ((hv = header_skip(in, out, echo)) == -1)
+			if ((hv = header_skip(in, echo)) == -1)
 				return -1;
 			if (hv == 0)
 				return -1;
@@ -400,7 +401,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 			if ((references = ftello(in)) == -1)
 				goto out;
-			if (header_skip(in, NULL, 0) == -1)
+			if (header_skip(in, NULL) == -1)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "reply-to")) {
@@ -408,7 +409,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 			if ((reply_to = ftello(in)) == -1)
 				goto out;
-			if (header_skip(in, NULL, 0) == -1)
+			if (header_skip(in, NULL) == -1)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "subject")) {
@@ -420,11 +421,11 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 			if ((to = ftello(in)) == -1)
 				goto out;
-			if (header_skip(in, NULL, 0) == -1)
+			if (header_skip(in, NULL) == -1)
 				goto out;
 		}
 		else {
-			if (header_skip(in, NULL, 0) == -1)
+			if (header_skip(in, NULL) == -1)
 				goto out;
 		}
 	}
@@ -635,7 +636,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 			sm.have_subject = 1;
 		}
 		else {
-			if (header_skip(fp, NULL, 0) == -1)
+			if (header_skip(fp, NULL) == -1)
 				goto fp;
 			continue;
 		}
@@ -952,7 +953,7 @@ header_copy_addresses(FILE *in, FILE *out, const char *exclude)
 }
 
 static int
-header_content_type(FILE *in, FILE *out, int echo, struct charset *ct,
+header_content_type(FILE *in, FILE *echo, struct charset *ct,
 		    struct encoding *enc)
 {
 	char buf[19];
@@ -961,7 +962,7 @@ header_content_type(FILE *in, FILE *out, int echo, struct charset *ct,
 	int state;
 
 	lex.cstate = 0;
-	lex.echo = echo ? out : NULL;
+	lex.echo = echo;
 	lex.qstate = 0;
 	lex.skipws = 1;
 
@@ -1058,7 +1059,7 @@ header_content_type(FILE *in, FILE *out, int echo, struct charset *ct,
 }
 
 static int
-header_encoding(FILE *in, FILE *out, int echo, struct encoding *e)
+header_encoding(FILE *in, FILE *echo, struct encoding *e)
 {
 	struct header_lex lex;
 	char buf[17];
@@ -1066,7 +1067,7 @@ header_encoding(FILE *in, FILE *out, int echo, struct encoding *e)
 	int state;
 
 	lex.cstate = 0;
-	lex.echo = echo ? out : NULL;
+	lex.echo = echo;
 	lex.qstate = 0;
 	lex.skipws = 1;
 
@@ -1118,7 +1119,7 @@ header_from(FILE *fp, struct from *from)
 		return -1;
 
 	if (!eof)
-		if (header_skip(fp, NULL, 0) == -1)
+		if (header_skip(fp, NULL) == -1)
 			return -1;
 	return 0;
 }
@@ -1278,13 +1279,13 @@ header_name(FILE *fp, char *buf, size_t bufsz)
 }
 
 static int
-header_skip(FILE *in, FILE *out, int echo)
+header_skip(FILE *in, FILE *echo)
 {
 	struct header_lex lex;
 	int ch;
 
 	lex.cstate = -1;
-	lex.echo = echo ? out : NULL;
+	lex.echo = echo;
 	lex.qstate = -1;
 	lex.skipws = 0;
 
