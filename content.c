@@ -838,7 +838,7 @@ header_date(FILE *fp)
 
 	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
 		return -1;
-	if ((tm.tm_gmtoff = header_date_timezone(buf)) == -1)
+	if ((off = header_date_timezone(buf)) == -1)
 		return -1;
 
 	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1)
@@ -846,7 +846,6 @@ header_date(FILE *fp)
 	if (n != 0)
 		return -1;
 
-	off = tm.tm_gmtoff;
 	if ((date = timegm(&tm)) == -1)
 		return -1;
 
