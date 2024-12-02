@@ -21,7 +21,6 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <imsg.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -149,19 +148,19 @@ content_proc_ignore(struct content_proc *pr, const char *s, int type)
 int
 content_proc_init(struct content_proc *pr, const char *exe, int null)
 {
-	pid_t pid;
 	int i, sv[2];
 
 	if (socketpair(AF_UNIX,
 		       SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
 		       sv) == -1)
 		return -1;
+	if (imsgbuf_init(&pr->msgbuf, sv[0]) == -1)
+		goto sv;
+	imsgbuf_allow_fdpass(&pr->msgbuf);
 
-	switch (pid = fork()) {
+	switch (pr->pid = fork()) {
 	case -1:
-		close(sv[0]);
-		close(sv[1]);
-		return -1;
+		goto msgbuf;
 	case 0:
 		for (i = 0; i < 3; i++)
 			if (dup2(null, i) == -1)
@@ -175,16 +174,14 @@ content_proc_init(struct content_proc *pr, const char *exe, int null)
 	}
 
 	close(sv[1]);
-
-	if (imsgbuf_init(&pr->msgbuf, sv[0]) == -1) {
-		close(sv[0]);
-		kill(pid, SIGKILL);
-		waitpid(pid, NULL, 0);
-		return -1;
-	}
-	imsgbuf_allow_fdpass(&pr->msgbuf);
-	pr->pid = pid;
 	return 0;
+
+	msgbuf:
+	imsgbuf_clear(&pr->msgbuf);
+	sv:
+	close(sv[0]);
+	close(sv[1]);
+	return -1;
 }
 
 int
