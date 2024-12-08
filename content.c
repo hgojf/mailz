@@ -1336,7 +1336,7 @@ header_skip(FILE *in, FILE *echo)
 	while ((ch = header_lex(in, &lex)) != HL_EOF) {
 		if (ch == HL_ERR)
 			return -1;
-		if (echo && ch == HL_PIPE)
+		if (echo != NULL && ch == HL_PIPE)
 			return 0;
 	}
 	return 1;
