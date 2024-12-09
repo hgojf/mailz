@@ -56,6 +56,14 @@
 #define HL_ERR -130
 #define HL_PIPE -131
 
+struct from {
+	char *addr;
+	char *name;
+	size_t addrsz;
+	size_t namesz;
+};
+
+
 struct header_lex {
 	int cstate;
 	int qstate;
@@ -69,13 +77,6 @@ struct ignore {
 	#define IGNORE_IGNORE 0
 	#define IGNORE_RETAIN 1
 	int type;
-};
-
-struct from {
-	char *addr;
-	char *name;
-	size_t addrsz;
-	size_t namesz;
 };
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
