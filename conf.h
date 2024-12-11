@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ_CONF_H
-#define MAILZ_CONF_H
+#ifndef CONF_H
+#define CONF_H
 struct mailz_conf {
 	char address[255];
 	struct mailz_ignore {
@@ -29,4 +29,4 @@ struct mailz_conf {
 
 void mailz_conf_free(struct mailz_conf *);
 int mailz_conf_init(struct mailz_conf *);
-#endif /* MAILZ_CONF_H */
+#endif /* ! CONF_H */

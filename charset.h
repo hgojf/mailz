@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ_CHARSET_H
-#define MAILZ_CHARSET_H
+#ifndef CHARSET_H
+#define CHARSET_H
 #include <wchar.h>
 
 #include "encoding.h"
@@ -44,4 +44,4 @@ struct charset {
 int charset_from_name(struct charset *, const char *);
 void charset_from_type(struct charset *, enum charset_type);
 int charset_getc(struct charset *, struct encoding *, FILE *, char [static 4]);
-#endif /* MAILZ_CHARSET_H */
+#endif /* ! CHARSET_H */

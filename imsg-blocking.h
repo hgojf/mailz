@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ_IMSG_BLOCKING_H
-#define MAILZ_IMSG_BLOCKING_H
+#ifndef IMSG_BLOCKING_H
+#define IMSG_BLOCKING_H
 ssize_t imsg_get_blocking(struct imsgbuf *, struct imsg *);
-#endif /* MAILZ_IMSG_BLOCKING_H */
+#endif /* ! IMSG_BLOCKING_H */

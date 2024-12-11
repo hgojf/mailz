@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ__ERR_H
-#define MAILZ__ERR_H
+#ifndef _ERR_H
+#define _ERR_H
 __dead void _err(int, const char *, ...)
 	__attribute__((__format__(printf, 2, 3)));
-#endif /* MAILZ__ERR_H */
+#endif /* ! _ERR_H */

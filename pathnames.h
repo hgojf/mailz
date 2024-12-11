@@ -14,11 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ_PATHNAMES_H
-#define MAILZ_PATHNAMES_H
+#ifndef PATHNAMES_H
+#define PATHNAMES_H
 #define PATH_DEV_NULL "/dev/null"
 #define PATH_MAILZ_CONTENT PREFIX "/libexec/mailz-content"
 #define PATH_LESS "/usr/bin/less"
 #define PATH_SENDMAIL "/usr/sbin/sendmail"
 #define PATH_TMPDIR "/tmp/mailz.XXXXXX"
-#endif /* MAILZ_PATHNAMES_H */
+#endif /* ! PATHNAMES_H */

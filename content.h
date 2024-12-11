@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ_CONTENT_H
-#define MAILZ_CONTENT_H
+#ifndef CONTENT_H
+#define CONTENT_H
 enum {
 	IMSG_CNT_IGNORE,
 	IMSG_CNT_RETAIN,
@@ -43,4 +43,4 @@ struct content_summary {
 	char subject[245];
 	int have_subject;
 };
-#endif /* MAILZ_CONTENT_H */
+#endif /* ! CONTENT_H */

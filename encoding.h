@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ_ENCODING_H
-#define MAILZ_ENCODING_H
+#ifndef ENCODING_H
+#define ENCODING_H
 enum encoding_type {
 	ENCODING_7BIT,
 	ENCODING_8BIT,
@@ -42,4 +42,4 @@ struct encoding {
 int encoding_from_name(struct encoding *, const char *);
 void encoding_from_type(struct encoding *, enum encoding_type);
 int encoding_getc(struct encoding *, FILE *);
-#endif /* MAILZ_ENCODING_H */
+#endif /* ! ENCODING_H */

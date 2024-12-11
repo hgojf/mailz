@@ -14,8 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef MAILZ_CONTENT_PROC_H
-#define MAILZ_CONTENT_PROC_H
+#ifndef CONTENT_PROC_H
+#define CONTENT_PROC_H
 #include <sys/queue.h>
 
 #include <imsg.h>
@@ -45,4 +45,4 @@ struct content_letter {
 void content_letter_close(struct content_letter *);
 int content_letter_getc(struct content_letter *, char [static 4]);
 int content_letter_init(struct content_proc *, struct content_letter *, int);
-#endif /* MAILZ_CONTENT_PROC_H */
+#endif /* ! CONTENT_PROC_H */
