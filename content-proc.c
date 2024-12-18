@@ -353,37 +353,20 @@ content_proc_summary(struct content_proc *pr,
 static int
 string_valid(const char *s, size_t sz)
 {
-	mbstate_t mbs;
-	size_t len, n;
+	size_t i;
 
-	if ((len = strnlen(s, sz)) == sz)
-		return 0;
-	len += 1; /* include the NUL */
-
-	memset(&mbs, 0, sizeof(mbs));
-
-	while ((n = mbrtowc(NULL, s, len, &mbs)) != 0) {
+	for (i = 0; i < sz; i++) {
 		int ch;
 
-		switch (n) {
-		case -1:
-		case -3:
+		if (s[i] == '\0')
+			return 1;
+
+		ch = (unsigned char)s[i];
+
+		if (!isspace(ch) && !isprint(ch))
 			return 0;
-		case -2:
-			s += 1;
-			len -= 1;
-			break;
-		case 1:
-			ch = (unsigned char)*s;
-			if (!isprint(ch) && !isspace(ch))
-				return 0;
-			/* FALLTHROUGH */
-		default:
-			s += n;
-			len -= n;
-			break;
-		}
 	}
 
-	return 1;
+	/* no NUL terminator */
+	return 0;
 }
