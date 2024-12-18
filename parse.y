@@ -172,7 +172,8 @@ int
 mailz_conf_init(struct mailz_conf *c)
 {
 	struct passwd *pw;
-	char path[PATH_MAX], *pathp;
+	char hostname[HOST_NAME_MAX + 1], path[PATH_MAX], *pathp;
+	int n;
 
 	memset(c, 0, sizeof(*c));
 
@@ -189,8 +190,12 @@ mailz_conf_init(struct mailz_conf *c)
 		pathp = path;
 	}
 
-	if (strlcpy(c->address, pw->pw_name, sizeof(c->address))
-		    >= sizeof(c->address))
+	if (gethostname(hostname, sizeof(hostname)) == -1)
+		return -1;
+
+	n = snprintf(c->address, sizeof(c->address), "%s@%s", pw->pw_name,
+		     hostname);
+	if (n < 0 || (size_t)n >= sizeof(c->address))
 		return -1;
 
 	if (configure(c, pathp) == -1)
