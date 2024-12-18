@@ -94,7 +94,7 @@ static int header_subject_reply(FILE *, FILE *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static int header_address(FILE *, struct from *, int *);
 static int header_copy(FILE *, FILE *);
-static int header_copy_addresses(FILE *, FILE *, const char *);
+static int header_copy_addresses(FILE *, FILE *, const char *, int *);
 static int header_content_type(FILE *, FILE *, struct charset *,
 			       struct encoding *);
 static time_t header_date(FILE *);
@@ -356,9 +356,12 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 			break;
 
 		if (setup.group && !strcasecmp(buf, "cc")) {
+			int any;
+
 			if (fprintf(out, "Cc:") < 0)
 				goto out;
-			if (header_copy_addresses(in, out, addr) == -1)
+			any = 0;
+			if (header_copy_addresses(in, out, addr, &any) == -1)
 				goto out;
 			if (fprintf(out, "\n") < 0)
 				goto out;
@@ -546,32 +549,29 @@ static int
 handle_reply_to(FILE *in, FILE *out, const char *addr, off_t from,
 		off_t to, off_t reply_to)
 {
+	int any;
+
 	if (fprintf(out, "To:") < 0)
 		return -1;
 
+	any = 0;
 	if (reply_to != -1) {
 		if (fseeko(in, reply_to, SEEK_SET) == -1)
 			return -1;
-		if (header_copy_addresses(in, out, addr) == -1)
+		if (header_copy_addresses(in, out, addr, &any) == -1)
 			return -1;
 	}
 	else {
 		if (fseeko(in, from, SEEK_SET) == -1)
 			return -1;
-		if (header_copy_addresses(in, out, addr) == -1)
+		if (header_copy_addresses(in, out, addr, &any) == -1)
 			return -1;
 	}
 
 	if (to != -1) {
 		if (fseeko(in, to, SEEK_SET) == -1)
 			return -1;
-		/*
-		 * XXX: if the from or reply_to header only contained our
-		 * address, this will be an extraneous comma.
-		 */
-		if (fprintf(out, ",") == -1)
-			return -1;
-		if (header_copy_addresses(in, out, addr) == -1)
+		if (header_copy_addresses(in, out, addr, &any) == -1)
 			return -1;
 	}
 
@@ -964,11 +964,11 @@ header_copy(FILE *in, FILE *out)
 }
 
 static int
-header_copy_addresses(FILE *in, FILE *out, const char *exclude)
+header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
 {
 	char addr[255], name[65];
 	struct from from;
-	int any, eof, n;
+	int eof, n;
 
 	from.addr = addr;
 	from.addrsz = sizeof(addr);
@@ -976,7 +976,6 @@ header_copy_addresses(FILE *in, FILE *out, const char *exclude)
 	from.name = name;
 	from.namesz = sizeof(name);
 
-	any = 0;
 	eof = 0;
 	while ((n = header_address(in, &from, &eof)) != 0) {
 		if (n == -1)
@@ -984,7 +983,7 @@ header_copy_addresses(FILE *in, FILE *out, const char *exclude)
 		if (!strcmp(addr, exclude))
 			continue;
 
-		if (any)
+		if (*any)
 			if (fprintf(out, ",") < 0)
 				return -1;
 
@@ -996,7 +995,7 @@ header_copy_addresses(FILE *in, FILE *out, const char *exclude)
 			if (fprintf(out, " %s", addr) < 0)
 				return -1;
 		}
-		any = 1;
+		*any = 1;
 	}
 
 	return 0;
