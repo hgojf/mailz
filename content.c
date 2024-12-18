@@ -89,7 +89,7 @@ static int handle_reply_body(FILE *, FILE *, time_t, const char *,
 			     const char *);
 static int handle_reply_references(FILE *, FILE *, const char *,
 				   const char *, off_t);
-static int handle_reply_to(FILE *, FILE *, char *, off_t, off_t, off_t);
+static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int header_subject_reply(FILE *, FILE *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static int header_address(FILE *, struct from *, int *);
@@ -305,7 +305,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	struct content_reply_setup setup;
 	struct imsg msg2;
 	FILE *in, *out;
-	char in_reply_to[MSGID_LEN], msgid[MSGID_LEN];
+	char *addr, in_reply_to[MSGID_LEN], msgid[MSGID_LEN];
 	char from_addr[255], from_name[65];
 	ssize_t n;
 	time_t date;
@@ -332,6 +332,13 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	if ((out = imsg_get_fp(&msg2, "w")) == NULL)
 		goto msg2;
 
+	if ((addr = strchr(setup.addr, '<')) != NULL) {
+		addr++;
+		addr[strcspn(addr, ">")] = '\0';
+	}
+	else
+		addr = setup.addr;
+
 	date = -1;
 	from = -1;
 	in_reply_to[0] = '\0';
@@ -351,7 +358,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 		if (setup.group && !strcasecmp(buf, "cc")) {
 			if (fprintf(out, "Cc:") < 0)
 				goto out;
-			if (header_copy(in, out) == -1)
+			if (header_copy_addresses(in, out, addr) == -1)
 				goto out;
 			if (fprintf(out, "\n") < 0)
 				goto out;
@@ -433,7 +440,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	if (fprintf(out, "From: %s\n", setup.addr) < 0)
 		goto out;
 
-	if (handle_reply_to(in, out, setup.addr, from, to, reply_to) == -1)
+	if (handle_reply_to(in, out, addr, from, to, reply_to) == -1)
 		goto out;
 	if (handle_reply_references(in, out, msgid, in_reply_to,
 				    references) == -1)
@@ -536,20 +543,11 @@ handle_reply_references(FILE *in, FILE *out, const char *msgid,
 }
 
 static int
-handle_reply_to(FILE *in, FILE *out, char *from_addr, off_t from,
+handle_reply_to(FILE *in, FILE *out, const char *addr, off_t from,
 		off_t to, off_t reply_to)
 {
-	char *addr;
-
 	if (fprintf(out, "To:") < 0)
 		return -1;
-
-	if ((addr = strchr(from_addr, '<')) != NULL) {
-		addr++;
-		addr[strcspn(addr, ">")] = '\0';
-	}
-	else
-		addr = from_addr;
 
 	if (reply_to != -1) {
 		if (fseeko(in, reply_to, SEEK_SET) == -1)
@@ -567,6 +565,10 @@ handle_reply_to(FILE *in, FILE *out, char *from_addr, off_t from,
 	if (to != -1) {
 		if (fseeko(in, to, SEEK_SET) == -1)
 			return -1;
+		/*
+		 * XXX: if the from or reply_to header only contained our
+		 * address, this will be an extraneous comma.
+		 */
 		if (fprintf(out, ",") == -1)
 			return -1;
 		if (header_copy_addresses(in, out, addr) == -1)
