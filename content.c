@@ -1364,7 +1364,7 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 		if (ch == HL_ERR)
 			return -1;
 		if (!isspace(ch) && !isprint(ch))
-			continue;
+			return -1;
 
 		if (n == bufsz - 1)
 			continue; /* truncate */
