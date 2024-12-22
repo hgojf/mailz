@@ -63,7 +63,6 @@ struct from {
 	size_t namesz;
 };
 
-
 struct header_lex {
 	int cstate;
 	int qstate;
