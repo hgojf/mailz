@@ -99,7 +99,7 @@ maildir_unset_flag(const char *name, int flag, char *buf, size_t bufsz)
 	size_t i, j;
 
 	if (maildir_info(name, &info) == -1)
-		return NULL;
+		return name;
 
 	if (bufsz == 0)
 		return NULL;
