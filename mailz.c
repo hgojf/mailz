@@ -813,22 +813,30 @@ main(int argc, char *argv[])
 		usage();
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
-		return 1;
+		errx(1, "setlocale");
 	signal(SIGPIPE, SIG_IGN);
 
 	if (mailz_conf_init(&conf) == -1)
 		return 1;
 
-	if ((root = open(argv[0], O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+	if ((root = open(argv[0], O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
+		warn("%s", argv[0]);
 		goto conf;
-	if ((cur = openat(root, "cur", O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+	}
+	if ((cur = openat(root, "cur", O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
+		warn("%s/cur", argv[0]);
 		goto root;
+	}
 
-	if (mkdtemp(tmpdir) == NULL)
+	if (mkdtemp(tmpdir) == NULL) {
+		warn("%s", tmpdir);
 		goto cur;
+	}
 
-	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
+	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1) {
+		warn("%s", PATH_DEV_NULL);
 		goto tmpdir;
+	}
 
 	if (unveil(tmpdir, "rwc") == -1)
 		goto null;
