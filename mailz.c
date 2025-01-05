@@ -623,19 +623,27 @@ letter_from_summary(struct letter *letter, const char *path,
 static int
 letter_print(size_t nth, struct letter *letter)
 {
-	struct tm tm;
+	struct tm ctm, tm;
 	char date[33];
-	const char *subject;
+	const char *fmt, *subject;
+	time_t now;
 
+	now = time(NULL);
+	if (localtime_r(&now, &ctm) == NULL)
+		return -1;
 	if (localtime_r(&letter->date, &tm) == NULL)
 		return -1;
-	if (strftime(date, sizeof(date), "%a %b %d %H:%M", &tm) == 0)
+	if (ctm.tm_year == tm.tm_year)
+		fmt = "%a %b %d %H:%M";
+	else
+		fmt = "%a %b %d %H:%M %Y";
+	if (strftime(date, sizeof(date), fmt, &tm) == 0)
 		return -1;
 
 	if ((subject = letter->subject) == NULL)
 		subject = "No Subject";
 
-	if (printf("%4zu %-20s %-32s %-30s\n", nth, date,
+	if (printf("%4zu %-24s %-32s %-30s\n", nth, date,
 		   letter->from, subject) < 0)
 		return -1;
 	return 0;
