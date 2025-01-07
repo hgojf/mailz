@@ -60,6 +60,7 @@ static void commands_run(struct letter *, size_t, int, int,
 			 struct mailz_ignore *);
 static int commands_token(FILE *, char *, size_t, int *);
 static const struct command *commands_search(const char *);
+static int command_delete(struct letter *, struct command_args *);
 static int command_flag(struct letter *, struct command_args *, int,
 			int);
 static int command_more(struct letter *, struct command_args *);
@@ -86,6 +87,7 @@ static const struct command {
 	int alias;
 	int (*fn) (struct letter *, struct command_args *);
 } commands[] = {
+	{ "delete",	CMD_NOALIAS,	command_delete },
 	{ "more",	CMD_NOALIAS,	command_more },
 	{ "read",	'r',		command_read },
 	{ "reply",	CMD_NOALIAS,	command_reply },
@@ -215,6 +217,12 @@ commands_search(const char *s)
 			return &commands[i];
 	}
 	return NULL;
+}
+
+static int
+command_delete(struct letter *letter, struct command_args *args)
+{
+	return command_flag(letter, args, 'T', 1);
 }
 
 static int
