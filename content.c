@@ -1363,7 +1363,7 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 		if (ch == HL_ERR)
 			return -1;
 		if (!isspace(ch) && !isprint(ch))
-			return -1;
+			continue; /* ignore */
 
 		if (n == bufsz - 1)
 			continue; /* truncate */
