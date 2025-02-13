@@ -1534,7 +1534,7 @@ main(int argc, char *argv[])
 	}
 
 	argc -= optind;
-	argv += optind;
+	/* No argv += optind; because we dont use argv. */
 
 	if (argc != 0)
 		usage();
