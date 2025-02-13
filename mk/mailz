@@ -1,7 +1,8 @@
 .PHONY: clean-mailz install-mailz tidy-mailz
 
-SRCS_MAILZ = _err.c ${.OBJDIR}/conf-lex.c ${.OBJDIR}/conf-parse.c
-SRCS_MAILZ +=  content-proc.c imsg-blocking.c maildir.c mailz.c
+SRCS_MAILZ_NOGEN = _err.c content-proc.c imsg-blocking.c maildir.c mailz.c
+SRCS_MAILZ = ${.OBJDIR}/conf-lex.c ${.OBJDIR}/conf-parse.c
+SRCS_MAILZ += ${SRCS_MAILZ_NOGEN} 
 DEPS_MAILZ = $(SRCS_MAILZ:.c=.d)
 OBJS_MAILZ = $(SRCS_MAILZ:.c=.o)
 
@@ -26,6 +27,6 @@ mailz: ${OBJS_MAILZ}
 	$(CC) -o $@ ${LDFLAGS_MAILZ} ${OBJS_MAILZ}
 
 tidy-mailz:
-	cd ${.CURDIR} && clang-tidy ${TIDYFLAGS} ${SRCS_MAILZ} -- ${CFLAGS}
+	cd ${.CURDIR} && clang-tidy ${TIDYFLAGS} ${SRCS_MAILZ_NOGEN} -- ${CFLAGS}
 
 -include ${DEPS_MAILZ}
