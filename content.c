@@ -36,21 +36,21 @@
 #include "imsg-blocking.h"
 
 /*
- * Email lines should be at max 998 bytes.
- * One byte is used for the ':', 2 bytes for the CRLF, the rest are
- * available for header identifiers.
+ * Email lines should be at max 998 bytes, excluding the CRLF.
+ * One byte is used for the ':', the rest are available for header
+ * identifiers.
  * This length includes the terminating NUL byte.
  */
-#define HEADER_NAME_LEN 996
+#define HEADER_NAME_LEN 998
 
 /*
- * Email lines should be at max 998 bytes.
+ * Email lines should be at max 998 bytes, excluding the CRLF.
  * One byte (at minimum) is used for the header identifier,
  * another is used for the ':', 2 are used for the opening and closing
- * '<', 2 are used for the CRLF.
+ * '<'.
  * This length includes the terminating NUL byte.
  */
-#define MSGID_LEN 993
+#define MSGID_LEN 995
 
 #define HL_EOF -129
 #define HL_ERR -130
