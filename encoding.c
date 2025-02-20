@@ -26,11 +26,8 @@
 
 static int encoding_b64(struct encoding_b64 *, FILE *);
 static int encoding_qp(FILE *);
-static int encoding_raw(FILE *, int);
+static int encoding_raw(FILE *, int, int);
 static int hexdigcaps(int);
-
-#define ENC_RAW_7BIT 0x1
-#define ENC_RAW_NONUL 0x2
 
 struct {
 	const char *ident;
@@ -118,13 +115,13 @@ encoding_getc(struct encoding *e, FILE *fp)
 {
 	switch (e->type) {
 	case ENCODING_7BIT:
-		return encoding_raw(fp, ENC_RAW_NONUL | ENC_RAW_7BIT);
+		return encoding_raw(fp, 0, 0);
 	case ENCODING_8BIT:
-		return encoding_raw(fp, ENC_RAW_NONUL);
+		return encoding_raw(fp, 1, 0);
 	case ENCODING_BASE64:
 		return encoding_b64(&e->v.b64, fp);
 	case ENCODING_BINARY:
-		return encoding_raw(fp, 0);
+		return encoding_raw(fp, 1, 1);
 	case ENCODING_QP:
 		return encoding_qp(fp);
 	}
@@ -164,18 +161,16 @@ encoding_qp(FILE *fp)
 }
 
 static int
-encoding_raw(FILE *fp, int flags)
+encoding_raw(FILE *fp, int high, int nul)
 {
 	int ch;
 
 	if ((ch = fgetc(fp)) == EOF)
 		return ENCODING_EOF;
-
-	if (flags & ENC_RAW_NONUL && ch == '\0')
+	if (!high && (ch & 0x80))
 		return ENCODING_ERR;
-	if (flags & ENC_RAW_7BIT && ch > 127)
+	if (!nul && ch == '\0')
 		return ENCODING_ERR;
-
 	return ch;
 }
 
