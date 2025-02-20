@@ -47,7 +47,8 @@ mailz: $(OBJS_MAILZ)
 
 -include $(DEPS_MAILZ)
 
-SRCS_REGRESS = encoding.c regress/encoding.c regress/regress.c
+SRCS_REGRESS = charset.c encoding.c regress/charset.c regress/encoding.c
+SRCS_REGRESS += regress/regress.c
 
 DEPS_REGRESS = $(SRCS_REGRESS:.c=.d)
 OBJS_REGRESS = $(SRCS_REGRESS:.c=.o)
@@ -61,8 +62,9 @@ test: regress-run
 
 -include $(DEPS_REGRESS)
 
-SRCS_ALL = _err.c charset.c content-proc.c content.c encoding.c imsg-blocking.c
-SRCS_ALL += maildir.c mailz.c regress/encoding.c regress/regress.c
+SRCS_ALL = _err.c charset.c content-proc.c content.c encoding.c
+SRCS_ALL += imsg-blocking.c maildir.c mailz.c regress/charset.c
+SRCS_ALL += regress/encoding.c regress/regress.c
 SRCS_GENERATED = lex.c parse.c
 
 .PHONY: tidy

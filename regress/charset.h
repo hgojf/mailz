@@ -14,16 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdio.h>
+#ifndef REGRESS_CHARSET_H
+#define REGRESS_CHARSET_H
 
-#include "charset.h"
-#include "encoding.h"
+void charset_getc_test(void);
 
-int
-main(void)
-{
-	charset_getc_test();
-	encoding_getc_test();
-
-	puts("Ok.");
-}
+#endif /* !REGRESS_CHARSET_H */
