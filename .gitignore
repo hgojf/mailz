@@ -1,7 +1,7 @@
 regress/*.[od]
 *.[od]
-conf-lex.c
-conf-parse.[ch]
+lex.c
+parse.[ch]
 mailz
 mailz-content
 regress-run

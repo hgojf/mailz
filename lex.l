@@ -17,7 +17,7 @@
 %{
 #include <string.h>
 
-#include "conf-parse.h"
+#include "parse.h"
 %}
 
 %option noinput nounput
