@@ -1,5 +1,7 @@
+regress/*.[od]
 *.[od]
 conf-lex.c
 conf-parse.[ch]
 mailz
 mailz-content
+regress-run

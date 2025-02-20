@@ -1,0 +1,19 @@
+.PHONY: clean-regress test tidy-regress
+
+SRCS_REGRESS = encoding.c regress/encoding.c regress/regress.c
+DEPS_REGRESS = $(SRCS_REGRESS:.c=.d)
+OBJS_REGRESS = $(SRCS_REGRESS:.c=.o)
+
+clean-regress:
+	rm -f regress-run ${DEPS_REGRESS} ${OBJS_REGRESS}
+
+regress-run: ${OBJS_REGRESS}
+	$(CC) -o $@ ${OBJS_REGRESS}
+
+test: regress-run
+	@./regress-run
+
+tidy-regress:
+	clang-tidy ${TIDYFLAGS} ${SRCS_REGRESS} -- ${CFLAGS}
+
+-include ${DEPS_REGRESS}
