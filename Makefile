@@ -7,7 +7,6 @@ CFLAGS += -MD -MP
 CFLAGS += -Wmissing-prototypes -Wvla
 CFLAGS += -Wall -Wextra
 CFLAGS += -DPREFIX=\"${PREFIX}\"
-CFLAGS += -I${.CURDIR}
 
 PREFIX ?= /usr/local
 

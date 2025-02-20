@@ -16,6 +16,6 @@ mailz-content: ${OBJS_CONTENT}
 	$(CC) -o $@ ${LDFLAGS_CONTENT} ${OBJS_CONTENT}
 
 tidy-content:
-	cd ${.CURDIR} && clang-tidy ${TIDYFLAGS} ${SRCS_CONTENT} -- ${CFLAGS}
+	clang-tidy ${TIDYFLAGS} ${SRCS_CONTENT} -- ${CFLAGS}
 
 -include ${DEPS_CONTENT}

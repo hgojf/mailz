@@ -3,5 +3,5 @@
 MANPATH ?= ${PREFIX}/man
 
 install-man:
-	$(INSTALL) -m 0644 ${.CURDIR}/mailz.1 ${MANPATH}/man1/
-	$(INSTALL) -m 0644 ${.CURDIR}/mailz.conf.5 ${MANPATH}/man5/
+	$(INSTALL) -m 0644 mailz.1 ${MANPATH}/man1/
+	$(INSTALL) -m 0644 mailz.conf.5 ${MANPATH}/man5/
