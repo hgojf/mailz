@@ -141,8 +141,11 @@ encoding_qp(FILE *fp)
 		if ((ch = fgetc(fp)) == EOF)
 			return ENCODING_EOF;
 
-		if (ch != '=')
+		if (ch != '=') {
+			if (ch < 33 || ch > 126)
+				return ENCODING_ERR;
 			return ch;
+		}
 
 		if ((hi = fgetc(fp)) == EOF)
 			return ENCODING_ERR;
