@@ -89,7 +89,6 @@ static int handle_reply_body(FILE *, FILE *, time_t, const char *,
 static int handle_reply_references(FILE *, FILE *, const char *,
 				   const char *, off_t);
 static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
-static int header_subject_reply(FILE *, FILE *);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static int header_address(FILE *, struct from *, int *);
 static int header_copy(FILE *, FILE *);
@@ -107,6 +106,7 @@ static int header_message_id(FILE *, char *, size_t);
 static int header_name(FILE *, char *, size_t);
 static int header_skip(FILE *, FILE *);
 static int header_subject(FILE *, char *, size_t);
+static int header_subject_reply(FILE *, FILE *);
 static int header_token(FILE *, struct header_lex *, char *, size_t,
 			int *);
 static int ignore_header(const char *, struct ignore *);
