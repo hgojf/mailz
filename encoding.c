@@ -139,8 +139,15 @@ encoding_qp(FILE *fp)
 			return ENCODING_EOF;
 
 		if (ch != '=') {
-			if (ch < 33 || ch > 126)
-				return ENCODING_ERR;
+			switch (ch) {
+			case ' ':
+			case '\t':
+			case '\n':
+				break;
+			default:
+				if (ch < 33 || ch > 126)
+					return ENCODING_ERR;
+			}
 			return ch;
 		}
 

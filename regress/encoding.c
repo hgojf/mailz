@@ -58,6 +58,7 @@ encoding_getc_test(void)
 		test("hi\0", "hi\0", ENCODING_BINARY, ENCODING_EOF),
 
 		test("hi", "hi", ENCODING_QP, ENCODING_EOF),
+		test("hi ", "hi ", ENCODING_QP, ENCODING_EOF),
 		test("h=\ni", "hi", ENCODING_QP, ENCODING_EOF),
 		test("hi=FF", "hi\xFF", ENCODING_QP, ENCODING_EOF),
 		test("hi\xFF", "hi", ENCODING_QP, ENCODING_ERR),
