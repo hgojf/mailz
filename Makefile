@@ -11,6 +11,8 @@ CFLAGS += -MD -MP
 CFLAGS += -Wall -Wextra
 CFLAGS += -Wmissing-prototypes -Wvla
 
+CFLAGS += -std=c99 -pedantic
+
 # This is needed for outputting object files to the subdirectory
 # where their source file is located, as POSIX does not include the
 # -o $@.
