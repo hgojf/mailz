@@ -33,6 +33,7 @@
 #include "charset.h"
 #include "content.h"
 #include "encoding.h"
+#include "header.h"
 #include "imsg-blocking.h"
 
 /*
@@ -103,7 +104,6 @@ static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
 static int header_lex(FILE *, struct header_lex *);
 static int header_message_id(FILE *, char *, size_t);
-static int header_name(FILE *, char *, size_t);
 static int header_skip(FILE *, FILE *);
 static int header_subject(FILE *, char *, size_t);
 static int header_subject_reply(FILE *, FILE *);
@@ -207,10 +207,10 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 		FILE *echo;
 		int hv;
 
-		if ((hv = header_name(in, buf, sizeof(buf))) == -1)
-			return -1;
-		if (hv == 0)
+		if ((hv = header_name(in, buf, sizeof(buf))) == HEADER_EOF)
 			break;
+		if (hv != HEADER_OK)
+			return -1;
 
 		if (reply || (ignore != NULL && ignore_header(buf, ignore)))
 			echo = NULL;
@@ -349,10 +349,10 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 		char buf[HEADER_NAME_LEN];
 		int hv;
 
-		if ((hv = header_name(in, buf, sizeof(buf))) == -1)
-			goto out;
-		if (hv == 0)
+		if ((hv = header_name(in, buf, sizeof(buf))) == HEADER_EOF)
 			break;
+		if (hv != HEADER_OK)
+			goto out;
 
 		if (setup.group && !strcasecmp(buf, "cc")) {
 			int any;
@@ -597,10 +597,10 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 		char buf[HEADER_NAME_LEN];
 		int n;
 
-		if ((n = header_name(fp, buf, sizeof(buf))) == -1)
-			goto fp;
-		if (n == 0)
+		if ((n = header_name(fp, buf, sizeof(buf))) == HEADER_EOF)
 			break;
+		if (n != HEADER_OK)
+			goto fp;
 
 		if (!strcasecmp(buf, "date")) {
 			if (sm.date != -1)
@@ -1290,37 +1290,6 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 
 	buf[n] = '\0';
 	return 0;
-}
-
-static int
-header_name(FILE *fp, char *buf, size_t bufsz)
-{
-	size_t n;
-
-	if (bufsz == 0)
-		return -1;
-
-	n = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = fgetc(fp)) == EOF)
-			return -1;
-		if (ch == ':')
-			break;
-		if (ch == '\n' && n == 0)
-			return 0;
-
-		if (ch < 33 || ch > 126)
-			return -1;
-
-		if (n == bufsz - 1)
-			return -1;
-		buf[n++] = ch;
-	}
-
-	buf[n] = '\0';
-	return 1;
 }
 
 static int

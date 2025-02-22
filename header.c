@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Henry Ford <fordhenry2299@gmail.com>
+ * Copyright (c) 2024 Henry Ford <fordhenry2299@gmail.com>
 
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,16 +16,35 @@
 
 #include <stdio.h>
 
-#include "charset.h"
-#include "encoding.h"
 #include "header.h"
 
 int
-main(void)
+header_name(FILE *fp, char *buf, size_t bufsz)
 {
-	charset_getc_test();
-	encoding_getc_test();
-	header_name_test();
+	size_t n;
 
-	puts("Ok.");
+	if (bufsz == 0)
+		return HEADER_INVALID;
+
+	n = 0;
+	for (;;) {
+		int ch;
+
+		if ((ch = fgetc(fp)) == EOF)
+			return HEADER_INVALID;
+		if (ch == ':')
+			break;
+		if (ch == '\n' && n == 0)
+			return HEADER_EOF;
+
+		if (ch < 33 || ch > 126)
+			return HEADER_INVALID;
+
+		if (n == bufsz - 1)
+			return HEADER_INVALID;
+		buf[n++] = ch;
+	}
+
+	buf[n] = '\0';
+	return HEADER_OK;
 }

@@ -14,18 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdio.h>
+#ifndef REGRESS_HEADER_H
+#define REGRESS_HEADER_H
 
-#include "charset.h"
-#include "encoding.h"
-#include "header.h"
+void header_name_test(void);
 
-int
-main(void)
-{
-	charset_getc_test();
-	encoding_getc_test();
-	header_name_test();
-
-	puts("Ok.");
-}
+#endif /* REGRESS_HEADER_H */

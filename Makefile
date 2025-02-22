@@ -22,7 +22,7 @@ CFLAGS += -std=c99 -pedantic
 CFLAGS += -DPREFIX=\"$(PREFIX)\"
 
 LDFLAGS_CONTENT = -lutil
-SRCS_CONTENT = charset.c content.c encoding.c imsg-blocking.c
+SRCS_CONTENT = charset.c content.c encoding.c header.c imsg-blocking.c
 
 DEPS_CONTENT = $(SRCS_CONTENT:.c=.d)
 OBJS_CONTENT = $(SRCS_CONTENT:.c=.o)
@@ -49,8 +49,8 @@ mailz: $(OBJS_MAILZ)
 
 -include $(DEPS_MAILZ)
 
-SRCS_REGRESS = charset.c encoding.c regress/charset.c regress/encoding.c
-SRCS_REGRESS += regress/regress.c
+SRCS_REGRESS = charset.c encoding.c header.c regress/charset.c regress/encoding.c
+SRCS_REGRESS += regress/header.c regress/regress.c
 
 DEPS_REGRESS = $(SRCS_REGRESS:.c=.d)
 OBJS_REGRESS = $(SRCS_REGRESS:.c=.o)
@@ -65,8 +65,8 @@ test: regress-run
 -include $(DEPS_REGRESS)
 
 SRCS_ALL = _err.c charset.c content-proc.c content.c encoding.c
-SRCS_ALL += imsg-blocking.c maildir.c mailz.c regress/charset.c
-SRCS_ALL += regress/encoding.c regress/regress.c
+SRCS_ALL += header.c imsg-blocking.c maildir.c mailz.c regress/charset.c
+SRCS_ALL += regress/encoding.c regress/header.c regress/regress.c
 SRCS_GENERATED = lex.c parse.c
 
 .PHONY: tidy

@@ -14,18 +14,50 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <err.h>
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
-#include "charset.h"
-#include "encoding.h"
+#include "../header.h"
 #include "header.h"
 
-int
-main(void)
-{
-	charset_getc_test();
-	encoding_getc_test();
-	header_name_test();
+#define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-	puts("Ok.");
+void
+header_name_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *out;
+		int error;
+	} tests[] = {
+		{ "Cc:", "Cc", HEADER_OK },
+
+		{ "\n", NULL, HEADER_EOF },
+
+		{ "Cc", NULL, HEADER_INVALID },
+		{ "Cc\xFF:", NULL, HEADER_INVALID },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		FILE *fp;
+		char buf[10];
+		int error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		error = header_name(fp, buf, sizeof(buf));
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+		if (error == HEADER_OK)
+			if (strcmp(buf, tests[i].out) != 0)
+				errx(1, "wrong output");
+
+		fclose(fp);
+	}
 }
