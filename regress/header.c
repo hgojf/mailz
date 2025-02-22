@@ -31,14 +31,16 @@ header_name_test(void)
 	const struct {
 		char *in;
 		const char *out;
+		size_t bufsz;
 		int error;
 	} tests[] = {
-		{ "Cc:", "Cc", HEADER_OK },
+		{ "Cc:", "Cc", 10, HEADER_OK },
 
-		{ "\n", NULL, HEADER_EOF },
+		{ "\n", NULL, 10, HEADER_EOF },
 
-		{ "Cc", NULL, HEADER_INVALID },
-		{ "Cc\xFF:", NULL, HEADER_INVALID },
+		{ "Cc", NULL, 10, HEADER_INVALID },
+		{ "Cc\xFF:", NULL, 10, HEADER_INVALID },
+		{ "Cc:", NULL, 2, HEADER_INVALID },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {
@@ -51,7 +53,7 @@ header_name_test(void)
 		if (fp == NULL)
 			err(1, "fmemopen");
 
-		error = header_name(fp, buf, sizeof(buf));
+		error = header_name(fp, buf, tests[i].bufsz);
 		if (error != tests[i].error)
 			errx(1, "wrong error");
 		if (error == HEADER_OK)
