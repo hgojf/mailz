@@ -114,3 +114,38 @@ header_name_test(void)
 		fclose(fp);
 	}
 }
+
+void
+header_subject_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *out;
+		size_t bufsz;
+	} tests[] = {
+		{ "hi", "hi", 10 },
+		{ "h\xFFi", "hi", 10 },
+		{ "hello", "hello", 6 },
+		{ "hello", "hell", 5 },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		FILE *fp;
+		char buf[10];
+		int error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		error = header_subject(fp, buf, tests[i].bufsz);
+		if (error != HEADER_OK)
+			errx(1, "wrong error");
+		if (strcmp(buf, tests[i].out) != 0)
+			errx(1, "wrong output");
+
+		fclose(fp);
+	}
+}

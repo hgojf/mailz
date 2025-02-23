@@ -27,6 +27,7 @@ main(void)
 	encoding_getc_test();
 	header_lex_test();
 	header_name_test();
+	header_subject_test();
 
 	puts("Ok.");
 }

@@ -93,7 +93,6 @@ static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
 static int header_message_id(FILE *, char *, size_t);
 static int header_skip(FILE *, FILE *);
-static int header_subject(FILE *, char *, size_t);
 static int header_subject_reply(FILE *, FILE *);
 static int header_token(FILE *, struct header_lex *, char *, size_t,
 			int *);
@@ -617,7 +616,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 			if (sm.have_subject)
 				goto fp;
 			if (header_subject(fp, sm.subject,
-					   sizeof(sm.subject)) == -1)
+					   sizeof(sm.subject)) < 0)
 				goto fp;
 			sm.have_subject = 1;
 		}
@@ -1228,37 +1227,6 @@ header_skip(FILE *in, FILE *echo)
 		}
 	}
 	return 1;
-}
-
-static int
-header_subject(FILE *fp, char *buf, size_t bufsz)
-{
-	struct header_lex lex;
-	size_t n;
-	int ch;
-
-	if (bufsz == 0)
-		return -1;
-
-	lex.cstate = -1;
-	lex.echo = NULL;
-	lex.qstate = -1;
-	lex.skipws = 1;
-
-	n = 0;
-	while ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
-		if (ch < 0)
-			return -1;
-		if (!isspace(ch) && !isprint(ch))
-			continue; /* ignore */
-
-		if (n == bufsz - 1)
-			continue; /* truncate */
-		buf[n++] = ch;
-	}
-
-	buf[n] = '\0';
-	return 0;
 }
 
 static int

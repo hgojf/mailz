@@ -19,5 +19,6 @@
 
 void header_lex_test(void);
 void header_name_test(void);
+void header_subject_test(void);
 
 #endif /* REGRESS_HEADER_H */

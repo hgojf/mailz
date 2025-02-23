@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <ctype.h>
 #include <limits.h>
 #include <stdio.h>
 
@@ -110,6 +111,37 @@ header_name(FILE *fp, char *buf, size_t bufsz)
 
 		if (n == bufsz - 1)
 			return HEADER_INVALID;
+		buf[n++] = ch;
+	}
+
+	buf[n] = '\0';
+	return HEADER_OK;
+}
+
+int
+header_subject(FILE *fp, char *buf, size_t bufsz)
+{
+	struct header_lex lex;
+	size_t n;
+	int ch;
+
+	if (bufsz == 0)
+		return HEADER_INVALID;
+
+	lex.cstate = -1;
+	lex.echo = NULL;
+	lex.qstate = -1;
+	lex.skipws = 1;
+
+	n = 0;
+	while ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
+		if (ch < 0)
+			return ch;
+		if (!isspace(ch) && !isprint(ch))
+			continue; /* ignore */
+
+		if (n == bufsz - 1)
+			continue; /* truncate */
 		buf[n++] = ch;
 	}
 
