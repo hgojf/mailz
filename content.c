@@ -81,7 +81,6 @@ static int handle_reply_references(FILE *, FILE *, const char *,
 static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static int header_address(FILE *, struct from *, int *);
-static int header_copy(FILE *, FILE *);
 static int header_copy_addresses(FILE *, FILE *, const char *, int *);
 static int header_content_type(FILE *, FILE *, struct charset *,
 			       struct encoding *);
@@ -499,7 +498,7 @@ handle_reply_references(FILE *in, FILE *out, const char *msgid,
 			return -1;
 		if (fprintf(out, "References:") < 0)
 			return -1;
-		if (header_copy(in, out) == -1)
+		if (header_copy(in, out) < 0)
 			return -1;
 		putref = 1;
 	}
@@ -921,27 +920,6 @@ header_date_timezone_usa(const char *s, size_t len)
 		return -1;
 
 	return hr * 60 * 60;
-}
-
-static int
-header_copy(FILE *in, FILE *out)
-{
-	struct header_lex lex;
-	int ch;
-
-	lex.cstate = -1;
-	lex.echo = NULL;
-	lex.qstate = -1;
-	lex.skipws = 0;
-
-	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
-		if (ch < 0)
-			return -1;
-		if (fputc(ch, out) == EOF)
-			return -1;
-	}
-
-	return 0;
 }
 
 static int

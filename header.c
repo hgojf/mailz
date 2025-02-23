@@ -21,6 +21,27 @@
 #include "header.h"
 
 int
+header_copy(FILE *in, FILE *out)
+{
+	struct header_lex lex;
+	int ch;
+
+	lex.cstate = -1;
+	lex.echo = NULL;
+	lex.qstate = -1;
+	lex.skipws = 0;
+
+	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
+		if (ch < 0)
+			return ch;
+		if (fputc(ch, out) == EOF)
+			return HEADER_OUTPUT;
+	}
+
+	return HEADER_OK;
+}
+
+int
 header_lex(FILE *fp, struct header_lex *lex)
 {
 	for (;;) {

@@ -13,6 +13,7 @@ struct header_lex {
 	FILE *echo;
 };
 
+int header_copy(FILE *, FILE *);
 int header_name(FILE *, char *, size_t);
 int header_message_id(FILE *, char *, size_t);
 int header_lex(FILE *, struct header_lex *);
