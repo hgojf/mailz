@@ -285,7 +285,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	struct content_reply_setup setup;
 	struct imsg msg2;
 	FILE *in, *out;
-	char *addr, in_reply_to[MSGID_LEN], msgid[MSGID_LEN];
+	char addr_buf[255], *addr, in_reply_to[MSGID_LEN], msgid[MSGID_LEN];
 	char from_addr[255], from_name[65];
 	ssize_t n;
 	time_t date;
@@ -313,8 +313,15 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 		goto msg2;
 
 	if ((addr = strchr(setup.addr, '<')) != NULL) {
+		size_t n;
+
 		addr++;
-		addr[strcspn(addr, ">")] = '\0';
+		n = strcspn(addr, ">");
+		if (n >= sizeof(addr_buf))
+			goto msg2;
+		memcpy(addr_buf, addr, n);
+		addr_buf[n] = '\0';
+		addr = addr_buf;
 	}
 	else
 		addr = setup.addr;
