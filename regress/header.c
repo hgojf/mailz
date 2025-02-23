@@ -159,9 +159,9 @@ header_subject_reply_test(void)
 		char *in;
 		const char *out;
 	} tests[] = {
-		{ "hi", "hi" },
-		{ "Re: hi", "hi" },
-		{ "Resurrection", "Resurrection" },
+		{ "hi", "Subject: Re: hi\n" },
+		{ "Re: hi", "Subject: Re: hi\n" },
+		{ "Resurrection", "Subject: Re: Resurrection\n" },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {
@@ -184,15 +184,8 @@ header_subject_reply_test(void)
 			errx(1, "wrong error");
 
 		fflush(out);
-		#define reply "Subject: Re: "
-		if (strncmp(obuf, reply, sizeof(reply) - 1) != 0)
+		if (strcmp(obuf, tests[i].out) != 0)
 			errx(1, "wrong output");
-		if (obuf[osize - 1] != '\n')
-			errx(1, "wrong output");
-		obuf[osize - 1] = '\0';
-		if (strcmp(&obuf[sizeof(reply) - 1], tests[i].out) != 0)
-			errx(1, "wrong output");
-		#undef reply
 
 		fclose(in);
 		fclose(out);
