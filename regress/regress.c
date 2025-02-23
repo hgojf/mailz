@@ -28,6 +28,7 @@ main(void)
 	header_lex_test();
 	header_name_test();
 	header_subject_test();
+	header_subject_reply_test();
 
 	puts("Ok.");
 }

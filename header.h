@@ -16,5 +16,6 @@ struct header_lex {
 int header_name(FILE *, char *, size_t);
 int header_lex(FILE *, struct header_lex *);
 int header_subject(FILE *, char *, size_t);
+int header_subject_reply(FILE *, FILE *);
 
 #endif /* HEADER_H */

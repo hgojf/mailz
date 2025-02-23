@@ -148,3 +148,50 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 	buf[n] = '\0';
 	return HEADER_OK;
 }
+
+int
+header_subject_reply(FILE *in, FILE *out)
+{
+	struct header_lex lex;
+	const char *re;
+	size_t i;
+	int ch;
+
+	lex.cstate = -1;
+	lex.echo = NULL;
+	lex.qstate = -1;
+	lex.skipws = 1;
+
+	if (fprintf(out, "Subject: Re: ") < 0)
+		return HEADER_OUTPUT;
+
+	re = "Re: ";
+	i = 0;
+	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
+		if (ch < 0)
+			return ch;
+
+		if (re[i] != '\0') {
+			if (re[i] == ch) {
+				i++;
+				continue;
+			}
+
+			if (i != 0) {
+				if (fwrite(re, i, 1, out) != 1)
+					return HEADER_OUTPUT;
+			}
+			re = "";
+			i = 0;
+		}
+
+		if (fputc(ch, out) == EOF)
+			return HEADER_OUTPUT;
+	}
+
+	if (fprintf(out, "\n") < 0)
+		return HEADER_OUTPUT;
+
+	return HEADER_OK;
+}
+

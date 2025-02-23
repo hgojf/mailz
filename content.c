@@ -93,7 +93,6 @@ static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
 static int header_message_id(FILE *, char *, size_t);
 static int header_skip(FILE *, FILE *);
-static int header_subject_reply(FILE *, FILE *);
 static int header_token(FILE *, struct header_lex *, char *, size_t,
 			int *);
 static int ignore_header(const char *, struct ignore *);
@@ -406,7 +405,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "subject")) {
-			if (header_subject_reply(in, out) == -1)
+			if (header_subject_reply(in, out) < 0)
 				goto out;
 		}
 		else if (setup.group && !strcasecmp(buf, "to")) {
@@ -1227,52 +1226,6 @@ header_skip(FILE *in, FILE *echo)
 		}
 	}
 	return 1;
-}
-
-static int
-header_subject_reply(FILE *in, FILE *out)
-{
-	struct header_lex lex;
-	const char *re;
-	size_t i;
-	int ch;
-
-	lex.cstate = -1;
-	lex.echo = NULL;
-	lex.qstate = -1;
-	lex.skipws = 1;
-
-	if (fprintf(out, "Subject: Re: ") < 0)
-		return -1;
-
-	re = "Re: ";
-	i = 0;
-	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
-		if (ch < 0)
-			return -1;
-
-		if (re[i] != '\0') {
-			if (re[i] == ch) {
-				i++;
-				continue;
-			}
-
-			if (i != 0) {
-				if (fwrite(re, i, 1, out) != 1)
-					return -1;
-			}
-			re = "";
-			i = 0;
-		}
-
-		if (fputc(ch, out) == EOF)
-			return -1;
-	}
-
-	if (fprintf(out, "\n") < 0)
-		return -1;
-
-	return 0;
 }
 
 static int

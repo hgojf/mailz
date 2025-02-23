@@ -16,6 +16,7 @@
 
 #include <err.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -147,5 +148,54 @@ header_subject_test(void)
 			errx(1, "wrong output");
 
 		fclose(fp);
+	}
+}
+
+void
+header_subject_reply_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *out;
+	} tests[] = {
+		{ "hi", "hi" },
+		{ "Re: hi", "hi" },
+		{ "Resurrection", "Resurrection" },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		FILE *in, *out;
+		char *obuf;
+		size_t osize;
+		int error;
+
+		in = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (in == NULL)
+			err(1, "fmemopen");
+
+		out = open_memstream(&obuf, &osize);
+		if (out == NULL)
+			err(1, "open_memstream");
+
+		error = header_subject_reply(in, out);
+		if (error != HEADER_OK)
+			errx(1, "wrong error");
+
+		fflush(out);
+		#define reply "Subject: Re: "
+		if (strncmp(obuf, reply, sizeof(reply) - 1) != 0)
+			errx(1, "wrong output");
+		if (obuf[osize - 1] != '\n')
+			errx(1, "wrong output");
+		obuf[osize - 1] = '\0';
+		if (strcmp(&obuf[sizeof(reply) - 1], tests[i].out) != 0)
+			errx(1, "wrong output");
+		#undef reply
+
+		fclose(in);
+		fclose(out);
+		free(obuf);
 	}
 }
