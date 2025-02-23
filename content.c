@@ -53,22 +53,11 @@
  */
 #define MSGID_LEN 995
 
-#define HL_EOF -129
-#define HL_ERR -130
-#define HL_PIPE -131
-
 struct from {
 	char *addr;
 	char *name;
 	size_t addrsz;
 	size_t namesz;
-};
-
-struct header_lex {
-	int cstate;
-	int qstate;
-	int skipws;
-	FILE *echo;
 };
 
 struct ignore {
@@ -102,7 +91,6 @@ static long header_date_timezone_std(const char *, size_t);
 static long header_date_timezone_usa(const char *, size_t);
 static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
-static int header_lex(FILE *, struct header_lex *);
 static int header_message_id(FILE *, char *, size_t);
 static int header_skip(FILE *, FILE *);
 static int header_subject(FILE *, char *, size_t);
@@ -684,16 +672,16 @@ header_address(FILE *fp, struct from *from, int *eof)
 	for (;;) {
 		int ch;
 
-		if ((ch = header_lex(fp, &lex)) == HL_ERR)
+		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
 			return -1;
 
 		if (state == 0) {
-			if (ch == HL_EOF || ch == ',') {
+			if (ch == HEADER_EOF || ch == ',') {
 				from->addr[n] = '\0';
 				if (from->name != NULL)
 					from->name[0] = '\0';
 
-				if (ch == HL_EOF) {
+				if (ch == HEADER_EOF) {
 					*eof = 1;
 					if (n == 0)
 						return 0;
@@ -721,7 +709,7 @@ header_address(FILE *fp, struct from *from, int *eof)
 		}
 
 		if (state == 1) {
-			if (ch == HL_EOF)
+			if (ch == HEADER_EOF)
 				return -1;
 			if (ch == '>') {
 				state = 2;
@@ -734,10 +722,10 @@ header_address(FILE *fp, struct from *from, int *eof)
 		}
 
 		if (state == 2) {
-			if (ch == HL_EOF || ch == ',') {
+			if (ch == HEADER_EOF || ch == ',') {
 				from->addr[n] = '\0';
 
-				if (ch == HL_EOF)
+				if (ch == HEADER_EOF)
 					*eof = 1;
 				return 1;
 			}
@@ -952,8 +940,8 @@ header_copy(FILE *in, FILE *out)
 	lex.qstate = -1;
 	lex.skipws = 0;
 
-	while ((ch = header_lex(in, &lex)) != HL_EOF) {
-		if (ch == HL_ERR)
+	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
+		if (ch < 0)
 			return -1;
 		if (fputc(ch, out) == EOF)
 			return -1;
@@ -1019,11 +1007,12 @@ header_content_type(FILE *in, FILE *echo, struct charset *ct,
 	for (;;) {
 		int ch;
 
-		if ((ch = header_lex(in, &lex)) == HL_ERR)
+		if ((ch = header_lex(in, &lex)) < 0 && ch != HEADER_EOF) {
+			if (ch == HEADER_OUTPUT && errno == EPIPE)
+				return 0;
 			return -1;
-		if (ch == HL_PIPE)
-			return 0;
-		if (ch == HL_EOF)
+		}
+		if (ch == HEADER_EOF)
 			break;
 
 		if (state == 0) {
@@ -1124,12 +1113,13 @@ header_encoding(FILE *in, FILE *echo, struct encoding *e)
 	for (;;) {
 		int ch;
 
-		if ((ch = header_lex(in, &lex)) == HL_ERR)
+		if ((ch = header_lex(in, &lex)) < 0 && ch != HEADER_EOF) {
+			if (ch == HEADER_OUTPUT && errno == EPIPE)
+				return 0;
 			return -1;
-		if (ch == HL_EOF)
+		}
+		if (ch == HEADER_EOF)
 			break;
-		if (ch == HL_PIPE)
-			return 0;
 
 		if (!toolong) {
 			if (n == sizeof(buf) - 1) {
@@ -1170,79 +1160,6 @@ header_from(FILE *fp, struct from *from)
 }
 
 static int
-header_lex(FILE *fp, struct header_lex *lex)
-{
-	for (;;) {
-		int ch;
-
-		if ((ch = fgetc(fp)) == EOF)
-			goto eof;
-		if (ch == '\n') {
-			if ((ch = fgetc(fp)) == EOF)
-				goto eof;
-			if (ch != ' ' && ch != '\t') {
-				if (ungetc(ch, fp) == EOF)
-					return HL_ERR;
-				goto eof;
-			}
-		}
-
-		if (lex->echo != NULL) {
-			if (fputc(ch, lex->echo) == EOF) {
-				if (ferror(lex->echo) && errno == EPIPE)
-					return HL_PIPE;
-				return HL_ERR;
-			}
-		}
-
-		if (lex->cstate != -1) {
-			if (ch == '(') {
-				if (lex->cstate == INT_MAX)
-					return HL_ERR;
-				lex->cstate++;
-				continue;
-			}
-
-			if (lex->cstate > 0) {
-				if (ch == ')')
-					lex->cstate--;
-				continue;
-			}
-		}
-
-		if (lex->qstate != -1) {
-			if (ch == '\"') {
-				lex->qstate = !lex->qstate;
-				continue;
-			}
-		}
-
-		if (lex->skipws) {
-			if (ch == ' ' || ch == '\t')
-				continue;
-			lex->skipws = 0;
-		}
-
-		return ch;
-	}
-
-	eof:
-	if (lex->echo != NULL) {
-		if (fputc('\n', lex->echo) == EOF) {
-			if (ferror(lex->echo) && errno == EPIPE)
-				return HL_PIPE;
-			return HL_ERR;
-		}
-	}
-
-	if (lex->cstate != -1 && lex->cstate != 0)
-		return HL_ERR;
-	if (lex->qstate != -1 && lex->qstate != 0)
-		return HL_ERR;
-	return HL_EOF;
-}
-
-static int
 header_message_id(FILE *fp, char *buf, size_t bufsz)
 {
 	struct header_lex lex;
@@ -1262,9 +1179,9 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 	for (;;) {
 		int ch;
 
-		if ((ch = header_lex(fp, &lex)) == HL_ERR)
+		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
 			return -1;
-		if (ch == HL_EOF)
+		if (ch == HEADER_EOF)
 			break;
 
 		if (state == 2)
@@ -1303,11 +1220,12 @@ header_skip(FILE *in, FILE *echo)
 	lex.qstate = -1;
 	lex.skipws = 0;
 
-	while ((ch = header_lex(in, &lex)) != HL_EOF) {
-		if (ch == HL_ERR)
+	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
+		if (ch < 0) {
+			if (ch == HEADER_OUTPUT && errno == EPIPE)
+				return 0;
 			return -1;
-		if (echo != NULL && ch == HL_PIPE)
-			return 0;
+		}
 	}
 	return 1;
 }
@@ -1328,8 +1246,8 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 	lex.skipws = 1;
 
 	n = 0;
-	while ((ch = header_lex(fp, &lex)) != HL_EOF) {
-		if (ch == HL_ERR)
+	while ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
+		if (ch < 0)
 			return -1;
 		if (!isspace(ch) && !isprint(ch))
 			continue; /* ignore */
@@ -1361,8 +1279,8 @@ header_subject_reply(FILE *in, FILE *out)
 
 	re = "Re: ";
 	i = 0;
-	while ((ch = header_lex(in, &lex)) != HL_EOF) {
-		if (ch == HL_ERR)
+	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
+		if (ch < 0)
 			return -1;
 
 		if (re[i] != '\0') {
@@ -1406,9 +1324,9 @@ header_token(FILE *fp, struct header_lex *lex, char *buf,
 	for (;;) {
 		int ch;
 
-		if ((ch = header_lex(fp, lex)) == HL_ERR)
+		if ((ch = header_lex(fp, lex)) < 0 && ch != HEADER_EOF)
 			return -1;
-		if (ch == HL_EOF) {
+		if (ch == HEADER_EOF) {
 			*eof = 1;
 			if (n == 0)
 				return 0;

@@ -14,9 +14,77 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <limits.h>
 #include <stdio.h>
 
 #include "header.h"
+
+int
+header_lex(FILE *fp, struct header_lex *lex)
+{
+	for (;;) {
+		int ch;
+
+		if ((ch = fgetc(fp)) == EOF)
+			goto eof;
+		if (ch == '\n') {
+			if ((ch = fgetc(fp)) == EOF)
+				goto eof;
+			if (ch != ' ' && ch != '\t') {
+				if (ungetc(ch, fp) == EOF)
+					return HEADER_EOF;
+				goto eof;
+			}
+		}
+
+		if (lex->echo != NULL) {
+			if (fputc(ch, lex->echo) == EOF)
+				return HEADER_OUTPUT;
+		}
+
+		if (lex->cstate != -1) {
+			if (ch == '(') {
+				if (lex->cstate == INT_MAX)
+					return HEADER_INVALID;
+				lex->cstate++;
+				continue;
+			}
+
+			if (lex->cstate > 0) {
+				if (ch == ')')
+					lex->cstate--;
+				continue;
+			}
+		}
+
+		if (lex->qstate != -1) {
+			if (ch == '\"') {
+				lex->qstate = !lex->qstate;
+				continue;
+			}
+		}
+
+		if (lex->skipws) {
+			if (ch == ' ' || ch == '\t')
+				continue;
+			lex->skipws = 0;
+		}
+
+		return ch;
+	}
+
+	eof:
+	if (lex->echo != NULL) {
+		if (fputc('\n', lex->echo) == EOF)
+			return HEADER_OUTPUT;
+	}
+
+	if (lex->cstate != -1 && lex->cstate != 0)
+		return HEADER_INVALID;
+	if (lex->qstate != -1 && lex->qstate != 0)
+		return HEADER_INVALID;
+	return HEADER_EOF;
+}
 
 int
 header_name(FILE *fp, char *buf, size_t bufsz)

@@ -25,6 +25,57 @@
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 void
+header_lex_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *out;
+		int raw;
+		int error;
+	} tests[] = {
+		{ "hi", "hi", 0, HEADER_EOF },
+		{ "hi\n there", "hi there", 0, HEADER_EOF },
+		{ "hi(there)", "hi", 0, HEADER_EOF },
+		{ "hi \"there\"", "hi there", 0, HEADER_EOF },
+		{ "hi(\"", "hi(\"", 1, HEADER_EOF },
+		{ "\n", "", 1, HEADER_EOF },
+
+		{ "hi(", "hi", 0, HEADER_INVALID },
+		{ "hi\"", "hi", 0, HEADER_INVALID },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		struct header_lex lex;
+		FILE *fp;
+		const char *out;
+		int error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		lex.echo = NULL;
+		lex.cstate = tests[i].raw ? -1 : 0;
+		lex.qstate = tests[i].raw ? -1 : 0;
+		lex.skipws = tests[i].raw ? 0 : 1;
+
+		out = tests[i].out;
+		while ((error = header_lex(fp, &lex)) != tests[i].error) {
+			if (error < 0)
+				errx(1, "wrong error");
+			if (*out == '\0' || *out++ != error)
+				errx(1, "wrong output");
+		}
+		if (*out != '\0')
+			errx(1, "wrong output");
+
+		fclose(fp);
+	}
+}
+
+void
 header_name_test(void)
 {
 	size_t i;
