@@ -26,6 +26,46 @@
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 void
+header_date_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		time_t date;
+		int error;
+	} tests[] = {
+		{ "Mon, 01 Jan 1970 00:00:00 -0000", 0, HEADER_OK },
+		{ "Mon, 01 Jan 1970 00:00 -0000", 0, HEADER_OK },
+		{ "Mon, 01 Jan 1970 00:00:00 GMT", 0, HEADER_OK },
+		{ "Mon, 01 Jan 70 00:00:00 -0000", 0, HEADER_OK },
+
+		{ "Monday, 01 Jan 1970 00:00:00 -0000", 0, HEADER_INVALID },
+		{ "Mon, 01 January 1970 00:00:00 -0000", 0, HEADER_INVALID },
+		{ "Mon, 01 January 1970 00:00:00 ESD", 0, HEADER_INVALID },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		FILE *fp;
+		int error;
+		time_t date;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		error = header_date(fp, &date);
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+		if (error == HEADER_OK)
+			if (date != tests[i].date)
+				errx(1, "wrong date");
+
+		fclose(fp);
+	}
+}
+
+void
 header_lex_test(void)
 {
 	size_t i;

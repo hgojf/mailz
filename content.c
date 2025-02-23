@@ -84,26 +84,12 @@ static int header_address(FILE *, struct from *, int *);
 static int header_copy_addresses(FILE *, FILE *, const char *, int *);
 static int header_content_type(FILE *, FILE *, struct charset *,
 			       struct encoding *);
-static time_t header_date(FILE *);
-static long header_date_timezone(const char *);
-static long header_date_timezone_std(const char *, size_t);
-static long header_date_timezone_usa(const char *, size_t);
 static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
-static int header_token(FILE *, struct header_lex *, char *, size_t,
-			int *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
 static void strip_trailing(char *);
 static void usage(void);
-
-static const char *days[] = {
-	"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
-};
-static const char *months[] = {
-	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-};
 
 static int
 handle_ignore(struct imsg *msg, struct ignore *ignore, int type)
@@ -356,7 +342,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 		else if (!strcasecmp(buf, "date")) {
 			if (date != -1)
 				goto out;
-			if ((date = header_date(in)) == -1)
+			if (header_date(in, &date) != HEADER_OK)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "from")) {
@@ -593,7 +579,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 		if (!strcasecmp(buf, "date")) {
 			if (sm.date != -1)
 				goto fp;
-			if ((sm.date = header_date(fp)) == -1)
+			if (header_date(fp, &sm.date) != HEADER_OK)
 				goto fp;
 		}
 		else if (!strcasecmp(buf, "from")) {
@@ -731,202 +717,6 @@ header_address(FILE *fp, struct from *from, int *eof)
 			}
 		}
 	}
-}
-
-static time_t
-header_date(FILE *fp)
-{
-	struct header_lex lex;
-	struct tm tm;
-	char buf[100], *bufp, *e, *s;
-	const char *errstr;
-	size_t i;
-	time_t date;
-	long off;
-	int eof, n;
-
-	lex.cstate = 0;
-	lex.echo = NULL;
-	lex.qstate = 0;
-	lex.skipws = 1;
-
-	memset(&tm, 0, sizeof(tm));
-
-	eof = 0;
-	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
-		return -1;
-
-	if ((e = strchr(buf, ',')) != NULL) {
-		if (e[1] != '\0')
-			return -1;
-		*e = '\0';
-		tm.tm_wday = -1;
-		for (i = 0; i < nitems(days); i++) {
-			if (!strcmp(buf, days[i])) {
-				tm.tm_wday = i;
-				break;
-			}
-		}
-		if (tm.tm_wday == -1)
-			return -1;
-
-		if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
-			return -1;
-	}
-
-	tm.tm_mday = strtonum(buf, 1, 31, &errstr);
-	if (errstr != NULL)
-		return -1;
-
-	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
-		return -1;
-
-	tm.tm_mon = -1;
-	for (i = 0; i < nitems(months); i++) {
-		if (!strcmp(buf, months[i])) {
-			tm.tm_mon = i;
-			break;
-		}
-	}
-	if (tm.tm_mon == -1)
-		return -1;
-
-	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
-		return -1;
-
-	tm.tm_year = strtonum(buf, 0, 9999, &errstr);
-	if (errstr != NULL)
-		return -1;
-	if (tm.tm_year <= 49)
-		tm.tm_year += 2000;
-	else if (tm.tm_year <= 999)
-		tm.tm_year += 1900;
-	tm.tm_year -= 1900;
-
-	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
-		return -1;
-
-	bufp = buf;
-
-	if ((s = strsep(&bufp, ":")) == NULL)
-		return -1;
-	tm.tm_hour = strtonum(s, 0, 23, &errstr);
-	if (errstr != NULL)
-		return -1;
-
-	if ((s = strsep(&bufp, ":")) == NULL)
-		return -1;
-	tm.tm_min = strtonum(s, 0, 59, &errstr);
-	if (errstr != NULL)
-		return -1;
-
-	if ((s = bufp) != NULL) {
-		tm.tm_sec = strtonum(s, 0, 60, &errstr);
-		if (errstr != NULL)
-			return -1;
-	}
-
-	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1 || n == 0)
-		return -1;
-	if ((off = header_date_timezone(buf)) == -1)
-		return -1;
-
-	if ((n = header_token(fp, &lex, buf, sizeof(buf), &eof)) == -1)
-		return -1;
-	if (n != 0)
-		return -1;
-
-	if ((date = timegm(&tm)) == -1)
-		return -1;
-
-	return date - off;
-}
-
-static long
-header_date_timezone(const char *s)
-{
-	size_t len;
-	long rv;
-
-	len = strlen(s);
-
-	if ((rv = header_date_timezone_std(s, len)) != -1)
-		return rv;
-	if ((rv = header_date_timezone_usa(s, len)) != -1)
-		return rv;
-
-	if (!strcmp(s, "UT") || !strcmp(s, "GMT"))
-		return 0;
-
-	return -1;
-}
-
-static long
-header_date_timezone_std(const char *s, size_t len)
-{
-	const char *errstr;
-	char nbuf[3];
-	long rv;
-
-	if (len != 5)
-		return -1;
-
-	memcpy(nbuf, &s[1], 2);
-	nbuf[2] = '\0';
-
-	rv = strtonum(nbuf, 0, 99, &errstr) * 60 * 60;
-	if (errstr != NULL)
-		return -1;
-
-	memcpy(nbuf, &s[3], 2);
-	nbuf[2] = '\0';
-
-	rv += strtonum(nbuf, 0, 59, &errstr) * 60;
-	if (errstr != NULL)
-		return -1;
-
-	if (s[0] == '-')
-		rv = -rv;
-	else if (s[0] != '+')
-		return -1;
-
-	return rv;
-}
-
-static long
-header_date_timezone_usa(const char *s, size_t len)
-{
-	long hr;
-
-	if (len != 3)
-		return -1;
-
-	switch (s[0]) {
-	case 'E':
-		hr = -5;
-		break;
-	case 'C':
-		hr = -6;
-		break;
-	case 'M':
-		hr = -7;
-		break;
-	case 'P':
-		hr = -8;
-		break;
-	default:
-		return -1;
-	}
-
-	if (s[1] == 'D')
-		hr -= 1;
-	else if (s[1] != 'S')
-		return -1;
-
-	if (s[2] != 'T')
-		return -1;
-
-	return hr * 60 * 60;
 }
 
 static int
@@ -1136,44 +926,6 @@ header_from(FILE *fp, struct from *from)
 		if (header_skip(fp, NULL) < 0)
 			return -1;
 	return 0;
-}
-
-static int
-header_token(FILE *fp, struct header_lex *lex, char *buf,
-	     size_t bufsz, int *eof)
-{
-	size_t n;
-
-	if (*eof)
-		return 0;
-
-	if (bufsz == 0)
-		return -1;
-	lex->skipws = 1;
-
-	n = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(fp, lex)) < 0 && ch != HEADER_EOF)
-			return -1;
-		if (ch == HEADER_EOF) {
-			*eof = 1;
-			if (n == 0)
-				return 0;
-			break;
-		}
-
-		if (ch == ' ' || ch == '\t')
-			break;
-
-		if (n == bufsz -1)
-			return -1;
-		buf[n++] = ch;
-	}
-
-	buf[n] = '\0';
-	return 1;
 }
 
 static int
