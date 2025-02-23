@@ -92,7 +92,6 @@ static long header_date_timezone_usa(const char *, size_t);
 static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
 static int header_message_id(FILE *, char *, size_t);
-static int header_skip(FILE *, FILE *);
 static int header_token(FILE *, struct header_lex *, char *, size_t,
 			int *);
 static int ignore_header(const char *, struct ignore *);
@@ -232,9 +231,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			got_content_type = 1;
 		}
 		else {
-			if ((hv = header_skip(in, echo)) == -1)
-				return -1;
-			if (hv == 0)
+			if (header_skip(in, echo) < 0)
 				return -1;
 		}
 	}
@@ -393,7 +390,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 			if ((references = ftello(in)) == -1)
 				goto out;
-			if (header_skip(in, NULL) == -1)
+			if (header_skip(in, NULL) < 0)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "reply-to")) {
@@ -401,7 +398,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 			if ((reply_to = ftello(in)) == -1)
 				goto out;
-			if (header_skip(in, NULL) == -1)
+			if (header_skip(in, NULL) < 0)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "subject")) {
@@ -413,11 +410,11 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 			if ((to = ftello(in)) == -1)
 				goto out;
-			if (header_skip(in, NULL) == -1)
+			if (header_skip(in, NULL) < 0)
 				goto out;
 		}
 		else {
-			if (header_skip(in, NULL) == -1)
+			if (header_skip(in, NULL) < 0)
 				goto out;
 		}
 	}
@@ -620,7 +617,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 			sm.have_subject = 1;
 		}
 		else {
-			if (header_skip(fp, NULL) == -1)
+			if (header_skip(fp, NULL) < 0)
 				goto fp;
 			continue;
 		}
@@ -1152,7 +1149,7 @@ header_from(FILE *fp, struct from *from)
 		return -1;
 
 	if (!eof)
-		if (header_skip(fp, NULL) == -1)
+		if (header_skip(fp, NULL) < 0)
 			return -1;
 	return 0;
 }
@@ -1205,27 +1202,6 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 
 	buf[n] = '\0';
 	return 0;
-}
-
-static int
-header_skip(FILE *in, FILE *echo)
-{
-	struct header_lex lex;
-	int ch;
-
-	lex.cstate = -1;
-	lex.echo = echo;
-	lex.qstate = -1;
-	lex.skipws = 0;
-
-	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
-		if (ch < 0) {
-			if (ch == HEADER_OUTPUT && errno == EPIPE)
-				return 0;
-			return -1;
-		}
-	}
-	return 1;
 }
 
 static int

@@ -119,6 +119,24 @@ header_name(FILE *fp, char *buf, size_t bufsz)
 }
 
 int
+header_skip(FILE *in, FILE *echo)
+{
+	struct header_lex lex;
+	int ch;
+
+	lex.cstate = -1;
+	lex.echo = echo;
+	lex.qstate = -1;
+	lex.skipws = 0;
+
+	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
+		if (ch < 0)
+			return ch;
+	}
+	return HEADER_OK;
+}
+
+int
 header_subject(FILE *fp, char *buf, size_t bufsz)
 {
 	struct header_lex lex;
@@ -194,4 +212,3 @@ header_subject_reply(FILE *in, FILE *out)
 
 	return HEADER_OK;
 }
-
