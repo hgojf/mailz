@@ -14,6 +14,7 @@ struct header_lex {
 };
 
 int header_name(FILE *, char *, size_t);
+int header_message_id(FILE *, char *, size_t);
 int header_lex(FILE *, struct header_lex *);
 int header_skip(FILE *, FILE *);
 int header_subject(FILE *, char *, size_t);

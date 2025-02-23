@@ -91,7 +91,6 @@ static long header_date_timezone_std(const char *, size_t);
 static long header_date_timezone_usa(const char *, size_t);
 static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct from *);
-static int header_message_id(FILE *, char *, size_t);
 static int header_token(FILE *, struct header_lex *, char *, size_t,
 			int *);
 static int ignore_header(const char *, struct ignore *);
@@ -375,14 +374,14 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 			if (strlen(in_reply_to) != 0)
 				goto out;
 			if (header_message_id(in, in_reply_to,
-					      sizeof(in_reply_to)) == -1)
+					      sizeof(in_reply_to)) < 0)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "message-id")) {
 			if (strlen(msgid) != 0)
 				goto out;
 			if (header_message_id(in, msgid,
-					      sizeof(msgid)) == -1)
+					      sizeof(msgid)) < 0)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "references")) {
@@ -1151,56 +1150,6 @@ header_from(FILE *fp, struct from *from)
 	if (!eof)
 		if (header_skip(fp, NULL) < 0)
 			return -1;
-	return 0;
-}
-
-static int
-header_message_id(FILE *fp, char *buf, size_t bufsz)
-{
-	struct header_lex lex;
-	size_t n;
-	int state;
-
-	if (bufsz == 0)
-		return -1;
-
-	lex.cstate = 0;
-	lex.echo = NULL;
-	lex.qstate = 0;
-	lex.skipws = 0;
-
-	n = 0;
-	state = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
-			return -1;
-		if (ch == HEADER_EOF)
-			break;
-
-		if (state == 2)
-			continue;
-
-		if (state == 0) {
-			if (ch == '<')
-				state = 1;
-			continue;
-		}
-
-		if (ch == '>') {
-			state = 2;
-			continue;
-		}
-
-		if (!isprint(ch) && !isspace(ch))
-			return -1;
-		if (n == bufsz - 1)
-			return -1;
-		buf[n++] = ch;
-	}
-
-	buf[n] = '\0';
 	return 0;
 }
 

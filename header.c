@@ -87,6 +87,61 @@ header_lex(FILE *fp, struct header_lex *lex)
 	return HEADER_EOF;
 }
 
+
+int
+header_message_id(FILE *fp, char *buf, size_t bufsz)
+{
+	struct header_lex lex;
+	size_t n;
+	int state;
+
+	if (bufsz == 0)
+		return HEADER_INVALID;
+
+	lex.cstate = 0;
+	lex.echo = NULL;
+	lex.qstate = 0;
+	lex.skipws = 0;
+
+	n = 0;
+	state = 0;
+	for (;;) {
+		int ch;
+
+		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
+			return ch;
+
+		if (state == 2) {
+			if (ch == HEADER_EOF)
+				break;
+			continue;
+		}
+
+		if (ch == HEADER_EOF)
+			return HEADER_INVALID;
+
+		if (state == 0) {
+			if (ch == '<')
+				state = 1;
+			continue;
+		}
+
+		if (ch == '>') {
+			state = 2;
+			continue;
+		}
+
+		if (!isprint(ch) && !isspace(ch))
+			return HEADER_INVALID;
+		if (n == bufsz - 1)
+			return HEADER_INVALID;
+		buf[n++] = ch;
+	}
+
+	buf[n] = '\0';
+	return HEADER_OK;
+}
+
 int
 header_name(FILE *fp, char *buf, size_t bufsz)
 {

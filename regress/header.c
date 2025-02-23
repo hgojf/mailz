@@ -77,6 +77,44 @@ header_lex_test(void)
 }
 
 void
+header_message_id_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *out;
+		size_t bufsz;
+		int error;
+	} tests[] = {
+		{ "<uniq>", "uniq", 10, HEADER_OK },
+		{ "<uniq>", "uniq", 5, HEADER_OK },
+
+		{ "<uniq", NULL, 10, HEADER_INVALID },
+		{ "<uniq>", NULL, 4, HEADER_INVALID },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		char buf[10];
+		FILE *fp;
+		int error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		error = header_message_id(fp, buf, tests[i].bufsz);
+		if (error != tests[i].error)
+			errx(1, "wrong error %d", error);
+		if (error == HEADER_OK)
+			if (strcmp(buf, tests[i].out) != 0)
+				errx(1, "wrong output");
+
+		fclose(fp);
+	}
+}
+
+void
 header_name_test(void)
 {
 	size_t i;

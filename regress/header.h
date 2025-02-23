@@ -18,6 +18,7 @@
 #define REGRESS_HEADER_H
 
 void header_lex_test(void);
+void header_message_id_test(void);
 void header_name_test(void);
 void header_subject_test(void);
 void header_subject_reply_test(void);

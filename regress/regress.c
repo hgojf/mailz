@@ -26,6 +26,7 @@ main(void)
 	charset_getc_test();
 	encoding_getc_test();
 	header_lex_test();
+	header_message_id_test();
 	header_name_test();
 	header_subject_test();
 	header_subject_reply_test();
