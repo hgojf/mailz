@@ -14,26 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdio.h>
+#ifndef REGRESS_MAILDIR_H
+#define REGRESS_MAILDIR_H
 
-#include "charset.h"
-#include "encoding.h"
-#include "header.h"
-#include "maildir.h"
+void maildir_get_flag_test(void);
 
-int
-main(void)
-{
-	charset_getc_test();
-	encoding_getc_test();
-	header_address_test();
-	header_date_test();
-	header_lex_test();
-	header_message_id_test();
-	header_name_test();
-	header_subject_test();
-	header_subject_reply_test();
-	maildir_get_flag_test();
-
-	puts("Ok.");
-}
+#endif /* REGRESS_MAILDIR_H */

@@ -14,26 +14,37 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdio.h>
+#include <err.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "charset.h"
-#include "encoding.h"
-#include "header.h"
+#include "../maildir.h"
 #include "maildir.h"
 
-int
-main(void)
-{
-	charset_getc_test();
-	encoding_getc_test();
-	header_address_test();
-	header_date_test();
-	header_lex_test();
-	header_message_id_test();
-	header_name_test();
-	header_subject_test();
-	header_subject_reply_test();
-	maildir_get_flag_test();
+#define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-	puts("Ok.");
+void
+maildir_get_flag_test(void)
+{
+	size_t i;
+	const struct {
+		const char *in;
+		int flag;
+		int error;
+	} tests[] = {
+		{ "hi", 'S', 0 },
+		{ "hi:2,", 'S', 0 },
+		{ "hi:3,S", 'S', 0 },
+		{ "hi:", 'S', 0 },
+
+		{ "hi:2,S", 'S', 1 },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		int error;
+
+		error = maildir_get_flag(tests[i].in, tests[i].flag);
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+	}
 }
