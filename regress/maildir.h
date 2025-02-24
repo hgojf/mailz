@@ -18,5 +18,6 @@
 #define REGRESS_MAILDIR_H
 
 void maildir_get_flag_test(void);
+void maildir_unset_flag_test(void);
 
 #endif /* REGRESS_MAILDIR_H */
