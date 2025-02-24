@@ -5,3 +5,4 @@ parse.[ch]
 mailz
 mailz-content
 regress-run
+tags
