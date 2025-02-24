@@ -34,6 +34,7 @@ main(void)
 	header_subject_test();
 	header_subject_reply_test();
 	maildir_get_flag_test();
+	maildir_set_flag_test();
 	maildir_unset_flag_test();
 
 	puts("Ok.");
