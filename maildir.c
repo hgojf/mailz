@@ -83,9 +83,9 @@ maildir_set_flag(const char *name, int flag, char *buf, size_t bufsz)
 		return NULL;
 
 	if (!set) {
-		buf[j++] = flag;
 		if (j == bufsz - 1)
 			return NULL;
+		buf[j++] = flag;
 	}
 
 	buf[j] = '\0';
