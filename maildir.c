@@ -22,10 +22,10 @@ struct maildir_info {
 	const char *flags;
 };
 
-static int maildir_info(const char *, struct maildir_info *);
+static int maildir_get_info(const char *, struct maildir_info *);
 
 static int
-maildir_info(const char *name, struct maildir_info *info)
+maildir_get_info(const char *name, struct maildir_info *info)
 {
 	const char *flags;
 
@@ -43,7 +43,7 @@ maildir_get_flag(const char *name, int flag)
 {
 	struct maildir_info info;
 
-	if (maildir_info(name, &info) == -1)
+	if (maildir_get_info(name, &info) == -1)
 		return 0;
 	if (strchr(info.flags, flag) != NULL)
 		return 1;
@@ -57,7 +57,7 @@ maildir_set_flag(const char *name, int flag, char *buf, size_t bufsz)
 	size_t i, j;
 	int set;
 
-	if (maildir_info(name, &info) == -1)
+	if (maildir_get_info(name, &info) == -1)
 		return NULL;
 
 	if (bufsz == 0)
@@ -98,7 +98,7 @@ maildir_unset_flag(const char *name, int flag, char *buf, size_t bufsz)
 	struct maildir_info info;
 	size_t i, j;
 
-	if (maildir_info(name, &info) == -1)
+	if (maildir_get_info(name, &info) == -1)
 		return name;
 
 	if (bufsz == 0)
