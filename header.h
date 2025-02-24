@@ -6,6 +6,13 @@
 #define HEADER_INVALID -2
 #define HEADER_OUTPUT -3
 
+struct header_address {
+	char *addr;
+	char *name;
+	size_t addrsz;
+	size_t namesz;
+};
+
 struct header_lex {
 	int cstate;
 	int qstate;
@@ -13,6 +20,7 @@ struct header_lex {
 	FILE *echo;
 };
 
+int header_address(FILE *, struct header_address *, int *);
 int header_copy(FILE *, FILE *);
 int header_date(FILE *, time_t *);
 int header_name(FILE *, char *, size_t);

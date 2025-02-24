@@ -29,6 +29,7 @@ static long header_date_timezone(const char *);
 static long header_date_timezone_std(const char *, size_t);
 static long header_date_timezone_usa(const char *, size_t);
 static int header_token(FILE *, struct header_lex *, char *, size_t, int *);
+static size_t strip_trailing(const char *, size_t);
 
 static const char *days[] = {
 	"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
@@ -37,6 +38,90 @@ static const char *months[] = {
 	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 };
+
+int
+header_address(FILE *fp, struct header_address *from, int *eof)
+{
+	struct header_lex lex;
+	size_t n;
+	int state;
+
+	if (*eof)
+		return HEADER_EOF;
+
+	if (from->addrsz == 0)
+		return HEADER_INVALID;
+
+	lex.cstate = 0;
+	lex.echo = NULL;
+	lex.qstate = 0;
+	lex.skipws = 1;
+
+	n = 0;
+	state = 0;
+	for (;;) {
+		int ch;
+
+		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
+			return ch;
+
+		if (state == 0) {
+			if (ch == HEADER_EOF || ch == ',') {
+				from->addr[n] = '\0';
+				if (from->namesz != 0)
+					from->name[0] = '\0';
+
+				if (ch == HEADER_EOF) {
+					*eof = 1;
+					if (n == 0)
+						return HEADER_EOF;
+				}
+
+				return HEADER_OK;
+			}
+
+			if (ch == '<') {
+				if (from->namesz != 0) {
+					n = strip_trailing(from->addr, n);
+					if (n >= from->namesz)
+						return HEADER_INVALID;
+					memcpy(from->name, from->addr, n);
+					from->name[n] = '\0';
+				}
+				n = 0;
+				state = 1;
+				continue;
+			}
+
+			if (n == from->addrsz - 1)
+				return HEADER_INVALID;
+			from->addr[n++] = ch;
+		}
+
+		if (state == 1) {
+			if (ch == HEADER_EOF)
+				return HEADER_INVALID;
+			if (ch == '>') {
+				state = 2;
+				continue;
+			}
+
+			if (n == from->addrsz - 1)
+				return HEADER_INVALID;
+			from->addr[n++] = ch;
+		}
+
+		if (state == 2) {
+			if (ch == HEADER_EOF || ch == ',') {
+				from->addr[n] = '\0';
+
+				if (ch == HEADER_EOF)
+					*eof = 1;
+				return HEADER_OK;
+			}
+		}
+	}
+}
 
 int
 header_copy(FILE *in, FILE *out)
@@ -538,4 +623,12 @@ header_token(FILE *fp, struct header_lex *lex, char *buf,
 
 	buf[n] = '\0';
 	return HEADER_OK;
+}
+
+size_t
+strip_trailing(const char *s, size_t n)
+{
+	while (n > 0 && (s[n - 1] == ' ' || s[n - 1] == '\t'))
+		n--;
+	return n;
 }

@@ -53,13 +53,6 @@
  */
 #define MSGID_LEN 995
 
-struct from {
-	char *addr;
-	char *name;
-	size_t addrsz;
-	size_t namesz;
-};
-
 struct ignore {
 	char **headers;
 	size_t nheader;
@@ -80,15 +73,13 @@ static int handle_reply_references(FILE *, FILE *, const char *,
 				   const char *, off_t);
 static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
-static int header_address(FILE *, struct from *, int *);
 static int header_copy_addresses(FILE *, FILE *, const char *, int *);
 static int header_content_type(FILE *, FILE *, struct charset *,
 			       struct encoding *);
 static int header_encoding(FILE *, FILE *, struct encoding *);
-static int header_from(FILE *, struct from *);
+static int header_from(FILE *, struct header_address *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
-static void strip_trailing(char *);
 static void usage(void);
 
 static int
@@ -346,7 +337,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "from")) {
-			struct from from_p;
+			struct header_address from_p;
 
 			if (from != -1)
 				goto out;
@@ -583,7 +574,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto fp;
 		}
 		else if (!strcasecmp(buf, "from")) {
-			struct from from;
+			struct header_address from;
 
 			if (strlen(sm.from) != 0)
 				goto fp;
@@ -636,94 +627,10 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 }
 
 static int
-header_address(FILE *fp, struct from *from, int *eof)
-{
-	struct header_lex lex;
-	size_t n;
-	int state;
-
-	if (*eof)
-		return 0;
-
-	if (from->addrsz == 0)
-		return -1;
-
-	lex.cstate = 0;
-	lex.echo = NULL;
-	lex.qstate = 0;
-	lex.skipws = 1;
-
-	n = 0;
-	state = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
-			return -1;
-
-		if (state == 0) {
-			if (ch == HEADER_EOF || ch == ',') {
-				from->addr[n] = '\0';
-				if (from->name != NULL)
-					from->name[0] = '\0';
-
-				if (ch == HEADER_EOF) {
-					*eof = 1;
-					if (n == 0)
-						return 0;
-				}
-
-				return 1;
-			}
-
-			if (ch == '<') {
-				if (from->name != NULL) {
-					if (n >= from->namesz)
-						return -1;
-					memcpy(from->name, from->addr, n);
-					from->name[n] = '\0';
-					strip_trailing(from->name);
-				}
-				n = 0;
-				state = 1;
-				continue;
-			}
-
-			if (n == from->addrsz - 1)
-				return -1;
-			from->addr[n++] = ch;
-		}
-
-		if (state == 1) {
-			if (ch == HEADER_EOF)
-				return -1;
-			if (ch == '>') {
-				state = 2;
-				continue;
-			}
-
-			if (n == from->addrsz - 1)
-				return -1;
-			from->addr[n++] = ch;
-		}
-
-		if (state == 2) {
-			if (ch == HEADER_EOF || ch == ',') {
-				from->addr[n] = '\0';
-
-				if (ch == HEADER_EOF)
-					*eof = 1;
-				return 1;
-			}
-		}
-	}
-}
-
-static int
 header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
 {
 	char addr[255], name[65];
-	struct from from;
+	struct header_address from;
 	int eof, n;
 
 	from.addr = addr;
@@ -733,8 +640,8 @@ header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
 	from.namesz = sizeof(name);
 
 	eof = 0;
-	while ((n = header_address(in, &from, &eof)) != 0) {
-		if (n == -1)
+	while ((n = header_address(in, &from, &eof)) != HEADER_EOF) {
+		if (n < 0)
 			return -1;
 		if (!strcmp(addr, exclude))
 			continue;
@@ -912,14 +819,12 @@ header_encoding(FILE *in, FILE *echo, struct encoding *e)
 }
 
 static int
-header_from(FILE *fp, struct from *from)
+header_from(FILE *fp, struct header_address *from)
 {
-	int eof, n;
+	int eof;
 
 	eof = 0;
-	if ((n = header_address(fp, from, &eof)) == -1)
-		return -1;
-	if (n == 0)
+	if (header_address(fp, from, &eof) < 0)
 		return -1;
 
 	if (!eof)
@@ -960,21 +865,6 @@ imsg_get_fp(struct imsg *msg, const char *perm)
 	}
 
 	return rv;
-}
-
-static void
-strip_trailing(char *s)
-{
-	char *p;
-	size_t len;
-
-	len = strlen(s);
-	if (len == 0)
-		return;
-
-	p = s + (len - 1);
-	while (p > s && (*p == ' ' || *p == '\t'))
-		*p-- = '\0';
 }
 
 static void

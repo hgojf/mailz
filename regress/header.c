@@ -26,6 +26,80 @@
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 void
+header_address_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *addr;
+		const char *name;
+		size_t addrsz;
+		size_t namesz;
+		int error;
+	} tests[] = {
+		#define test_addr(in, addr) { in, addr, "", 255, 0, HEADER_OK }
+		#define test_bad(in) { in, NULL, NULL, 255, 65, HEADER_INVALID }
+		#define test_lim(in, addr, name) { in, addr, name, \
+						   sizeof(addr), sizeof(name), \
+						   HEADER_OK }
+		#define test_off(in, addr, name) { in, addr, name, \
+						   sizeof(addr) - 1,sizeof(name) - 1, \
+						   HEADER_INVALID }
+		#define test_ok(in, addr, name)  { in, addr, name, \
+						   255, 65, HEADER_OK }
+		test_addr("Dave <dave@fake.invalid>", "dave@fake.invalid"),
+		test_ok("Dave <dave@fake.invalid>", "dave@fake.invalid", "Dave"),
+		test_ok("dave@fake.invalid", "dave@fake.invalid", ""),
+		test_ok("<dave@fake.invalid>", "dave@fake.invalid", ""),
+		test_ok("<>", "", ""),
+
+		test_bad("Dave <"),
+
+		test_lim("Dave <dave@fake.invalid>", "dave@fake.invalid", "Dave"),
+		test_off("Dave <dave@fake.invalid>", "dave@fake.invalid", "Dave"),
+
+		#undef test_addr
+		#undef test_bad
+		#undef test_lim
+		#undef test_off
+		#undef test_ok
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		struct header_address address;
+		FILE *fp;
+		char addr[255], name[65];
+		int eof, error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		address.addr = addr;
+		address.addrsz = tests[i].addrsz;
+		address.name = name;
+		address.namesz = tests[i].namesz;
+
+		if (tests[i].namesz == 0)
+			name[0] = '\0';
+
+		eof = 0;
+		error = header_address(fp, &address, &eof);
+		if (error != tests[i].error)
+			errx(1, "wrong error %d", error);
+		if (error == HEADER_OK) {
+			if (strcmp(addr, tests[i].addr) != 0)
+				errx(1, "wrong address");
+			if (strcmp(name, tests[i].name) != 0)
+				errx(1, "wrong name");
+		}
+
+		fclose(fp);
+	}
+}
+
+void
 header_date_test(void)
 {
 	size_t i;

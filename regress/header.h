@@ -17,6 +17,7 @@
 #ifndef REGRESS_HEADER_H
 #define REGRESS_HEADER_H
 
+void header_address_test(void);
 void header_date_test(void);
 void header_lex_test(void);
 void header_message_id_test(void);
