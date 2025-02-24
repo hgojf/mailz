@@ -61,8 +61,6 @@ struct ignore {
 	int type;
 };
 
-#define nitems(a) (sizeof((a)) / sizeof(*(a)))
-
 static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
 static int handle_letter_under(FILE *, FILE *, struct ignore *, int);
