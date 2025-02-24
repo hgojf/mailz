@@ -104,9 +104,11 @@ maildir_unset_flag(const char *name, int flag, char *buf, size_t bufsz)
 	if (bufsz == 0)
 		return NULL;
 
-	for (i = 0, j = 0; name[i] != '\0' && j < bufsz - 1; i++) {
+	for (i = 0, j = 0; name[i] != '\0'; i++) {
 		if (&name[i] >= info.flags && name[i] == flag)
 			continue;
+		if (j == bufsz - 1)
+			return NULL;
 		buf[j++] = name[i];
 	}
 
