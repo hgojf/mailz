@@ -19,6 +19,7 @@
 
 void header_address_test(void);
 void header_date_test(void);
+void header_encoding_test(void);
 void header_lex_test(void);
 void header_message_id_test(void);
 void header_name_test(void);

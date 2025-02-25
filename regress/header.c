@@ -140,6 +140,42 @@ header_date_test(void)
 }
 
 void
+header_encoding_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *out;
+		size_t bufsz;
+		int error;
+	} tests[] = {
+		{ "Quoted-Printable", "Quoted-Printable", 20, HEADER_OK },
+		{ "Quoted-Printable", "Quoted-Printable", 17, HEADER_OK },
+		{ "Quoted-Printable", "Quoted-Printable", 16, HEADER_TRUNC },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		char buf[20];
+		FILE *fp;
+		int error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		error = header_encoding(fp, NULL, buf, tests[i].bufsz);
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+		if (error == HEADER_OK)
+			if (strcmp(buf, tests[i].out) != 0)
+				errx(1, "wrong output");
+
+		fclose(fp);
+	}
+}
+
+void
 header_lex_test(void)
 {
 	size_t i;

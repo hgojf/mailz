@@ -340,6 +340,31 @@ header_date_timezone_usa(const char *s, size_t len)
 }
 
 int
+header_encoding(FILE *fp, FILE *echo, char *buf, size_t bufsz)
+{
+	struct header_lex lex;
+	size_t n;
+	int ch;
+
+	lex.cstate = 0;
+	lex.echo = echo;
+	lex.qstate = 0;
+	lex.skipws = 1;
+
+	n = 0;
+	while ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
+		if (ch < 0)
+			return ch;
+		if (n != bufsz)
+			buf[n++] = ch;
+	}
+
+	if (n != bufsz)
+		buf[n] = '\0';
+	return n == bufsz ? HEADER_TRUNC : HEADER_OK;
+}
+
+int
 header_lex(FILE *fp, struct header_lex *lex)
 {
 	for (;;) {

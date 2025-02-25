@@ -28,6 +28,7 @@ main(void)
 	encoding_getc_test();
 	header_address_test();
 	header_date_test();
+	header_encoding_test();
 	header_lex_test();
 	header_message_id_test();
 	header_name_test();

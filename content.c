@@ -74,7 +74,6 @@ static int handle_summary(struct imsgbuf *, struct imsg *);
 static int header_copy_addresses(FILE *, FILE *, const char *, int *);
 static int header_content_type(FILE *, FILE *, struct charset *,
 			       struct encoding *);
-static int header_encoding(FILE *, FILE *, struct encoding *);
 static int header_from(FILE *, struct header_address *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
@@ -184,11 +183,19 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 		}
 
 		if (!strcasecmp(buf, "content-transfer-encoding")) {
+			char buf[17];
+
 			if (got_encoding)
 				return -1;
-			if ((hv = header_encoding(in, echo, &encoding)) == -1)
-				return -1;
-			if (hv == 0)
+			hv = header_encoding(in, echo, buf,
+						  sizeof(buf));
+			if (hv == HEADER_OK) {
+				if (encoding_from_name(&encoding, buf) == -1)
+					encoding_from_type(&encoding, ENCODING_BINARY);
+			}	
+			else if (hv == HEADER_TRUNC)
+				encoding_from_type(&encoding, ENCODING_BINARY);
+			else
 				return -1;
 			got_encoding = 1;
 		}
@@ -765,53 +772,6 @@ header_content_type(FILE *in, FILE *echo, struct charset *ct,
 		if (charset_from_name(ct, buf) == -1)
 			charset_from_type(ct, CHARSET_OTHER);
 	}
-
-	return 1;
-}
-
-static int
-header_encoding(FILE *in, FILE *echo, struct encoding *e)
-{
-	struct header_lex lex;
-	char buf[17];
-	size_t n;
-	int toolong;
-
-	lex.cstate = 0;
-	lex.echo = echo;
-	lex.qstate = 0;
-	lex.skipws = 1;
-
-	n = 0;
-	toolong = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(in, &lex)) < 0 && ch != HEADER_EOF) {
-			if (ch == HEADER_OUTPUT && errno == EPIPE)
-				return 0;
-			return -1;
-		}
-		if (ch == HEADER_EOF)
-			break;
-
-		if (!toolong) {
-			if (n == sizeof(buf) - 1) {
-				toolong = 1;
-				continue;
-			}
-			buf[n++] = ch;
-		}
-	}
-
-	if (!toolong) {
-		buf[n] = '\0';
-
-		if (encoding_from_name(e, buf) == -1)
-			encoding_from_type(e, ENCODING_BINARY);
-	}
-	else
-		encoding_from_type(e, ENCODING_BINARY);
 
 	return 1;
 }
