@@ -72,6 +72,8 @@ maildir_set_flag_test(void)
 
 		{ "hi", NULL, 255, 'S', MAILDIR_ERROR },
 		{ "hi:3,", NULL, 255, 'S', MAILDIR_ERROR },
+
+		{ "hi:2,S", NULL, 255, 'S', MAILDIR_SAME },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {
