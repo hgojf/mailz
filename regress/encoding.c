@@ -23,6 +23,32 @@
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 void
+encoding_from_name_test(void)
+{
+	size_t i;
+	const struct {
+		const char *in;
+		int type;
+	} tests[] = {
+		{ "7bit", ENCODING_7BIT },
+		{ "8bit", ENCODING_8BIT },
+		{ "base64", ENCODING_BASE64 },
+		{ "binary", ENCODING_BINARY },
+		{ "quoted-printable", ENCODING_QP },
+
+		{ "7BIT", ENCODING_7BIT },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		int type;
+
+		type = encoding_from_name(tests[i].in);
+		if (type != tests[i].type)
+			errx(1, "wrong type");
+	}
+}
+
+void
 encoding_getc_test(void)
 {
 	size_t i;

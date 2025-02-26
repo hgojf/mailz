@@ -79,18 +79,16 @@ encoding_b64(struct encoding_b64 *b64, FILE *fp)
 }
 
 int
-encoding_from_name(struct encoding *e, const char *name)
+encoding_from_name(const char *name)
 {
 	size_t i;
 
 	for (i = 0; i < nitems(encodings); i++) {
-		if (!strcasecmp(name, encodings[i].ident)) {
-			encoding_from_type(e, encodings[i].type);
-			return 0;
-		}
+		if (!strcasecmp(name, encodings[i].ident))
+			return i;
 	}
 
-	return -1;
+	return ENCODING_UNKNOWN;
 }
 
 void

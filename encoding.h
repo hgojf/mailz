@@ -17,6 +17,7 @@
 #ifndef ENCODING_H
 #define ENCODING_H
 enum encoding_type {
+	#define ENCODING_UNKNOWN -1
 	ENCODING_7BIT,
 	ENCODING_8BIT,
 	ENCODING_BASE64,
@@ -39,7 +40,7 @@ struct encoding {
 #define ENCODING_EOF -129
 #define ENCODING_ERR -130
 
-int encoding_from_name(struct encoding *, const char *);
+int encoding_from_name(const char *);
 void encoding_from_type(struct encoding *, enum encoding_type);
 int encoding_getc(struct encoding *, FILE *);
 #endif /* ! ENCODING_H */

@@ -184,14 +184,16 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 
 		if (!strcasecmp(buf, "content-transfer-encoding")) {
 			char buf[17];
+			int enc;
 
 			if (got_encoding)
 				return -1;
 			hv = header_encoding(in, echo, buf,
 						  sizeof(buf));
 			if (hv == HEADER_OK) {
-				if (encoding_from_name(&encoding, buf) == -1)
-					encoding_from_type(&encoding, ENCODING_BINARY);
+				if ((enc = encoding_from_name(buf)) == ENCODING_UNKNOWN)
+					enc = ENCODING_BINARY;
+				encoding_from_type(&encoding, enc);
 			}	
 			else if (hv == HEADER_TRUNC)
 				encoding_from_type(&encoding, ENCODING_BINARY);
