@@ -62,7 +62,7 @@ regress-run: $(OBJS_REGRESS)
 	$(CC) -o $@ $(LDFLAGS_REGRESS) $(OBJS_REGRESS)
 .PHONY: test
 
-test: regress-run
+test: mailz-content regress-run
 	@./regress-run
 
 -include $(DEPS_REGRESS)
