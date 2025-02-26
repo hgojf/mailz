@@ -84,7 +84,7 @@ encoding_from_name(struct encoding *e, const char *name)
 	size_t i;
 
 	for (i = 0; i < nitems(encodings); i++) {
-		if (!strcmp(name, encodings[i].ident)) {
+		if (!strcasecmp(name, encodings[i].ident)) {
 			encoding_from_type(e, encodings[i].type);
 			return 0;
 		}
