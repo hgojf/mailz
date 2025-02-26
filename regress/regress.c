@@ -27,6 +27,7 @@ main(void)
 {
 	charset_getc_test();
 	content_proc_letter_test();
+	content_proc_reply_test();
 	content_proc_summary_test();
 	encoding_from_name_test();
 	encoding_getc_test();

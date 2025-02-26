@@ -88,6 +88,94 @@ content_proc_letter_test(void)
 }
 
 void
+content_proc_reply_test(void)
+{
+	size_t i;
+	int null;
+	const struct {
+		const char *in;
+		const char *exclude;
+		int group;
+		int error;
+	} tests[] = {
+		{ "1", "frank@bogus.invalid", 0, 0 },
+	};
+
+	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
+		err(1, "%s", PATH_DEV_NULL);
+
+	setenv("TZ", "UTC", 1);
+
+	for (i = 0; i < nitems(tests); i++) {
+		struct content_proc pr;
+		char path[PATH_MAX];
+		FILE *out, *pin, *pout;
+		int error, in, n, p[2];
+
+		if (content_proc_init(&pr, "./mailz-content", null) == -1)
+			errx(1, "content_proc_init");
+
+		n = snprintf(path, sizeof(path),
+			     "regress/letters/reply_in_%s", tests[i].in);
+		if (n < 0)
+			err(1, "snprintf");
+		if ((size_t)n >= sizeof(path))
+			errx(1, "snprintf overflow");
+
+		if ((in = open(path, O_RDONLY | O_CLOEXEC)) == -1)
+			err(1, "%s", path);
+
+		n = snprintf(path, sizeof(path),
+			     "regress/letters/reply_out_%s", tests[i].in);
+		if (n < 0)
+			err(1, "snprintf");
+		if ((size_t)n >= sizeof(path))
+			errx(1, "snprintf overflow");
+
+		if ((out = fopen(path, "r")) == NULL)
+			err(1, "%s", path);
+
+		if (pipe2(p, O_CLOEXEC) == -1)
+			err(1, "pipe2");
+		if ((pin = fdopen(p[0], "r")) == NULL)
+			err(1, "fdopen");
+		if ((pout = fdopen(p[1], "w")) == NULL)
+			err(1, "fdopen");
+
+		error = content_proc_reply(&pr, pout, tests[i].exclude,
+					   tests[i].group, in);
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+		fclose(pout);
+		if (error == 0) {
+			int c1, c2;
+
+			for (;;) {
+				c1 = fgetc(pin);
+				c2 = fgetc(out);
+
+				/*
+				 * The text editor (vi) places a
+				 * newline at the end of the file
+				 * that cannot be easily removed,
+				 * so ignore it.
+				 */
+				if (c1 == EOF && c2 == '\n')
+					if (fgetc(out) == EOF)
+						break;
+
+				if (c1 != c2)
+					errx(1, "wrong output");
+			}
+		}
+
+		content_proc_kill(&pr);
+		fclose(pin);
+		fclose(out);
+	}
+}
+
+void
 content_proc_summary_test(void)
 {
 	size_t i;
