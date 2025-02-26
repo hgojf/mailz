@@ -76,7 +76,7 @@ content_proc_letter_test(void)
 			}
 
 			if (fread(buf2, n, 1, out) != 1)
-				errx(1, "wrong output 1");
+				errx(1, "wrong output");
 			if (memcmp(buf, buf2, n) != 0)
 				errx(1, "wrong output");
 		}
