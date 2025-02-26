@@ -109,6 +109,7 @@ header_date_test(void)
 		int error;
 	} tests[] = {
 		{ "Mon, 01 Jan 1970 00:00:00 -0000", 0, HEADER_OK },
+		{ "Mon, 01 Jan 1970 01:00:00 +0100", 0, HEADER_OK },
 		{ "Mon, 01 Jan 1970 00:00 -0000", 0, HEADER_OK },
 		{ "Mon, 01 Jan 1970 00:00:00 GMT", 0, HEADER_OK },
 		{ "Mon, 01 Jan 70 00:00:00 -0000", 0, HEADER_OK },

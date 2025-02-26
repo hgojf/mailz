@@ -248,7 +248,7 @@ header_date(FILE *fp, time_t *dp)
 	if ((date = timegm(&tm)) == -1)
 		return HEADER_INVALID;
 
-	*dp = date;
+	*dp = date - off;
 	return HEADER_OK;
 }
 
