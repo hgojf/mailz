@@ -17,6 +17,7 @@
 #include <stdio.h>
 
 #include "charset.h"
+#include "content-proc.h"
 #include "encoding.h"
 #include "header.h"
 #include "maildir.h"
@@ -25,6 +26,7 @@ int
 main(void)
 {
 	charset_getc_test();
+	content_proc_summary_test();
 	encoding_getc_test();
 	header_address_test();
 	header_date_test();
