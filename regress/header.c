@@ -50,6 +50,7 @@ header_address_test(void)
 		test_addr("Dave <dave@fake.invalid>", "dave@fake.invalid"),
 		test_ok("Dave <dave@fake.invalid>", "dave@fake.invalid", "Dave"),
 		test_ok("dave@fake.invalid", "dave@fake.invalid", ""),
+		test_ok("dave@fake.invalid   ", "dave@fake.invalid", ""),
 		test_ok("<dave@fake.invalid>", "dave@fake.invalid", ""),
 		test_ok("<>", "", ""),
 
