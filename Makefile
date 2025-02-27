@@ -34,7 +34,7 @@ mailz-content: $(OBJS_CONTENT)
 
 LDFLAGS_MAILZ = -lutil
 SRCS_MAILZ = _err.c content-proc.c imsg-blocking.c lex.c maildir.c
-SRCS_MAILZ += mailz.c parse.c
+SRCS_MAILZ += mailz.c parse.c printable.c
 
 DEPS_MAILZ = $(SRCS_MAILZ:.c=.d)
 OBJS_MAILZ = $(SRCS_MAILZ:.c=.o)
@@ -51,9 +51,10 @@ mailz: $(OBJS_MAILZ)
 
 LDFLAGS_REGRESS = -lutil
 SRCS_REGRESS = _err.c charset.c content-proc.c encoding.c header.c
-SRCS_REGRESS += imsg-blocking.c maildir.c regress/charset.c
-SRCS_REGRESS += regress/content-proc.c regress/encoding.c
-SRCS_REGRESS += regress/header.c regress/maildir.c regress/regress.c
+SRCS_REGRESS += imsg-blocking.c maildir.c printable.c
+SRCS_REGRESS += regress/charset.c regress/content-proc.c
+SRCS_REGRESS += regress/encoding.c regress/header.c regress/maildir.c
+SRCS_REGRESS += regress/printable.c regress/regress.c
 
 DEPS_REGRESS = $(SRCS_REGRESS:.c=.d)
 OBJS_REGRESS = $(SRCS_REGRESS:.c=.o)
@@ -68,9 +69,10 @@ test: mailz-content regress-run
 -include $(DEPS_REGRESS)
 
 SRCS_ALL = _err.c charset.c content-proc.c content.c encoding.c
-SRCS_ALL += header.c imsg-blocking.c maildir.c mailz.c regress/charset.c
-SRCS_ALL += regress/content-proc.c regress/encoding.c regress/header.c
-SRCS_ALL += regress/maildir.c regress/regress.c
+SRCS_ALL += header.c imsg-blocking.c maildir.c mailz.c printable.c
+SRCS_ALL += regress/charset.c regress/content-proc.c regress/encoding.c
+SRCS_ALL += regress/header.c regress/maildir.c regress/printable.c
+SRCS_ALL += regress/regress.c
 SRCS_GENERATED = lex.c parse.c
 
 .PHONY: tidy
@@ -96,6 +98,7 @@ clean:
 HEADERS = _err.h charset.h conf.h content-proc.h content.h header.h
 HEADERS += imsg-blocking.h maildir.h regress/charset.h regress/content-proc.h
 HEADERS += regress/encoding.h regress/header.h regress/maildir.h
+HEADERS += regress/printable.h
 
 tags: $(SRCS_ALL) $(HEADERS)
 	$(CTAGS) -f $@ $(SRCS_ALL) $(HEADERS)
