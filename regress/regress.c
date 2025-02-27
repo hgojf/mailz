@@ -21,6 +21,7 @@
 #include "encoding.h"
 #include "header.h"
 #include "maildir.h"
+#include "printable.h"
 
 int
 main(void)
@@ -42,6 +43,7 @@ main(void)
 	maildir_get_flag_test();
 	maildir_set_flag_test();
 	maildir_unset_flag_test();
+	string_printable_test();
 
 	puts("Ok.");
 }

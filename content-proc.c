@@ -32,8 +32,7 @@
 #include "content.h"
 #include "content-proc.h"
 #include "imsg-blocking.h"
-
-static int string_valid(const char *, size_t);
+#include "printable.h"
 
 void
 content_letter_close(struct content_letter *letter)
@@ -324,10 +323,10 @@ content_proc_summary(struct content_proc *pr,
 	if (localtime_r(&sm->date, &tm) == NULL)
 		goto bad;
 
-	if (!string_valid(sm->from, sizeof(sm->from)))
+	if (!string_printable(sm->from, sizeof(sm->from)))
 		goto bad;
 
-	if (!string_valid(sm->subject, sizeof(sm->subject)))
+	if (!string_printable(sm->subject, sizeof(sm->subject)))
 		goto bad;
 
 	switch (sm->have_subject) {
@@ -345,28 +344,4 @@ content_proc_summary(struct content_proc *pr,
 	bad:
 	imsg_free(&msg);
 	return rv;
-}
-
-/*
- * Check if a string is NUL-terminated, and if it is printable.
- */
-static int
-string_valid(const char *s, size_t sz)
-{
-	size_t i;
-
-	for (i = 0; i < sz; i++) {
-		int ch;
-
-		if (s[i] == '\0')
-			return 1;
-
-		ch = (unsigned char)s[i];
-
-		if (!isspace(ch) && !isprint(ch))
-			return 0;
-	}
-
-	/* no NUL terminator */
-	return 0;
 }
