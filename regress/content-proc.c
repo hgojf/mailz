@@ -103,6 +103,8 @@ content_proc_reply_test(void)
 
 	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
 		err(1, "%s", PATH_DEV_NULL);
+	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
+		err(1, "setlocale");
 
 	setenv("TZ", "UTC", 1);
 
