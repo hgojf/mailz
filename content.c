@@ -302,7 +302,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 		addr++;
 		n = strcspn(addr, ">");
 		if (n >= sizeof(addr_buf))
-			goto msg2;
+			goto out;
 		memcpy(addr_buf, addr, n);
 		addr_buf[n] = '\0';
 		addr = addr_buf;
