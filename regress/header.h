@@ -18,6 +18,8 @@
 #define REGRESS_HEADER_H
 
 void header_address_test(void);
+void header_content_type_test(void);
+void header_content_type_var_test(void);
 void header_copy_addresses_test(void);
 void header_date_test(void);
 void header_encoding_test(void);

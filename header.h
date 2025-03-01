@@ -14,6 +14,24 @@ struct header_address {
 	size_t namesz;
 };
 
+struct content_type {
+	char *type;
+	char *subtype;
+	size_t typesz;
+	size_t subtypesz;
+	int type_trunc;
+	int subtype_trunc;
+};
+
+struct content_type_var {
+	char *var;
+	char *val;
+	size_t varsz;
+	size_t valsz;
+	int var_trunc;
+	int val_trunc;
+};
+
 struct header_lex {
 	int cstate;
 	int qstate;
@@ -22,6 +40,8 @@ struct header_lex {
 };
 
 int header_address(FILE *, struct header_address *, int *);
+int header_content_type(FILE *, FILE *, struct content_type *, int *);
+int header_content_type_var(FILE *, FILE *, struct content_type_var *, int *);
 int header_copy(FILE *, FILE *);
 int header_copy_addresses(FILE *, FILE *, const char *, int *);
 int header_date(FILE *, time_t *);

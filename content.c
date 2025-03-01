@@ -71,8 +71,6 @@ static int handle_reply_references(FILE *, FILE *, const char *,
 				   const char *, off_t);
 static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
-static int header_content_type(FILE *, FILE *, struct charset *,
-			       struct encoding *);
 static int header_from(FILE *, struct header_address *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
@@ -201,13 +199,45 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			got_encoding = 1;
 		}
 		else if (!strcasecmp(buf, "content-type")) {
+			struct content_type ct;
+			struct content_type_var vt;
+			char type[5], var[8], val[11];
+			int eof;
+
 			if (got_content_type)
 				return -1;
-			if ((hv = header_content_type(in, echo,
-						      &charset, &encoding)) == -1)
+
+			ct.type = type;
+			ct.typesz = sizeof(type);
+			ct.subtype = NULL;
+			ct.subtypesz = 0;
+
+			eof = 0;
+			hv = header_content_type(in, echo, &ct, &eof);
+			if (hv < 0)
 				return -1;
-			if (hv == 0)
-				return -1;
+
+			if (ct.type_trunc || strcasecmp(type, "text") != 0) {
+				charset_from_type(&charset, CHARSET_OTHER);
+				encoding_from_type(&encoding, ENCODING_BINARY);
+			}
+
+			vt.var = var;
+			vt.varsz = sizeof(var);
+			vt.val = val;
+			vt.valsz = sizeof(val);
+			for (;;) {
+				hv = header_content_type_var(in, echo, &vt, &eof);
+				if (hv == HEADER_EOF)
+					break;
+				if (hv < 0)
+					return -1;
+
+				if (!vt.val_trunc && !vt.var_trunc && !strcasecmp(var, "charset")) {
+					if (charset_from_name(&charset, val) == -1)
+						charset_from_type(&charset, CHARSET_OTHER);
+				}
+			}
 
 			got_content_type = 1;
 		}
@@ -630,113 +660,6 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 	fp:
 	fclose(fp);
 	return rv;
-}
-
-static int
-header_content_type(FILE *in, FILE *echo, struct charset *ct,
-		    struct encoding *enc)
-{
-	char buf[19];
-	struct header_lex lex;
-	size_t n;
-	int state;
-
-	lex.cstate = 0;
-	lex.echo = echo;
-	lex.qstate = 0;
-	lex.skipws = 1;
-
-	state = 0;
-	n = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(in, &lex)) < 0 && ch != HEADER_EOF) {
-			if (ch == HEADER_OUTPUT && errno == EPIPE)
-				return 0;
-			return -1;
-		}
-		if (ch == HEADER_EOF)
-			break;
-
-		if (state == 0) {
-			if (ch == '/') {
-				buf[n] = '\0';
-
-				if (strcmp(buf, "text") != 0) {
-					charset_from_type(ct, CHARSET_OTHER);
-					encoding_from_type(enc, ENCODING_BINARY);
-				}
-				n = 0;
-				state = 1;
-				continue;
-			}
-
-			if (n == sizeof(buf) - 1) {
-				charset_from_type(ct, CHARSET_OTHER);
-				continue;
-			}
-			buf[n++] = ch;
-		}
-
-		if (state == 1) {
-			if (ch == ';') {
-				lex.skipws = 1;
-				state = 2;
-			}
-			continue;
-		}
-
-		if (state == 2) {
-			if (ch == '=') {
-				buf[n] = '\0';
-
-				if (!strcmp(buf, "charset"))
-					state = 3;
-				else
-					state = 4;
-				n = 0;
-				continue;
-			}
-
-			if (n == sizeof(buf) - 1)
-				continue;
-			buf[n++] = ch;
-		}
-
-		if (state == 3) {
-			if (ch == ';') {
-				buf[n] = '\0';
-
-				if (charset_from_name(ct, buf) == -1)
-					charset_from_type(ct, CHARSET_OTHER);
-				state = 2;
-				n = 0;
-			}
-
-			if (n == sizeof(buf) - 1)
-				continue;
-			buf[n++] = ch;
-		}
-
-		if (state == 4) {
-			if (ch == ';')
-				state = 2;
-			continue;
-		}
-	}
-
-	if (state == 0)
-		return -1;
-
-	if (state == 3) {
-		buf[n] = '\0';
-
-		if (charset_from_name(ct, buf) == -1)
-			charset_from_type(ct, CHARSET_OTHER);
-	}
-
-	return 1;
 }
 
 static int

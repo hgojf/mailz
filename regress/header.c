@@ -101,6 +101,126 @@ header_address_test(void)
 }
 
 void
+header_content_type_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *type;
+		const char *subtype;
+		size_t typesz;
+		size_t subtypesz;
+		int error;
+	} tests[] = {
+		{ "text/plain", "text", "plain", 10, 10, HEADER_OK },
+		{ "text/plain;", "text", "plain", 10, 10, HEADER_OK },
+
+		{ "text/plain", "text", "plain", 5, 6, HEADER_OK },
+		{ "text/plain", "text", NULL, 5, 5, HEADER_OK },
+		{ "text/plain", NULL, NULL, 4, 5, HEADER_OK },
+
+		{ "text", NULL, NULL, 10, 10, HEADER_INVALID },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		struct content_type ct;
+		char subtype[10], type[10];
+		FILE *fp;
+		int eof, error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		ct.type = type;
+		ct.typesz = tests[i].typesz;
+		ct.subtype = subtype;
+		ct.subtypesz = tests[i].subtypesz;
+
+		eof = 0;
+		error = header_content_type(fp, NULL, &ct, &eof);
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+		if (error == HEADER_OK) {
+			if ((tests[i].type == NULL) != ct.type_trunc)
+				errx(1, "wrong type");
+			if (tests[i].type != NULL)
+				if (strcmp(type, tests[i].type) != 0)
+					errx(1, "wrong type");
+
+			if ((tests[i].subtype == NULL) != ct.subtype_trunc)
+				errx(1, "wrong type");
+			if (tests[i].subtype != NULL)
+				if (strcmp(subtype, tests[i].subtype) != 0)
+					errx(1, "wrong subtype");
+		}
+
+		fclose(fp);
+	}
+}
+
+void
+header_content_type_var_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *var;
+		const char *val;
+		size_t varsz;
+		size_t valsz;
+		int error;
+	} tests[] = {
+		{ "charset=us-ascii", "charset", "us-ascii", 20, 20, HEADER_OK },
+		{ "charset=us-ascii;", "charset", "us-ascii", 20, 20, HEADER_OK },
+
+		{ "charset=us-ascii;", "charset", "us-ascii", 8, 9, HEADER_OK },
+		{ "charset=us-ascii", "charset", NULL, 20, 8, HEADER_OK },
+		{ "charset=us-ascii", NULL, NULL, 7, 8, HEADER_OK },
+
+		{ "charset", NULL, NULL, 20, 20, HEADER_INVALID },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		struct content_type_var vt;
+		char val[20], var[20];
+		FILE *fp;
+		int eof, error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		vt.val = val;
+		vt.valsz = tests[i].valsz;
+		vt.var = var;
+		vt.varsz = tests[i].varsz;
+
+		eof = 0;
+		error = header_content_type_var(fp, NULL, &vt, &eof);
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+		if (error == HEADER_OK) {
+			if ((tests[i].var == NULL) != vt.var_trunc)
+				errx(1, "wrong var");
+			if (tests[i].var != NULL)
+				if (strcmp(var, tests[i].var) != 0)
+					errx(1, "wrong var");
+
+			if ((tests[i].val == NULL) != vt.val_trunc)
+				errx(1, "wrong val");
+			if (tests[i].val != NULL)
+				if (strcmp(val, tests[i].val) != 0)
+					errx(1, "wrong val");
+		}
+
+		fclose(fp);
+	}
+}
+
+void
 header_copy_addresses_test(void)
 {
 	size_t i;

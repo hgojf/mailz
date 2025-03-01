@@ -125,6 +125,143 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 }
 
 int
+header_content_type(FILE *in, FILE *echo, struct content_type *ct,
+		    int *eof)
+{
+	struct header_lex lex;
+	size_t n;
+	int state;
+
+	lex.cstate = 0;
+	lex.echo = echo;
+	lex.qstate = 0;
+	lex.skipws = 1;
+
+	n = 0;
+	state = 0;
+
+	ct->type_trunc = 0;
+	ct->subtype_trunc = 0;
+	for (;;) {
+		int ch;
+
+		ch = header_lex(in, &lex);
+		if (ch != HEADER_EOF && ch < 0)
+			return ch;
+
+		switch (state) {
+		case 0:
+			if (ch == HEADER_EOF)
+				return HEADER_INVALID;
+			if (!ct->type_trunc) {
+				if (n == ct->typesz)
+					ct->type_trunc = 1;
+				else
+					ct->type[n++] = ch == '/' ? '\0' : ch;
+			}
+
+			if (ch == '/') {
+				n = 0;
+				state = 1;
+			}
+			break;
+		case 1:
+			if (!ct->subtype_trunc) {
+				if (n == ct->subtypesz)
+					ct->subtype_trunc = 1;
+				else {
+					int nch;
+
+					if (ch == ';' || ch == HEADER_EOF)
+						nch = '\0';
+					else
+						nch = ch;
+					ct->subtype[n++] = nch;
+				}
+			}
+
+			if (ch == ';' || ch == HEADER_EOF) {
+				if (ch == HEADER_EOF)
+					*eof = 1;
+				return HEADER_OK;
+			}
+			break;
+		}
+	}
+}
+
+int
+header_content_type_var(FILE *in, FILE *echo,
+			struct content_type_var *vp, int *eof)
+{
+	struct header_lex lex;
+	size_t n;
+	int state;
+
+	if (*eof)
+		return HEADER_EOF;
+
+	lex.cstate = 0;
+	lex.echo = echo;
+	lex.qstate = 0;
+	lex.skipws = 1;
+
+	n = 0;
+	state = 0;
+
+	vp->var_trunc = 0;
+	vp->val_trunc = 0;
+	for (;;) {
+		int ch;
+
+		ch = header_lex(in, &lex);
+		if (ch != HEADER_EOF && ch < 0)
+			return ch;
+
+		switch (state) {
+		case 0:
+			if (ch == HEADER_EOF) {
+				if (n == 0)
+					return HEADER_EOF;
+				return HEADER_INVALID;
+			}
+			if (!vp->var_trunc) {
+				if (n == vp->varsz)
+					vp->var_trunc = 1;
+				else
+					vp->var[n++] = ch == '=' ? '\0' : ch;
+			}
+			if (ch == '=') {
+				state = 1;
+				n = 0;
+			}
+			break;
+		case 1:
+			if (!vp->val_trunc) {
+				if (n == vp->valsz)
+					vp->val_trunc = 1;
+				else {
+					int nch;
+
+					if (ch == ';' || ch == HEADER_EOF)
+						nch = '\0';
+					else
+						nch = ch;
+					vp->val[n++] = nch;
+				}
+			}
+
+			if (ch == ';' || ch == HEADER_EOF) {
+				if (ch == HEADER_EOF)
+					*eof = 1;
+				return HEADER_OK;
+			}
+			break;
+		}
+	}
+}
+
+int
 header_copy(FILE *in, FILE *out)
 {
 	struct header_lex lex;

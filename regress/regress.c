@@ -33,6 +33,8 @@ main(void)
 	encoding_from_name_test();
 	encoding_getc_test();
 	header_address_test();
+	header_content_type_test();
+	header_content_type_var_test();
 	header_copy_addresses_test();
 	header_date_test();
 	header_encoding_test();

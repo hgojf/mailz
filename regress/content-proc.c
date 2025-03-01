@@ -39,6 +39,7 @@ content_proc_letter_test(void)
 	} tests[] = {
 		{ "1" },
 		{ "2" },
+		{ "3" },
 	};
 
 	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
