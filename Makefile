@@ -93,8 +93,6 @@ OBJS_REAL = $(SRCS_REAL:.c=.o)
 clean:
 	rm -f $(BINARIES) $(DEPS_REAL) $(OBJS_REAL) $(SRCS_GENERATED) parse.h
 
-.PHONY: tags
-
 HEADERS = _err.h charset.h conf.h content-proc.h content.h header.h
 HEADERS += imsg-blocking.h maildir.h regress/charset.h regress/content-proc.h
 HEADERS += regress/encoding.h regress/header.h regress/maildir.h
