@@ -16,7 +16,14 @@
 
 #ifndef MAILDIR_H
 #define MAILDIR_H
+
+#define MAILDIR_OK 0
+#define MAILDIR_INVALID -1
+#define MAILDIR_LONG -2
+#define MAILDIR_UNCHANGED -3
+
 int maildir_get_flag(const char *, int);
-const char *maildir_set_flag(const char *, int, char *, size_t);
-const char *maildir_unset_flag(const char *, int, char *, size_t);
+int maildir_set_flag(const char *, int, char *, size_t);
+int maildir_unset_flag(const char *, int, char *, size_t);
+
 #endif /* ! MAILDIR_H */

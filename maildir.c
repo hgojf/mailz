@@ -50,7 +50,7 @@ maildir_get_flag(const char *name, int flag)
 	return 0;
 }
 
-const char *
+int
 maildir_set_flag(const char *name, int flag, char *buf, size_t bufsz)
 {
 	struct maildir_info info;
@@ -58,60 +58,60 @@ maildir_set_flag(const char *name, int flag, char *buf, size_t bufsz)
 	int set;
 
 	if (maildir_get_info(name, &info) == -1)
-		return NULL;
+		return MAILDIR_INVALID;
 
 	set = 0;
 	for (i = 0, j = 0; name[i] != '\0'; i++) {
 		if (&name[i] >= info.flags) {
 			if (name[i] == flag)
-				return name;
+				return MAILDIR_UNCHANGED;
 			if (!set && name[i] > flag) {
 				if (j == bufsz)
-					return NULL;
+					return MAILDIR_LONG;
 				buf[j++] = flag;
 				set = 1;
 			}
 		}
 
 		if (j == bufsz)
-			return NULL;
+			return MAILDIR_LONG;
 		buf[j++] = name[i];
 	}
 
 	if (!set) {
 		if (j == bufsz)
-			return NULL;
+			return MAILDIR_LONG;
 		buf[j++] = flag;
 	}
 
 	if (j == bufsz)
-		return NULL;
+		return MAILDIR_LONG;
 	buf[j] = '\0';
-	return buf;
+	return MAILDIR_OK;
 }
 
-const char *
+int
 maildir_unset_flag(const char *name, int flag, char *buf, size_t bufsz)
 {
 	struct maildir_info info;
 	size_t i, j;
 
 	if (maildir_get_info(name, &info) == -1)
-		return name;
+		return MAILDIR_UNCHANGED;;
 
 	for (i = 0, j = 0; name[i] != '\0'; i++) {
 		if (&name[i] >= info.flags && name[i] == flag)
 			continue;
 		if (j == bufsz)
-			return NULL;
+			return MAILDIR_LONG;
 		buf[j++] = name[i];
 	}
 
 	if (i == j)
-		return name;
+		return MAILDIR_UNCHANGED;
 
 	if (j == bufsz)
-		return NULL;
+		return MAILDIR_LONG;
 	buf[j] = '\0';
-	return buf;
+	return MAILDIR_OK;
 }

@@ -229,24 +229,24 @@ static int
 command_flag(struct letter *letter, struct command_args *args,
 	     int flag, int set)
 {
-	const char *bufp;
 	char buf[NAME_MAX], *new;
+	int error;
 
 	if (set) {
-		bufp = maildir_set_flag(letter->path, flag, buf,
+		error = maildir_set_flag(letter->path, flag, buf,
 					sizeof(buf));
 	}
 	else {
-		bufp = maildir_unset_flag(letter->path, flag, buf,
+		error = maildir_unset_flag(letter->path, flag, buf,
 					sizeof(buf));
 	}
 
-	if (bufp == NULL)
-		return -1;
-	if (bufp == letter->path)
+	if (error == MAILDIR_UNCHANGED)
 		return 0;
+	if (error != MAILDIR_OK)
+		return -1;
 
-	if ((new = strdup(bufp)) == NULL)
+	if ((new = strdup(buf)) == NULL)
 		return -1;
 
 	if (renameat(args->cur, letter->path, args->cur, new) == -1) {

@@ -23,10 +23,6 @@
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-#define MAILDIR_ERROR 0
-#define MAILDIR_OK 1
-#define MAILDIR_SAME 2
-
 void
 maildir_get_flag_test(void)
 {
@@ -68,34 +64,25 @@ maildir_set_flag_test(void)
 		{ "hi:2,AU", "hi:2,ASU", 255, 'S', MAILDIR_OK },
 
 		{ "hi:2,", "hi:2,S", 7, 'S', MAILDIR_OK },
-		{ "hi:2,", NULL, 6, 'S', MAILDIR_ERROR },
+		{ "hi:2,", NULL, 6, 'S', MAILDIR_LONG },
 
-		{ "hi", NULL, 255, 'S', MAILDIR_ERROR },
-		{ "hi:3,", NULL, 255, 'S', MAILDIR_ERROR },
+		{ "hi", NULL, 255, 'S', MAILDIR_INVALID },
+		{ "hi:3,", NULL, 255, 'S', MAILDIR_INVALID },
 
-		{ "hi:2,S", NULL, 255, 'S', MAILDIR_SAME },
+		{ "hi:2,S", NULL, 255, 'S', MAILDIR_UNCHANGED },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {
 		char buf[255];
-		const char *error;
+		int error;
 
 		error = maildir_set_flag(tests[i].in, tests[i].flag,
 					   buf, tests[i].bufsz);
-		switch (tests[i].error) {
-		case MAILDIR_ERROR:
-			if (error != NULL)
-				errx(1, "wrong error");
-			break;
-		case MAILDIR_OK:
-			if (error != buf || strcmp(buf, tests[i].out) != 0)
-				errx(1, "wrong error");
-			break;
-		case MAILDIR_SAME:
-			if (error != tests[i].in)
-				errx(1, "wrong error");
-			break;
-		}
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+		if (error == MAILDIR_OK)
+			if (strcmp(buf, tests[i].out) != 0)
+				errx(1, "wrong output");
 	}
 }
 
@@ -114,31 +101,22 @@ maildir_unset_flag_test(void)
 		{ "hi:2,ASU", "hi:2,AU", 255, 'S', MAILDIR_OK },
 
 		{ "hi:2,S", "hi:2,", 6, 'S', MAILDIR_OK },
-		{ "hi:2,S", "hi:2,", 5, 'S', MAILDIR_ERROR },
+		{ "hi:2,S", "hi:2,", 5, 'S', MAILDIR_LONG },
 
-		{ "hi:2,", NULL, 255, 'S', MAILDIR_SAME },
-		{ "hi", NULL, 255, 'S', MAILDIR_SAME },
+		{ "hi:2,", NULL, 255, 'S', MAILDIR_UNCHANGED },
+		{ "hi", NULL, 255, 'S', MAILDIR_UNCHANGED },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {
 		char buf[255];
-		const char *error;
+		int error;
 
 		error = maildir_unset_flag(tests[i].in, tests[i].flag,
 					   buf, tests[i].bufsz);
-		switch (tests[i].error) {
-		case MAILDIR_ERROR:
-			if (error != NULL)
-				errx(1, "wrong error");
-			break;
-		case MAILDIR_OK:
-			if (error != buf || strcmp(buf, tests[i].out) != 0)
-				errx(1, "wrong error");
-			break;
-		case MAILDIR_SAME:
-			if (error != tests[i].in)
-				errx(1, "wrong error");
-			break;
-		}
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+		if (error == MAILDIR_OK)
+			if (strcmp(buf, tests[i].out) != 0)
+				errx(1, "wrong output");
 	}
 }
