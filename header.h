@@ -23,6 +23,7 @@ struct header_lex {
 
 int header_address(FILE *, struct header_address *, int *);
 int header_copy(FILE *, FILE *);
+int header_copy_addresses(FILE *, FILE *, const char *, int *);
 int header_date(FILE *, time_t *);
 int header_encoding(FILE *, FILE *, char *, size_t);
 int header_name(FILE *, char *, size_t);

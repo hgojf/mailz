@@ -101,6 +101,58 @@ header_address_test(void)
 }
 
 void
+header_copy_addresses_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *exclude;
+		const char *out;
+		int error;
+	} tests[] = {
+		{ "dave@bogus.invalid, Thomas <tom@bogus.invalid>",
+		   "tom@bogus.invalid", " dave@bogus.invalid",
+		   HEADER_OK },
+		{ "dave@bogus.invalid, Thomas <tom@bogus.invalid>, Fredrick <fred@bogus.invalid>",
+		   "tom@bogus.invalid",
+		   " dave@bogus.invalid, Fredrick <fred@bogus.invalid>",
+		   HEADER_OK },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		FILE *in, *out;
+		char *obuf;
+		size_t osz;
+		int any, error;
+
+		in = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (in == NULL)
+			err(1, "fmemopen");
+
+		out = open_memstream(&obuf, &osz);
+		if (out == NULL)
+			err(1, "open_memstream");
+
+		any = 0;
+		error = header_copy_addresses(in, out, tests[i].exclude,
+					      &any);
+		if (error != tests[i].error)
+			errx(1, "wrong error");
+
+		if (fclose(out) == EOF)
+			err(1, "fclose");
+		if (error == HEADER_OK) {
+			if (strcmp(obuf, tests[i].out) != 0)
+				errx(1, "wrong output");
+		}
+
+		free(obuf);
+		fclose(in);
+	}
+}
+
+void
 header_date_test(void)
 {
 	size_t i;

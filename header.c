@@ -146,6 +146,45 @@ header_copy(FILE *in, FILE *out)
 }
 
 int
+header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
+{
+	char addr[255], name[65];
+	struct header_address from;
+	int eof, n;
+
+	from.addr = addr;
+	from.addrsz = sizeof(addr);
+
+	from.name = name;
+	from.namesz = sizeof(name);
+
+	eof = 0;
+	while ((n = header_address(in, &from, &eof)) != HEADER_EOF) {
+		if (n < 0)
+			return n;
+		if (!strcmp(addr, exclude))
+			continue;
+
+		if (*any)
+			if (fprintf(out, ",") < 0)
+				return HEADER_OUTPUT;
+
+		if (strlen(name) != 0) {
+			if (fprintf(out, " %s <%s>", name, addr) < 0)
+				return HEADER_OUTPUT;
+		}
+		else {
+			if (fprintf(out, " %s", addr) < 0)
+				return HEADER_OUTPUT;
+		}
+		*any = 1;
+	}
+
+	return HEADER_OK;
+}
+
+
+int
 header_date(FILE *fp, time_t *dp)
 {
 	struct header_lex lex;

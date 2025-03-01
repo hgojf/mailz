@@ -71,7 +71,6 @@ static int handle_reply_references(FILE *, FILE *, const char *,
 				   const char *, off_t);
 static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
-static int header_copy_addresses(FILE *, FILE *, const char *, int *);
 static int header_content_type(FILE *, FILE *, struct charset *,
 			       struct encoding *);
 static int header_from(FILE *, struct header_address *);
@@ -332,7 +331,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 			if (fprintf(out, "Cc:") < 0)
 				goto out;
 			any = 0;
-			if (header_copy_addresses(in, out, addr, &any) == -1)
+			if (header_copy_addresses(in, out, addr, &any) < 0)
 				goto out;
 			if (fprintf(out, "\n") < 0)
 				goto out;
@@ -529,20 +528,20 @@ handle_reply_to(FILE *in, FILE *out, const char *addr, off_t from,
 	if (reply_to != -1) {
 		if (fseeko(in, reply_to, SEEK_SET) == -1)
 			return -1;
-		if (header_copy_addresses(in, out, addr, &any) == -1)
+		if (header_copy_addresses(in, out, addr, &any) < 0)
 			return -1;
 	}
 	else {
 		if (fseeko(in, from, SEEK_SET) == -1)
 			return -1;
-		if (header_copy_addresses(in, out, addr, &any) == -1)
+		if (header_copy_addresses(in, out, addr, &any) < 0)
 			return -1;
 	}
 
 	if (to != -1) {
 		if (fseeko(in, to, SEEK_SET) == -1)
 			return -1;
-		if (header_copy_addresses(in, out, addr, &any) == -1)
+		if (header_copy_addresses(in, out, addr, &any) < 0)
 			return -1;
 	}
 
@@ -631,44 +630,6 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 	fp:
 	fclose(fp);
 	return rv;
-}
-
-static int
-header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
-{
-	char addr[255], name[65];
-	struct header_address from;
-	int eof, n;
-
-	from.addr = addr;
-	from.addrsz = sizeof(addr);
-
-	from.name = name;
-	from.namesz = sizeof(name);
-
-	eof = 0;
-	while ((n = header_address(in, &from, &eof)) != HEADER_EOF) {
-		if (n < 0)
-			return -1;
-		if (!strcmp(addr, exclude))
-			continue;
-
-		if (*any)
-			if (fprintf(out, ",") < 0)
-				return -1;
-
-		if (strlen(name) != 0) {
-			if (fprintf(out, " %s <%s>", name, addr) < 0)
-				return -1;
-		}
-		else {
-			if (fprintf(out, " %s", addr) < 0)
-				return -1;
-		}
-		*any = 1;
-	}
-
-	return 0;
 }
 
 static int
