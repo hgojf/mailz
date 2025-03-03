@@ -320,7 +320,6 @@ header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
 	return HEADER_OK;
 }
 
-
 int
 header_date(FILE *fp, time_t *dp)
 {
@@ -539,6 +538,21 @@ header_encoding(FILE *fp, FILE *echo, char *buf, size_t bufsz)
 	if (n != bufsz)
 		buf[n] = '\0';
 	return n == bufsz ? HEADER_TRUNC : HEADER_OK;
+}
+
+int
+header_from(FILE *fp, struct header_address *from)
+{
+	int error, eof;
+
+	eof = 0;
+	if ((error = header_address(fp, from, &eof)) < 0)
+		return error;
+
+	if (!eof)
+		if ((error = header_skip(fp, NULL)) < 0)
+			return error;
+	return 0;
 }
 
 int

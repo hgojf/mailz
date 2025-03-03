@@ -46,6 +46,7 @@ int header_copy(FILE *, FILE *);
 int header_copy_addresses(FILE *, FILE *, const char *, int *);
 int header_date(FILE *, time_t *);
 int header_encoding(FILE *, FILE *, char *, size_t);
+int header_from(FILE *, struct header_address *);
 int header_name(FILE *, char *, size_t);
 int header_message_id(FILE *, char *, size_t);
 int header_lex(FILE *, struct header_lex *);

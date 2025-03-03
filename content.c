@@ -71,7 +71,6 @@ static int handle_reply_references(FILE *, FILE *, const char *,
 				   const char *, off_t);
 static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
-static int header_from(FILE *, struct header_address *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
 static void usage(void);
@@ -386,7 +385,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 			from_p.name = from_name;
 			from_p.namesz = sizeof(from_name);
 
-			if (header_from(in, &from_p) == -1)
+			if (header_from(in, &from_p) < 0)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "in-reply-to")) {
@@ -621,7 +620,7 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 			from.name = NULL;
 			from.namesz = 0;
 
-			if (header_from(fp, &from) == -1)
+			if (header_from(fp, &from) < 0)
 				goto fp;
 			if (strlen(sm.from) == 0)
 				goto fp;
@@ -660,21 +659,6 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 	fp:
 	fclose(fp);
 	return rv;
-}
-
-static int
-header_from(FILE *fp, struct header_address *from)
-{
-	int eof;
-
-	eof = 0;
-	if (header_address(fp, from, &eof) < 0)
-		return -1;
-
-	if (!eof)
-		if (header_skip(fp, NULL) < 0)
-			return -1;
-	return 0;
 }
 
 static int
