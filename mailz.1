@@ -25,12 +25,7 @@ Display mail that has already been read.
 .Pp
 Upon startup,
 .Nm
-will display a listing of all mail received sorted by date in
-ascending order.
-The message number that identifies the mail,
-the date it was sent, the email address it was sent by,
-and the subject of the mail are all presented in this listing.
-.Pp
+will display a listing of all mail received.
 Commands can then be entered in a
 .Xr sh 1
 like interface.
@@ -54,19 +49,14 @@ Mark each message as having been read.
 .It Ic reply
 Reply to each message, addressing the sender and recipients of the
 message.
-A temporary file containing the message contents quoted is created
-and presented for editing, and a prompt is presented to confirm the
-sending of the reply.
+A template reply is presented for editing before sending the reply.
 .It Ic respond
 Reply to each message, addressing the sender of the message.
-A temporary file containing the message contents quoted is created
-and presented for editing, and a prompt is presented to confirm the
-sending of the reply.
+A template reply is presented for editing before sending the reply.
 .It Ic save (s)
 Save each message to a temporary file and print its location.
 .It Ic thread (t)
-For each message, list all messages in the same thread sorted by date
-in ascending order.
+For each message, list all messages in the same thread.
 .It Ic unread (x)
 Mark each message as not having been read.
 .El
