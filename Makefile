@@ -91,7 +91,7 @@ DEPS_REAL = $(SRCS_REAL:.c=.d)
 OBJS_REAL = $(SRCS_REAL:.c=.o)
 
 clean:
-	rm -f $(BINARIES) $(DEPS_REAL) $(OBJS_REAL) $(SRCS_GENERATED) parse.h
+	rm -f $(BINARIES) $(DEPS_REAL) $(OBJS_REAL) $(SRCS_GENERATED) tags parse.h
 
 HEADERS = _err.h charset.h conf.h content-proc.h content.h header.h
 HEADERS += imsg-blocking.h mailbox.h maildir.h regress/charset.h
