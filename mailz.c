@@ -503,7 +503,7 @@ command_thread(struct letter *letter, struct command_args *args)
 
 	mailbox_thread_init(args->mailbox, &thread, letter);
 
-	while ((let = mailbox_thread_next(args->mailbox, &thread)) != NULL){
+	while ((let = mailbox_thread_next(args->mailbox, &thread)) != NULL) {
 		size_t idx;
 
 		idx = let - args->mailbox->letters;
