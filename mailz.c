@@ -33,6 +33,7 @@
 #include "_err.h"
 #include "conf.h"
 #include "content-proc.h"
+#include "mailbox.h"
 #include "maildir.h"
 #include "pathnames.h"
 
@@ -40,24 +41,17 @@ struct command_args {
 	const char *addr;
 	const char *tmpdir;
 	struct mailz_ignore *ignore;
+	struct mailbox *mailbox;
 	struct letter *letters;
 	size_t nletter;
 	int cur;
 	int null;
 };
 
-struct letter {
-	time_t date;
-	char *from;
-	char *path;
-	char *subject;
-};
-
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-static void commands_run(struct letter *, size_t, int, int,
-			 const char *, const char *,
-			 struct mailz_ignore *);
+static void commands_run(struct mailbox *, int, int, const char *,
+			 const char *, struct mailz_ignore *);
 static int commands_token(FILE *, char *, size_t, int *);
 static const struct command *commands_search(const char *);
 static int command_delete(struct letter *, struct command_args *);
@@ -73,12 +67,8 @@ static int command_thread(struct letter *, struct command_args *);
 static int command_unread(struct letter *, struct command_args *);
 static int content_proc_ex_ignore(struct content_proc *,
 				  const struct mailz_ignore *);
-static int letter_cmp(const void *, const void *);
-static void letter_free(struct letter *);
-static int letter_from_summary(struct letter *, const char *,
-			       const struct content_summary *);
 static int letter_print(size_t, struct letter *);
-static int read_letters(int, int, int, struct letter **, size_t *);
+static int read_letters(int, int, int, struct mailbox *);
 static void usage(void);
 
 static const struct command {
@@ -98,7 +88,7 @@ static const struct command {
 };
 
 static void
-commands_run(struct letter *letters, size_t nletter, int cur,
+commands_run(struct mailbox *mailbox, int cur,
 	     int null, const char *tmpdir, const char *addr,
 	     struct mailz_ignore *ignore)
 {
@@ -106,10 +96,11 @@ commands_run(struct letter *letters, size_t nletter, int cur,
 	struct letter *letter;
 
 	args.addr = addr;
-	args.letters = letters;
-	args.nletter = nletter;
 	args.cur = cur;
 	args.ignore = ignore;
+	args.letters = mailbox->letters;
+	args.nletter = mailbox->nletter;
+	args.mailbox = mailbox;
 	args.null = null;
 	args.tmpdir = tmpdir;
 
@@ -156,14 +147,14 @@ commands_run(struct letter *letters, size_t nletter, int cur,
 				goto bad;
 			}
 
-			idx = strtonum(buf, 1, nletter, &errstr);
+			idx = strtonum(buf, 1, mailbox->nletter, &errstr);
 			if (errstr != NULL) {
 				warnx("message number was %s", errstr);
 				goto bad;
 			}
 
-			letter = &letters[idx - 1];
-			if (cmd->fn(&letters[idx - 1], &args) == -1)
+			letter = &mailbox->letters[idx - 1];
+			if (cmd->fn(&mailbox->letters[idx - 1], &args) == -1)
 				goto bad;
 		}
 
@@ -507,45 +498,17 @@ command_save(struct letter *letter, struct command_args *args)
 static int
 command_thread(struct letter *letter, struct command_args *args)
 {
-	const char *subject;
-	size_t i, idx, start;
-	int have_first;
+	struct mailbox_thread thread;
+	struct letter *let;
 
-	idx = letter - args->letters;
+	mailbox_thread_init(args->mailbox, &thread, letter);
 
-	if ((subject = letter->subject) == NULL) {
-		if (letter_print(idx + 1, letter) == -1)
+	while ((let = mailbox_thread_next(args->mailbox, &thread)) != NULL){
+		size_t idx;
+
+		idx = let - args->mailbox->letters;
+		if (letter_print(idx + 1, let) == -1)
 			return -1;
-		return 0;
-	}
-
-	if ((have_first = strncmp(subject, "Re: ", 4))) {
-		if (letter_print(idx + 1, letter) == -1)
-			return -1;
-		start = idx + 1;
-	}
-	else {
-		subject += 4;
-		start = 0;
-	}
-
-	for (i = start; i < args->nletter; i++) {
-		if (args->letters[i].subject == NULL)
-			continue;
-
-		if (!strcmp(args->letters[i].subject, subject)) {
-			if (have_first)
-				break;
-			if (letter_print(i + 1, &args->letters[i]) == -1)
-				return -1;
-			have_first = 1;
-		}
-		else if (!strncmp(args->letters[i].subject, "Re: ", 4)
-			&& !strcmp(&args->letters[i].subject[4],
-				   subject)) {
-			if (letter_print(i + 1, &args->letters[i]) == -1)
-				return -1;
-		}
 	}
 
 	return 0;
@@ -574,58 +537,6 @@ content_proc_ex_ignore(struct content_proc *pr,
 					type) == -1)
 			return -1;
 	return 0;
-}
-
-static int
-letter_cmp(const void *one, const void *two)
-{
-	time_t n1, n2;
-
-	n1 = ((const struct letter *)one)->date;
-	n2 = ((const struct letter *)two)->date;
-
-	if (n1 > n2)
-		return 1;
-	else if (n1 == n2)
-		return 0;
-	else
-		return -1;
-}
-
-static void
-letter_free(struct letter *letter)
-{
-	free(letter->from);
-	free(letter->path);
-	free(letter->subject);
-}
-
-static int
-letter_from_summary(struct letter *letter, const char *path,
-		    const struct content_summary *sm)
-{
-	if ((letter->from = strdup(sm->from)) == NULL)
-		return -1;
-
-	if ((letter->path = strdup(path)) == NULL)
-		goto from;
-
-	if (sm->have_subject) {
-		if ((letter->subject = strdup(sm->subject)) == NULL)
-			goto path;
-	}
-	else
-		letter->subject = NULL;
-
-	letter->date = sm->date;
-
-	return 0;
-
-	path:
-	free(letter->path);
-	from:
-	free(letter->from);
-	return -1;
 }
 
 static int
@@ -658,13 +569,10 @@ letter_print(size_t nth, struct letter *letter)
 }
 
 static int
-read_letters(int ocur, int view_all, int null,
-	     struct letter **o_letters, size_t *o_nletter)
+read_letters(int ocur, int view_all, int null, struct mailbox *mailbox)
 {
 	DIR *cur;
 	struct content_proc pr;
-	struct letter *letters;
-	size_t i, nletter;
 	int curfd;
 
 	if ((curfd = dup(ocur)) == -1)
@@ -680,12 +588,11 @@ read_letters(int ocur, int view_all, int null,
 
 	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, null) == -1)
 		goto cur;
+	mailbox_init(mailbox);
 
-	letters = NULL;
-	nletter = 0;
 	for (;;) {
 		struct content_summary sm;
-		struct letter letter, *t;
+		struct letter letter;
 		struct dirent *de;
 		int fd;
 
@@ -702,39 +609,28 @@ read_letters(int ocur, int view_all, int null,
 		if (!view_all && maildir_get_flag(de->d_name, 'S'))
 			continue;
 
-		if (nletter == SIZE_MAX)
-			goto letters;
-
 		if ((fd = openat(curfd, de->d_name, O_RDONLY | O_CLOEXEC)) == -1)
 			goto letters;
 		if (content_proc_summary(&pr, &sm, fd) == -1)
 			goto letters;
 
-		if (letter_from_summary(&letter, de->d_name, &sm) == -1)
-			goto letters;
+		letter.date = sm.date;
+		letter.from = sm.from;
+		letter.path = de->d_name;
+		letter.subject = sm.have_subject ? sm.subject : NULL;
 
-		t = reallocarray(letters, nletter + 1, sizeof(*letters));
-		if (t == NULL) {
-			letter_free(&letter);
+		if (mailbox_add_letter(mailbox, &letter) == -1)
 			goto letters;
-		}
-
-		letters = t;
-		letters[nletter++] = letter;
 	}
 
-	qsort(letters, nletter, sizeof(*letters), letter_cmp);
-	*o_letters = letters;
-	*o_nletter = nletter;
+	mailbox_sort(mailbox);
 
 	closedir(cur);
 	content_proc_kill(&pr);
 	return 0;
 
 	letters:
-	for (i = 0; i < nletter; i++)
-		letter_free(&letters[i]);
-	free(letters);
+	mailbox_free(mailbox);
 	content_proc_kill(&pr);
 	cur:
 	closedir(cur);
@@ -805,8 +701,7 @@ main(int argc, char *argv[])
 {
 	char tmpdir[] = PATH_TMPDIR;
 	struct mailz_conf conf;
-	struct letter *letters;
-	size_t i, nletter;
+	struct mailbox mailbox;
 	int ch, cur, null, root, rv, view_all;
 
 	rv = 1;
@@ -870,22 +765,22 @@ main(int argc, char *argv[])
 	if (setup_letters(root, cur) == -1)
 		goto null;
 
-	if (read_letters(cur, view_all, null, &letters, &nletter) == -1)
+	if (read_letters(cur, view_all, null, &mailbox) == -1)
 		goto null;
 
-	if (nletter == 0)
+	if (mailbox.nletter == 0)
 		puts("No mail.");
 	else {
-		for (i = 0; i < nletter; i++)
-			letter_print(i + 1, &letters[i]);
-		commands_run(letters, nletter, cur, null, tmpdir,
-			     conf.address, &conf.ignore);
+		size_t i;
+
+		for (i = 0; i < mailbox.nletter; i++)
+			letter_print(i + 1, &mailbox.letters[i]);
+		commands_run(&mailbox, cur, null, tmpdir, conf.address,
+			     &conf.ignore);
 	}
 
 	rv = 0;
-	for (i = 0; i < nletter; i++)
-		letter_free(&letters[i]);
-	free(letters);
+	mailbox_free(&mailbox);
 	null:
 	close(null);
 	tmpdir:
