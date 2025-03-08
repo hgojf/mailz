@@ -154,8 +154,10 @@ commands_run(struct mailbox *mailbox, int cur,
 			}
 
 			letter = &mailbox->letters[idx - 1];
-			if (cmd->fn(&mailbox->letters[idx - 1], &args) == -1)
+			if (cmd->fn(&mailbox->letters[idx - 1], &args) == -1) {
+				warnx("command '%s' failed", cmd->ident);
 				goto bad;
+			}
 		}
 
 		bad:
