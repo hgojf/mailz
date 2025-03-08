@@ -749,16 +749,26 @@ main(int argc, char *argv[])
 		goto tmpdir;
 	}
 
-	if (unveil(tmpdir, "rwc") == -1)
+	if (unveil(tmpdir, "rwc") == -1) {
+		warn("%s", tmpdir);
 		goto null;
-	if (unveil(argv[0], "rc") == -1)
+	}
+	if (unveil(argv[0], "rc") == -1) {
+		warn("%s", argv[0]);
 		goto null;
-	if (unveil(PATH_LESS, "x") == -1)
+	}
+	if (unveil(PATH_LESS, "x") == -1) {
+		warn("%s", PATH_LESS);
 		goto null;
-	if (unveil(PATH_MAILZ_CONTENT, "x") == -1)
+	}
+	if (unveil(PATH_MAILZ_CONTENT, "x") == -1) {
+		warn("%s", PATH_MAILZ_CONTENT);
 		goto null;
-	if (unveil(PATH_SENDMAIL, "x") == -1)
+	}
+	if (unveil(PATH_SENDMAIL, "x") == -1) {
+		warn("%s", PATH_SENDMAIL);
 		goto null;
+	}
 	if (pledge("stdio rpath cpath wpath proc exec sendfd", NULL) == -1)
 		err(1, "pledge");
 
