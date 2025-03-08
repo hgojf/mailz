@@ -134,6 +134,11 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	if (handle_letter_under(in, out, ignore, 0) == -1)
 		goto in;
 
+	if (imsg_compose(msgbuf, IMSG_CNT_OK, 0, -1, -1, NULL, 0) == -1)
+		goto in;
+	if (imsgbuf_flush(msgbuf) == -1)
+		goto in;
+
 	in:
 	fclose(in);
 	out:

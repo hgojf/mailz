@@ -98,6 +98,9 @@ content_proc_letter_test(void)
 				errx(1, "wrong output");
 		}
 
+		if (content_letter_finish(&lr) == -1)
+			errx(1, "content_letter_finish");
+
 		content_letter_close(&lr);
 		content_proc_kill(&pr);
 		fclose(out);

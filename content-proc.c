@@ -41,6 +41,22 @@ content_letter_close(struct content_letter *letter)
 }
 
 int
+content_letter_finish(struct content_letter *letter)
+{
+	struct imsg msg;
+	ssize_t n;
+	int rv;
+
+	n = imsg_get_blocking(&letter->pr->msgbuf, &msg);
+	if (n <= 0)
+		return -1;
+
+	rv = imsg_get_type(&msg) == IMSG_CNT_OK ? 0 : -1;
+	imsg_free(&msg);
+	return rv;
+}
+
+int
 content_letter_getc(struct content_letter *letter, char buf[static 4])
 {
 	int i;
@@ -102,6 +118,7 @@ content_letter_init(struct content_proc *pr,
 	if ((letter->fp = fdopen(p[0], "r")) == NULL)
 		goto p;
 	memset(&letter->mbs, 0, sizeof(letter->mbs));
+	letter->pr = pr;
 	return 0;
 
 	p:

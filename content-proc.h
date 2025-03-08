@@ -38,11 +38,13 @@ int content_proc_reply(struct content_proc *, FILE *, const char *, int, int);
 int content_proc_summary(struct content_proc *, struct content_summary *, int);
 
 struct content_letter {
-	mbstate_t mbs;
+	struct content_proc *pr;
 	FILE *fp;
+	mbstate_t mbs;
 };
 
 void content_letter_close(struct content_letter *);
+int content_letter_finish(struct content_letter *);
 int content_letter_getc(struct content_letter *, char [static 4]);
 int content_letter_init(struct content_proc *, struct content_letter *, int);
 #endif /* ! CONTENT_PROC_H */
