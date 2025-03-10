@@ -222,7 +222,7 @@ static int
 command_flag(struct letter *letter, struct command_args *args,
 	     int flag, int set)
 {
-	char buf[NAME_MAX], *new;
+	char buf[NAME_MAX + 1], *new;
 	int error;
 
 	if (set) {
@@ -662,7 +662,7 @@ setup_letters(int root, int cur)
 	}
 
 	for (;;) {
-		char name[NAME_MAX], *namep;
+		char name[NAME_MAX + 1], *namep;
 		struct dirent *de;
 
 		errno = 0;
