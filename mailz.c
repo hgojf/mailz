@@ -311,7 +311,7 @@ command_more(struct letter *letter, struct command_args *args)
 
 		if (fwrite(buf, n, 1, fp) != 1) {
 			if (ferror(fp) && errno == EPIPE)
-				break;
+				goto read;
 			goto pid;
 		}
 	}
@@ -319,6 +319,7 @@ command_more(struct letter *letter, struct command_args *args)
 	if (content_letter_finish(&lr) == -1)
 		goto pid;
 
+	read:
 	if (command_read(letter, args) == -1)
 		goto pid;
 
