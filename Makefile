@@ -109,5 +109,5 @@ MANPATH ?= $(PREFIX)/man
 install:
 	$(INSTALL) -m 0755 mailz $(PREFIX)/bin
 	$(INSTALL) -m 0755 mailz-content $(PREFIX)/libexec
-	$(INSTALL) -m 0644 mailz.1 ${MANPATH}/man1/
-	$(INSTALL) -m 0644 mailz.conf.5 ${MANPATH}/man5/
+	$(INSTALL) -C -m 0644 mailz.1 ${MANPATH}/man1/
+	$(INSTALL) -C -m 0644 mailz.conf.5 ${MANPATH}/man5/
