@@ -14,6 +14,7 @@ struct mailbox {
 };
 
 struct mailbox_thread {
+	struct letter *letter;
 	const char *subject;
 	size_t idx;
 	int have_first;

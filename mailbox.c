@@ -124,6 +124,7 @@ mailbox_thread_init(struct mailbox *mailbox,
 		thread->idx = letter - mailbox->letters;
 		thread->subject = letter->subject;
 	}
+	thread->letter = letter;
 
 }
 
@@ -137,8 +138,13 @@ mailbox_thread_next(struct mailbox *mailbox,
 {
 	size_t i;
 
-	if (thread->subject == NULL)
-		return NULL;
+	if (thread->subject == NULL) {
+		struct letter *letter;
+
+		letter = thread->letter;
+		thread->letter = NULL;
+		return letter;
+	}
 
 	for (i = thread->idx; i < mailbox->nletter; i++) {
 		const char *subject;

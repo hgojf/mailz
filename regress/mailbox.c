@@ -13,16 +13,19 @@ mailbox_thread_test(void)
 {
 	size_t i;
 	const struct {
-		const char **subjects;
+		char **subjects;
+		size_t nsubject;
 		size_t *matches;
 		size_t letter;
 	} tests[] = {
 		#define matches(...) (size_t []) { __VA_ARGS__, SIZE_MAX }
-		#define subjects(...) (const char *[]) { __VA_ARGS__, NULL }
+		#define subjects(...) (char *[]) { __VA_ARGS__ }, \
+					nitems(((char *[]) { __VA_ARGS__ }))
 
 		{ subjects("hi", "Re: hi", "wazzap"), matches(0, 1), 0 },
 		{ subjects("wazzap", "hi", "Re: hi"), matches(1, 2), 1 },
 		{ subjects("hi", "hi", "Re: hi"), matches(0), 0 },
+		{ subjects(NULL, NULL), matches(0), 0 },
 
 		#undef matches
 		#undef subject
@@ -31,18 +34,17 @@ mailbox_thread_test(void)
 	for (i = 0; i < nitems(tests); i++) {
 		struct mailbox mailbox;
 		struct mailbox_thread thread;
-		const char **s;
-		size_t *m;
+		size_t j, *m;
 
 		mailbox_init(&mailbox);
 
-		for (s = tests[i].subjects; *s != NULL; s++) {
+		for (j = 0; j < tests[i].nsubject; j++) {
 			struct letter letter;
 
 			letter.date = 0;
 			letter.from = "bogus";
 			letter.path = "bogus";
-			letter.subject = (char *)*s;
+			letter.subject = tests[i].subjects[j];
 
 			if (mailbox_add_letter(&mailbox, &letter) == -1)
 				err(1, "mailbox_add_letter");
