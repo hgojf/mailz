@@ -39,6 +39,7 @@
 
 struct command_args {
 	const char *addr;
+	const char *maildir;
 	const char *tmpdir;
 	struct mailz_ignore *ignore;
 	struct mailbox *mailbox;
@@ -51,7 +52,7 @@ struct command_args {
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 static void commands_run(struct mailbox *, int, int, const char *,
-			 const char *, struct mailz_ignore *);
+			 const char *, struct mailz_ignore *, const char *);
 static int commands_token(FILE *, char *, size_t, int *);
 static const struct command *commands_search(const char *);
 static int command_delete(struct letter *, struct command_args *);
@@ -90,7 +91,7 @@ static const struct command {
 static void
 commands_run(struct mailbox *mailbox, int cur,
 	     int null, const char *tmpdir, const char *addr,
-	     struct mailz_ignore *ignore)
+	     struct mailz_ignore *ignore, const char *maildir)
 {
 	struct command_args args;
 	struct letter *letter;
@@ -101,6 +102,7 @@ commands_run(struct mailbox *mailbox, int cur,
 	args.letters = mailbox->letters;
 	args.nletter = mailbox->nletter;
 	args.mailbox = mailbox;
+	args.maildir = maildir;
 	args.null = null;
 	args.tmpdir = tmpdir;
 
@@ -236,13 +238,28 @@ command_flag(struct letter *letter, struct command_args *args,
 
 	if (error == MAILDIR_UNCHANGED)
 		return 0;
-	if (error != MAILDIR_OK)
+	if (error != MAILDIR_OK) {
+		switch (error) {
+		case MAILDIR_INVALID:
+			warnx("%s/cur/%s: invalid maildir info",
+			      args->maildir, letter->path);
+			break;
+		case MAILDIR_LONG:
+			warnx("%s/cur/%s: filename too long to modify",
+			      args->maildir, letter->path);
+			break;
+		}
 		return -1;
+	}
 
-	if ((new = strdup(buf)) == NULL)
+	if ((new = strdup(buf)) == NULL) {
+		warn(NULL);
 		return -1;
+	}
 
 	if (renameat(args->cur, letter->path, args->cur, new) == -1) {
+		warn("rename %s/cur/%s to %s/cur/%s", args->maildir, letter->path,
+		     args->maildir, new);
 		free(new);
 		return -1;
 	}
@@ -708,6 +725,7 @@ int
 main(int argc, char *argv[])
 {
 	char tmpdir[] = PATH_TMPDIR;
+	char *slash;
 	struct mailz_conf conf;
 	struct mailbox mailbox;
 	int ch, cur, null, root, rv, view_all;
@@ -730,6 +748,12 @@ main(int argc, char *argv[])
 
 	if (argc != 1)
 		usage();
+
+	/*
+	 * Delete trailing slash to make error messages nicer.
+	 */
+	if ((slash = strrchr(argv[0], '/')) != NULL && slash[1] == '\0')
+		*slash = '\0';
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		errx(1, "setlocale");
@@ -794,7 +818,7 @@ main(int argc, char *argv[])
 		for (i = 0; i < mailbox.nletter; i++)
 			letter_print(i + 1, &mailbox.letters[i]);
 		commands_run(&mailbox, cur, null, tmpdir, conf.address,
-			     &conf.ignore);
+			     &conf.ignore, argv[0]);
 	}
 
 	rv = 0;
