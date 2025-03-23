@@ -176,11 +176,8 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			echo = out;
 
 		if (echo) {
-			if (fprintf(out, "%s:", buf) < 0) {
-				if (ferror(out) && errno == EPIPE)
-					return 0;
+			if (fprintf(out, "%s:", buf) < 0)
 				return -1;
-			}
 		}
 
 		if (!strcasecmp(buf, "content-transfer-encoding")) {
@@ -257,8 +254,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 	}
 	else {
 		if (fputc('\n', out) == EOF)
-			if (ferror(out) && errno == EPIPE)
-				return -1;
+			return -1;
 	}
 
 	for (;;) {
@@ -282,11 +278,8 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			}
 		}
 
-		if (fwrite(buf, n, 1, out) != 1) {
-			if (ferror(out) && errno == EPIPE)
-				return 0;
+		if (fwrite(buf, n, 1, out) != 1)
 			return -1;
-		}
 
 		if (reply && n == 1 && buf[0] == '\n')
 			if (fprintf(out, "> ") < 0)
