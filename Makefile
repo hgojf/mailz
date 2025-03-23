@@ -3,7 +3,7 @@
 all: mailz mailz-content regress-run
 
 # Uncomment for better debugger use
-#CFLAGS += -g -fno-inline-functions
+#CFLAGS += -g -O0
 
 # Generate dependency files
 CFLAGS += -MD -MP
