@@ -16,6 +16,16 @@
 
 #ifndef CONF_H
 #define CONF_H
+
+#include <sys/tree.h>
+
+struct mailz_conf_mailbox {
+	char *ident;
+	char *maildir;
+	char address[255];
+	RB_ENTRY(mailz_conf_mailbox) entries;
+};
+
 struct mailz_conf {
 	char address[255];
 	struct mailz_ignore {
@@ -25,8 +35,11 @@ struct mailz_conf {
 		#define MAILZ_IGNORE_RETAIN 1
 		int type;
 	} ignore;
+	RB_HEAD(mailz_conf_mailboxes, mailz_conf_mailbox) mailboxes;
 };
 
+struct mailz_conf_mailbox *mailz_conf_mailbox(struct mailz_conf *, char *);
 void mailz_conf_free(struct mailz_conf *);
 int mailz_conf_init(struct mailz_conf *);
+
 #endif /* ! CONF_H */

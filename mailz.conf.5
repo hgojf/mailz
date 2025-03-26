@@ -1,4 +1,4 @@
-.Dd $Mdocdate: Nov 21 2024$
+.Dd $Mdocdate: Mar 25 2025$
 .Dt MAILZ.CONF 5
 .Os
 .Sh NAME
@@ -39,6 +39,28 @@ directive overrides any previous
 or
 .Ic retain
 directives.
+.It Ic mailbox Ar name { options ... }
+Define a mailbox which can be accessed by specifying
+.Ar name
+to
+.Xr mailz 1 .
+Options are seperated by line.
+.Pp
+The available options are as follows:
+.Bl -tag -width Ds
+.It Ic address Ar addr
+Set the sending address used by the
+.Ic reply
+command.
+If this option is not present, the address specified
+by the global
+.Ic address
+directive will be used.
+.It Ic maildir path Ar path
+Specifies the location of the mail directory.
+May include the '~' character, which will be expanded to the users
+home directory.
+.El
 .It Ic retain Ar header ...
 When displaying mail with the
 .Ic more
@@ -62,6 +84,11 @@ retain From To Cc Subject
 # For debugging
 #retain From To Cc Subject Message-ID References Content-Type \e
 #	Content-Transfer-Encoding
+
+mailbox "personal" {
+	address "Henry Ford <henryford@nota.personal.domain>"
+	maildir path "~/mail/personal/"
+}
 .Ed
 .Sh SEE ALSO
 .Xr mailz 1

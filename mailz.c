@@ -724,9 +724,10 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	char tmpdir[] = PATH_TMPDIR;
-	char *slash;
+	char *slash, tmpdir[] = PATH_TMPDIR;
+	const char *address, *maildir;
 	struct mailz_conf conf;
+	struct mailz_conf_mailbox *conf_mailbox;
 	struct mailbox mailbox;
 	int ch, cur, null, root, rv, view_all;
 
@@ -761,13 +762,24 @@ main(int argc, char *argv[])
 
 	if (mailz_conf_init(&conf) == -1)
 		return 1;
+	if ((conf_mailbox = mailz_conf_mailbox(&conf, argv[0])) != NULL) {
+		if (strlen(conf_mailbox->address) != 0)
+			address = conf_mailbox->address;
+		else
+			address = conf.address;
+		maildir = conf_mailbox->maildir;
+	}
+	else {
+		address = conf_mailbox->address;
+		maildir = argv[0];
+	}
 
-	if ((root = open(argv[0], O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
-		warn("%s", argv[0]);
+	if ((root = open(maildir, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
+		warn("%s", maildir);
 		goto conf;
 	}
 	if ((cur = openat(root, "cur", O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
-		warn("%s/cur", argv[0]);
+		warn("%s/cur", maildir);
 		goto root;
 	}
 
@@ -785,8 +797,8 @@ main(int argc, char *argv[])
 		warn("%s", tmpdir);
 		goto null;
 	}
-	if (unveil(argv[0], "rc") == -1) {
-		warn("%s", argv[0]);
+	if (unveil(maildir, "rc") == -1) {
+		warn("%s", maildir);
 		goto null;
 	}
 	if (unveil(PATH_LESS, "x") == -1) {
@@ -817,8 +829,8 @@ main(int argc, char *argv[])
 
 		for (i = 0; i < mailbox.nletter; i++)
 			letter_print(i + 1, &mailbox.letters[i]);
-		commands_run(&mailbox, cur, null, tmpdir, conf.address,
-			     &conf.ignore, argv[0]);
+		commands_run(&mailbox, cur, null, tmpdir, address,
+			     &conf.ignore, maildir);
 	}
 
 	rv = 0;

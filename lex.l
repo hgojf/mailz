@@ -25,6 +25,9 @@
 %%
 "address" { return ADDRESS; }
 "ignore" { return IGNORE; }
+"mailbox" { return MAILBOX; }
+"maildir" { return MAILDIR; }
+"path" { return PATH; }
 "retain" { return RETAIN; }
 
 [a-zA-Z-]+ {
