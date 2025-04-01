@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,8 +46,10 @@ mailbox_add_letter(struct mailbox *mailbox, struct letter *letter)
 	else
 		copy.subject = NULL;
 
-	if (mailbox->nletter == SIZE_MAX)
+	if (mailbox->nletter == SIZE_MAX) {
+		errno = ENOMEM;
 		goto subject;
+	}
 	letters = reallocarray(mailbox->letters, mailbox->nletter + 1,
 			       sizeof(*mailbox->letters));
 	if (letters == NULL)

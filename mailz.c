@@ -69,7 +69,7 @@ static int command_unread(struct letter *, struct command_args *);
 static int content_proc_ex_ignore(struct content_proc *,
 				  const struct mailz_ignore *);
 static int letter_print(size_t, struct letter *);
-static int read_letters(int, int, int, struct mailbox *);
+static int read_letters(const char *, int, int, int, struct mailbox *);
 static void usage(void);
 
 static const struct command {
@@ -594,25 +594,32 @@ letter_print(size_t nth, struct letter *letter)
 }
 
 static int
-read_letters(int ocur, int view_all, int null, struct mailbox *mailbox)
+read_letters(const char *maildir, int ocur, int view_all, int null,
+	     struct mailbox *mailbox)
 {
 	DIR *cur;
 	struct content_proc pr;
 	int curfd;
 
-	if ((curfd = dup(ocur)) == -1)
+	if ((curfd = dup(ocur)) == -1) {
+		warn("dup");
 		return -1;
+	}
 	if (fcntl(curfd, F_SETFD, FD_CLOEXEC) == -1) {
+		warn("fcntl");
 		close(curfd);
 		return -1;
 	}
 	if ((cur = fdopendir(curfd)) == NULL) {
+		warn("fdopendir");
 		close(curfd);
 		return -1;
 	}
 
-	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, null) == -1)
+	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, null) == -1) {
+		warnx("content_proc_init");
 		goto cur;
+	}
 	mailbox_init(mailbox);
 
 	for (;;) {
@@ -625,6 +632,7 @@ read_letters(int ocur, int view_all, int null, struct mailbox *mailbox)
 		if ((de = readdir(cur)) == NULL) {
 			if (errno == 0)
 				break;
+			warn("readdir");
 			goto letters;
 		}
 
@@ -634,18 +642,24 @@ read_letters(int ocur, int view_all, int null, struct mailbox *mailbox)
 		if (!view_all && maildir_get_flag(de->d_name, 'S'))
 			continue;
 
-		if ((fd = openat(curfd, de->d_name, O_RDONLY | O_CLOEXEC)) == -1)
+		if ((fd = openat(curfd, de->d_name, O_RDONLY | O_CLOEXEC)) == -1) {
+			warn("%s/cur/%s", maildir, de->d_name);
 			goto letters;
-		if (content_proc_summary(&pr, &sm, fd) == -1)
+		}
+		if (content_proc_summary(&pr, &sm, fd) == -1) {
+			warnx("content_proc_summary");
 			goto letters;
+		}
 
 		letter.date = sm.date;
 		letter.from = sm.from;
 		letter.path = de->d_name;
 		letter.subject = sm.have_subject ? sm.subject : NULL;
 
-		if (mailbox_add_letter(mailbox, &letter) == -1)
+		if (mailbox_add_letter(mailbox, &letter) == -1) {
+			warn(NULL); /* errno == ENOMEM */
 			goto letters;
+		}
 	}
 
 	mailbox_sort(mailbox);
@@ -833,7 +847,7 @@ main(int argc, char *argv[])
 	if (setup_letters(maildir, root, cur) == -1)
 		goto null;
 
-	if (read_letters(cur, view_all, null, &mailbox) == -1)
+	if (read_letters(maildir, cur, view_all, null, &mailbox) == -1)
 		goto null;
 
 	if (mailbox.nletter == 0)
