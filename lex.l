@@ -38,7 +38,7 @@
 	return STRING;
 }
 
-"\""[^\n\"]*"\"" {
+\"[^\n\"]*\" {
 	if ((size_t)yyleng - 2 >= sizeof(yylval.string))
 		return OVERLONG;
 	memcpy(yylval.string, &yytext[1], yyleng - 2);
@@ -47,8 +47,8 @@
 }
 
 [ \t] { }
-"#"[^\n]* { }
-"\\"\n { }
+#[^\n]* { }
+\\\n { }
 
 .|\n { return yytext[0]; }
 %%
