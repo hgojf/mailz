@@ -663,7 +663,7 @@ read_letters(int ocur, int view_all, int null, struct mailbox *mailbox)
 }
 
 static int
-setup_letters(int root, int cur)
+setup_letters(const char *maildir, int root, int cur)
 {
 	DIR *new;
 	int newfd, rv;
@@ -671,9 +671,12 @@ setup_letters(int root, int cur)
 	rv = -1;
 
 	if ((newfd = openat(root, "new",
-			    O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+			    O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
+		warn("%s/new", maildir);
 		return -1;
+	}
 	if ((new = fdopendir(newfd)) == NULL) {
+		warn("fdopendir");
 		close(newfd);
 		return -1;
 	}
@@ -687,6 +690,7 @@ setup_letters(int root, int cur)
 		if ((de = readdir(new)) == NULL) {
 			if (errno == 0)
 				break;
+			warn("readdir");
 			goto new;
 		}
 
@@ -697,15 +701,25 @@ setup_letters(int root, int cur)
 			int n;
 
 			n = snprintf(name, sizeof(name), "%s:2,", de->d_name);
-			if (n < 0 || (size_t)n >= sizeof(name))
+			if (n < 0) {
+				warn("snprintf");
 				goto new;
+			}
+			if ((size_t)n >= sizeof(name)) {
+				warnc(ENAMETOOLONG, "rename %s/new/%s to %s/cur/%s:2,",
+				     maildir, de->d_name, maildir, de->d_name);
+				goto new;
+			}
 			namep = name;
 		}
 		else
 			namep = de->d_name;
 
-		if (renameat(newfd, de->d_name, cur, namep) == -1)
+		if (renameat(newfd, de->d_name, cur, namep) == -1) {
+			warn("rename %s/new/%s to %s/cur/%s",
+			     maildir, de->d_name, maildir, namep);
 			goto new;
+		}
 	}
 
 	rv = 0;
@@ -816,7 +830,7 @@ main(int argc, char *argv[])
 	if (pledge("stdio rpath cpath wpath proc exec sendfd", NULL) == -1)
 		err(1, "pledge");
 
-	if (setup_letters(root, cur) == -1)
+	if (setup_letters(maildir, root, cur) == -1)
 		goto null;
 
 	if (read_letters(cur, view_all, null, &mailbox) == -1)
