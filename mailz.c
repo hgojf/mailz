@@ -136,8 +136,10 @@ commands_run(struct mailbox *mailbox, int cur,
 				warnx("no current letter");
 				goto bad;
 			}
-			if (cmd->fn(letter, &args) == -1)
+			if (cmd->fn(letter, &args) == -1) {
+				warnx("command '%s' failed", cmd->ident);
 				goto bad;
+			}
 		}
 
 		while (!gotnl) {
