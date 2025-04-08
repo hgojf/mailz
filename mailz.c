@@ -601,7 +601,9 @@ read_letters(const char *maildir, int ocur, int view_all, int null,
 {
 	DIR *cur;
 	struct content_proc pr;
-	int curfd;
+	int curfd, ret;
+
+	ret = -1;
 
 	if ((curfd = dup(ocur)) == -1) {
 		warn("dup");
@@ -665,17 +667,14 @@ read_letters(const char *maildir, int ocur, int view_all, int null,
 	}
 
 	mailbox_sort(mailbox);
-
-	closedir(cur);
-	content_proc_kill(&pr);
-	return 0;
-
+	ret = 0;
 	letters:
-	mailbox_free(mailbox);
+	if (ret == -1)
+		mailbox_free(mailbox);
 	content_proc_kill(&pr);
 	cur:
 	closedir(cur);
-	return -1;
+	return ret;
 }
 
 static int
