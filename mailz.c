@@ -46,12 +46,11 @@ struct command_args {
 	struct letter *letters;
 	size_t nletter;
 	int cur;
-	int null;
 };
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-static void commands_run(struct mailbox *, int, int, const char *,
+static void commands_run(struct mailbox *, int, const char *,
 			 const char *, struct mailz_ignore *, const char *);
 static int commands_token(FILE *, char *, size_t, int *);
 static const struct command *commands_search(const char *);
@@ -69,7 +68,7 @@ static int command_unread(struct letter *, struct command_args *);
 static int content_proc_ex_ignore(struct content_proc *,
 				  const struct mailz_ignore *);
 static int letter_print(size_t, struct letter *);
-static int read_letters(const char *, int, int, int, struct mailbox *);
+static int read_letters(const char *, int, int, struct mailbox *);
 static void usage(void);
 
 static const struct command {
@@ -90,7 +89,7 @@ static const struct command {
 
 static void
 commands_run(struct mailbox *mailbox, int cur,
-	     int null, const char *tmpdir, const char *addr,
+	     const char *tmpdir, const char *addr,
 	     struct mailz_ignore *ignore, const char *maildir)
 {
 	struct command_args args;
@@ -103,7 +102,6 @@ commands_run(struct mailbox *mailbox, int cur,
 	args.nletter = mailbox->nletter;
 	args.mailbox = mailbox;
 	args.maildir = maildir;
-	args.null = null;
 	args.tmpdir = tmpdir;
 
 	letter = NULL;
@@ -284,7 +282,7 @@ command_more(struct letter *letter, struct command_args *args)
 
 	rv = -1;
 
-	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, args->null) == -1)
+	if (content_proc_init(&pr, PATH_MAILZ_CONTENT) == -1)
 		return -1;
 
 	if (content_proc_ex_ignore(&pr, args->ignore) == -1)
@@ -375,7 +373,7 @@ command_reply1(struct letter *letter, struct command_args *args, int group)
 
 	rv = -1;
 
-	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, args->null) == -1)
+	if (content_proc_init(&pr, PATH_MAILZ_CONTENT) == -1)
 		return -1;
 
 	n = snprintf(path, sizeof(path), "%s/reply.XXXXXX", args->tmpdir);
@@ -464,7 +462,7 @@ command_save(struct letter *letter, struct command_args *args)
 
 	rv = -1;
 
-	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, args->null) == -1)
+	if (content_proc_init(&pr, PATH_MAILZ_CONTENT) == -1)
 		return -1;
 
 	if (content_proc_ex_ignore(&pr, args->ignore) == -1)
@@ -596,7 +594,7 @@ letter_print(size_t nth, struct letter *letter)
 }
 
 static int
-read_letters(const char *maildir, int ocur, int view_all, int null,
+read_letters(const char *maildir, int ocur, int view_all,
 	     struct mailbox *mailbox)
 {
 	DIR *cur;
@@ -620,7 +618,7 @@ read_letters(const char *maildir, int ocur, int view_all, int null,
 		return -1;
 	}
 
-	if (content_proc_init(&pr, PATH_MAILZ_CONTENT, null) == -1) {
+	if (content_proc_init(&pr, PATH_MAILZ_CONTENT) == -1) {
 		warnx("content_proc_init");
 		goto cur;
 	}
@@ -758,7 +756,7 @@ main(int argc, char *argv[])
 	struct mailz_conf conf;
 	struct mailz_conf_mailbox *conf_mailbox;
 	struct mailbox mailbox;
-	int ch, cur, null, root, rv, view_all;
+	int ch, cur, root, rv, view_all;
 
 	rv = 1;
 
@@ -817,39 +815,34 @@ main(int argc, char *argv[])
 		goto cur;
 	}
 
-	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1) {
-		warn("%s", PATH_DEV_NULL);
-		goto tmpdir;
-	}
-
 	if (unveil(tmpdir, "rwc") == -1) {
 		warn("%s", tmpdir);
-		goto null;
+		goto tmpdir;
 	}
 	if (unveil(maildir, "rc") == -1) {
 		warn("%s", maildir);
-		goto null;
+		goto tmpdir;
 	}
 	if (unveil(PATH_LESS, "x") == -1) {
 		warn("%s", PATH_LESS);
-		goto null;
+		goto tmpdir;
 	}
 	if (unveil(PATH_MAILZ_CONTENT, "x") == -1) {
 		warn("%s", PATH_MAILZ_CONTENT);
-		goto null;
+		goto tmpdir;
 	}
 	if (unveil(PATH_SENDMAIL, "x") == -1) {
 		warn("%s", PATH_SENDMAIL);
-		goto null;
+		goto tmpdir;
 	}
 	if (pledge("stdio rpath cpath wpath proc exec sendfd", NULL) == -1)
 		err(1, "pledge");
 
 	if (setup_letters(maildir, root, cur) == -1)
-		goto null;
+		goto tmpdir;
 
-	if (read_letters(maildir, cur, view_all, null, &mailbox) == -1)
-		goto null;
+	if (read_letters(maildir, cur, view_all, &mailbox) == -1)
+		goto tmpdir;
 
 	if (mailbox.nletter == 0)
 		puts("No mail.");
@@ -858,14 +851,12 @@ main(int argc, char *argv[])
 
 		for (i = 0; i < mailbox.nletter; i++)
 			letter_print(i + 1, &mailbox.letters[i]);
-		commands_run(&mailbox, cur, null, tmpdir, address,
+		commands_run(&mailbox, cur, tmpdir, address,
 			     &conf.ignore, maildir);
 	}
 
 	rv = 0;
 	mailbox_free(&mailbox);
-	null:
-	close(null);
 	tmpdir:
 	rmdir(tmpdir);
 	cur:

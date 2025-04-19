@@ -32,7 +32,7 @@ struct content_proc {
 #define CNT_IGNORE_RETAIN 1
 
 int content_proc_ignore(struct content_proc *, const char *, int);
-int content_proc_init(struct content_proc *, const char *, int);
+int content_proc_init(struct content_proc *, const char *);
 int content_proc_kill(struct content_proc *);
 int content_proc_reply(struct content_proc *, FILE *, const char *, int, int);
 int content_proc_summary(struct content_proc *, struct content_summary *, int);

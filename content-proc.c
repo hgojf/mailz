@@ -166,9 +166,9 @@ content_proc_ignore(struct content_proc *pr, const char *s, int type)
 }
 
 int
-content_proc_init(struct content_proc *pr, const char *exe, int null)
+content_proc_init(struct content_proc *pr, const char *exe)
 {
-	int i, sv[2];
+	int i, p[2], sv[2];
 
 	if (socketpair(AF_UNIX,
 		       SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
@@ -178,12 +178,16 @@ content_proc_init(struct content_proc *pr, const char *exe, int null)
 		goto sv;
 	imsgbuf_allow_fdpass(&pr->msgbuf);
 
+	if (pipe2(p, O_CLOEXEC) == -1)
+		goto msgbuf;
+	close(p[0]);
+
 	switch (pr->pid = fork()) {
 	case -1:
-		goto msgbuf;
+		goto p;
 	case 0:
 		for (i = 0; i < 3; i++)
-			if (dup2(null, i) == -1)
+			if (dup2(p[1], i) == -1)
 				_err(1, "dup2");
 		if (dup2(sv[1], CNT_PFD) == -1)
 			_err(1, "dup2");
@@ -193,9 +197,12 @@ content_proc_init(struct content_proc *pr, const char *exe, int null)
 		break;
 	}
 
+	close(p[1]);
 	close(sv[1]);
 	return 0;
 
+	p:
+	close(p[1]);
 	msgbuf:
 	imsgbuf_clear(&pr->msgbuf);
 	sv:

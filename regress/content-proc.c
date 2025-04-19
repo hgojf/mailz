@@ -33,15 +33,12 @@ void
 content_proc_letter_error_test(void)
 {
 	size_t i;
-	int null;
 	const struct {
 		const char *in;
 	} tests[] = {
 		{ "1" },
 	};
 
-	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
-		err(1, "%s", PATH_DEV_NULL);
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		err(1, "setlocale");
 
@@ -51,7 +48,7 @@ content_proc_letter_error_test(void)
 		char path[PATH_MAX];
 		int got_error, in, n;
 
-		if (content_proc_init(&pr, "./mailz-content", null) == -1)
+		if (content_proc_init(&pr, "./mailz-content") == -1)
 			errx(1, "content_proc_init");
 
 		n = snprintf(path, sizeof(path),
@@ -89,15 +86,12 @@ content_proc_letter_error_test(void)
 		content_letter_close(&lr);
 		content_proc_kill(&pr);
 	}
-
-	close(null);
 }
 
 void
 content_proc_letter_test(void)
 {
 	size_t i;
-	int null;
 	const struct {
 		const char *in;
 	} tests[] = {
@@ -106,8 +100,6 @@ content_proc_letter_test(void)
 		{ "3" },
 	};
 
-	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
-		err(1, "%s", PATH_DEV_NULL);
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		err(1, "setlocale");
 
@@ -118,7 +110,7 @@ content_proc_letter_test(void)
 		FILE *out;
 		int in, n;
 
-		if (content_proc_init(&pr, "./mailz-content", null) == -1)
+		if (content_proc_init(&pr, "./mailz-content") == -1)
 			errx(1, "content_proc_init");
 
 		n = snprintf(path, sizeof(path),
@@ -169,15 +161,12 @@ content_proc_letter_test(void)
 		content_proc_kill(&pr);
 		fclose(out);
 	}
-
-	close(null);
 }
 
 void
 content_proc_reply_test(void)
 {
 	size_t i;
-	int null;
 	const struct {
 		const char *in;
 		const char *exclude;
@@ -187,8 +176,6 @@ content_proc_reply_test(void)
 		{ "1", "frank@bogus.invalid", 0, 0 },
 	};
 
-	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
-		err(1, "%s", PATH_DEV_NULL);
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		err(1, "setlocale");
 
@@ -200,7 +187,7 @@ content_proc_reply_test(void)
 		FILE *out, *pin, *pout;
 		int error, in, n, p[2];
 
-		if (content_proc_init(&pr, "./mailz-content", null) == -1)
+		if (content_proc_init(&pr, "./mailz-content") == -1)
 			errx(1, "content_proc_init");
 
 		n = snprintf(path, sizeof(path),
@@ -267,7 +254,6 @@ void
 content_proc_summary_test(void)
 {
 	size_t i;
-	int null;
 	const struct {
 		const char *in;
 		const char *from;
@@ -279,16 +265,13 @@ content_proc_summary_test(void)
 		{ "2", "dave@bogus.invalid", NULL, 0, 0 },
 	};
 
-	if ((null = open(PATH_DEV_NULL, O_RDONLY | O_CLOEXEC)) == -1)
-		err(1, "%s", PATH_DEV_NULL);
-
 	for (i = 0; i < nitems(tests); i++) {
 		struct content_proc pr;
 		struct content_summary sm;
 		char path[PATH_MAX];
 		int error, fd, n;
 
-		if (content_proc_init(&pr, "./mailz-content", null) == -1)
+		if (content_proc_init(&pr, "./mailz-content") == -1)
 			errx(1, "content_proc_init");
 
 		n = snprintf(path, sizeof(path), "regress/letters/summary_%s",
