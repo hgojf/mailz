@@ -19,6 +19,7 @@
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <imsg.h>
 #include <limits.h>
 #include <locale.h>
@@ -35,6 +36,7 @@
 #include "encoding.h"
 #include "header.h"
 #include "imsg-blocking.h"
+#include "pathnames.h"
 
 /*
  * Email lines should be at max 998 bytes, excluding the CRLF.
@@ -706,7 +708,7 @@ main(int argc, char *argv[])
 	struct ignore ignore;
 	struct imsgbuf msgbuf;
 	size_t i;
-	int ch, reexec;
+	int ch, null, reexec;
 
 	reexec = 0;
 	while ((ch = getopt(argc, argv, "r")) != -1) {
@@ -727,6 +729,12 @@ main(int argc, char *argv[])
 
 	if (!reexec)
 		errx(1, "mailz-content should not be executed directly");
+
+	if ((null = open(PATH_DEV_NULL, O_RDWR)) == -1)
+		err(1, "%s", PATH_DEV_NULL);
+	for (i = 0; i < 3; i++)
+		if (dup2(null, i) == -1)
+			err(1, "dup2");
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		errx(1, "setlocale");
