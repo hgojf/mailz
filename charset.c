@@ -58,7 +58,6 @@ charset_from_name(struct charset *c, const char *name)
 void
 charset_from_type(struct charset *c, enum charset_type type)
 {
-	c->error = 0;
 	c->type = type;
 }
 
@@ -66,31 +65,18 @@ int
 charset_getc(struct charset *c, struct encoding *encoding, FILE *fp,
 	     char buf[static 4])
 {
-	int rv;
-
-	if (c->error)
-		return -1;
-
 	switch (c->type) {
 	case CHARSET_ASCII:
-		rv = charset_raw(encoding, fp, CTR_ASCII, buf);
-		break;
+		return charset_raw(encoding, fp, CTR_ASCII, buf);
 	case CHARSET_ISO_8859_1:
-		rv = charset_iso_8859_1(encoding, fp, buf);
-		break;
+		return charset_iso_8859_1(encoding, fp, buf);
 	case CHARSET_OTHER:
-		rv = charset_raw(encoding, fp, 0, buf);
-		break;
+		return charset_raw(encoding, fp, 0, buf);
 	case CHARSET_UTF8:
-		rv = charset_utf8(encoding, fp, buf);
-		break;
+		return charset_utf8(encoding, fp, buf);
 	default:
 		return -1;
 	}
-
-	if (rv == -1)
-		c->error = 1;
-	return rv;
 }
 
 static int

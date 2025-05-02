@@ -28,7 +28,6 @@ enum charset_type {
 
 struct charset {
 	enum charset_type type;
-	int error;
 };
 
 int charset_from_name(struct charset *, const char *);
