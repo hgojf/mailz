@@ -26,10 +26,8 @@
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
 static int charset_raw(struct encoding *, FILE *, int, char [static 4]);
-static int charset_iso_8859_1(struct charset_iso_8859_1 *,
-			      struct encoding *, FILE *, char [static 4]);
-static int charset_utf8(struct charset_utf8 *, struct encoding *,
-			FILE *, char [static 4]);
+static int charset_iso_8859_1(struct encoding *, FILE *, char [static 4]);
+static int charset_utf8(struct encoding *, FILE *, char [static 4]);
 
 #define CTR_ASCII 0x1
 
@@ -60,18 +58,6 @@ charset_from_name(struct charset *c, const char *name)
 void
 charset_from_type(struct charset *c, enum charset_type type)
 {
-	switch (type) {
-	case CHARSET_ASCII:
-	case CHARSET_OTHER:
-		break;
-	case CHARSET_ISO_8859_1:
-		memset(&c->v.iso_8859_1, 0, sizeof(c->v.iso_8859_1));
-		break;
-	case CHARSET_UTF8:
-		memset(&c->v.utf8, 0, sizeof(c->v.utf8));
-		break;
-	}
-
 	c->error = 0;
 	c->type = type;
 }
@@ -90,14 +76,13 @@ charset_getc(struct charset *c, struct encoding *encoding, FILE *fp,
 		rv = charset_raw(encoding, fp, CTR_ASCII, buf);
 		break;
 	case CHARSET_ISO_8859_1:
-		rv = charset_iso_8859_1(&c->v.iso_8859_1,
-					  encoding, fp, buf);
+		rv = charset_iso_8859_1(encoding, fp, buf);
 		break;
 	case CHARSET_OTHER:
 		rv = charset_raw(encoding, fp, 0, buf);
 		break;
 	case CHARSET_UTF8:
-		rv = charset_utf8(&c->v.utf8, encoding, fp, buf);
+		rv = charset_utf8(encoding, fp, buf);
 		break;
 	default:
 		return -1;
@@ -109,14 +94,15 @@ charset_getc(struct charset *c, struct encoding *encoding, FILE *fp,
 }
 
 static int
-charset_iso_8859_1(struct charset_iso_8859_1 *iso,
-		   struct encoding *encoding, FILE *fp,
+charset_iso_8859_1(struct encoding *encoding, FILE *fp,
 		   char buf[static 4])
 {
+	mbstate_t mbs;
 	size_t n;
 	char32_t uc;
 	int ch;
 
+	memset(&mbs, 0, sizeof(mbs));
 	if ((ch = encoding_getc(encoding, fp)) == ENCODING_ERR)
 		return -1;
 	if (ch == ENCODING_EOF)
@@ -125,7 +111,7 @@ charset_iso_8859_1(struct charset_iso_8859_1 *iso,
 
 	if (MB_CUR_MAX > 4)
 		return -1;
-	if ((n = c32rtomb(buf, uc, &iso->mbs)) == (size_t)-1)
+	if ((n = c32rtomb(buf, uc, &mbs)) == (size_t)-1)
 		return -1;
 
 	return n;
@@ -155,11 +141,12 @@ charset_raw(struct encoding *e, FILE *fp, int flags,
 }
 
 static int
-charset_utf8(struct charset_utf8 *utf8, struct encoding *e,
-	     FILE *fp, char buf[static 4])
+charset_utf8(struct encoding *e, FILE *fp, char buf[static 4])
 {
+	mbstate_t mbs;
 	int i;
 
+	memset(&mbs, 0, sizeof(mbs));
 	for (i = 0; i < 4; i++) {
 		int ch;
 		char cc;
@@ -174,7 +161,7 @@ charset_utf8(struct charset_utf8 *utf8, struct encoding *e,
 
 		cc = ch;
 
-		switch (mbrtowc(NULL, &cc, 1, &utf8->mbs)) {
+		switch (mbrtowc(NULL, &cc, 1, &mbs)) {
 		case -1:
 		case -3:
 			return -1;

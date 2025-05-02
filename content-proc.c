@@ -62,8 +62,10 @@ content_letter_finish(struct content_letter *letter)
 int
 content_letter_getc(struct content_letter *letter, char buf[static 4])
 {
+	mbstate_t mbs;
 	int i;
 
+	memset(&mbs, 0, sizeof(mbs));
 	for (i = 0; i < 4; i++) {
 		char c;
 		int ch;
@@ -75,7 +77,7 @@ content_letter_getc(struct content_letter *letter, char buf[static 4])
 		}
 
 		c = ch;
-		switch (mbrtowc(NULL, &c, 1, &letter->mbs)) {
+		switch (mbrtowc(NULL, &c, 1, &mbs)) {
 		case -1:
 		case -3:
 		case 0:
@@ -120,7 +122,6 @@ content_letter_init(struct content_proc *pr,
 
 	if ((letter->fp = fdopen(p[0], "r")) == NULL)
 		goto p;
-	memset(&letter->mbs, 0, sizeof(letter->mbs));
 	letter->pr = pr;
 	return 0;
 

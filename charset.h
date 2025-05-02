@@ -16,7 +16,6 @@
 
 #ifndef CHARSET_H
 #define CHARSET_H
-#include <wchar.h>
 
 #include "encoding.h"
 
@@ -30,18 +29,10 @@ enum charset_type {
 struct charset {
 	enum charset_type type;
 	int error;
-
-	union {
-		struct charset_iso_8859_1 {
-			mbstate_t mbs;
-		} iso_8859_1;
-		struct charset_utf8 {
-			mbstate_t mbs;
-		} utf8;
-	} v;
 };
 
 int charset_from_name(struct charset *, const char *);
 void charset_from_type(struct charset *, enum charset_type);
 int charset_getc(struct charset *, struct encoding *, FILE *, char [static 4]);
+
 #endif /* ! CHARSET_H */
