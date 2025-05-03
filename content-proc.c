@@ -45,9 +45,9 @@ content_letter_finish(struct content_letter *letter)
 {
 	struct imsg msg;
 	ssize_t n;
-	int ch, rv;
+	int rv;
 
-	while ((ch = fgetc(letter->fp)) != EOF)
+	while (fgetc(letter->fp) != EOF)
 		;
 
 	n = imsg_get_blocking(&letter->pr->msgbuf, &msg);
