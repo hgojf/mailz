@@ -36,6 +36,9 @@ and each command is terminated by a newline.
 Each command accepts zero or more message numbers to operate on.
 If a message number is not provided, the last message interacted with
 will be used (if any).
+If a message number is prefixed by 't' followed by a space
+each message in the same thread as that message will be operated
+on.
 .Pp
 The available commands are as follows:
 .Bl -tag -width Ds

@@ -149,6 +149,31 @@ commands_run(struct mailbox *mailbox, int cur,
 				goto bad;
 			}
 
+			if (!strcmp(buf, "t")) {
+				struct mailbox_thread thread;
+				struct letter *lp;
+
+				if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1) {
+					warnx("argument too long");
+					goto bad;
+				}
+				idx = strtonum(buf, 1, mailbox->nletter, &errstr);
+				if (errstr != NULL) {
+					warnx("message number was %s", errstr);
+					goto bad;
+				}
+				letter = &mailbox->letters[idx - 1];
+
+				mailbox_thread_init(mailbox, &thread, letter);
+				while ((lp = mailbox_thread_next(mailbox, &thread)) != NULL) {
+					if (cmd->fn(lp, &args) == -1) {
+						warnx("command '%s' failed", cmd->ident);
+						goto bad;
+					}
+				}
+				continue;
+			}
+
 			idx = strtonum(buf, 1, mailbox->nletter, &errstr);
 			if (errstr != NULL) {
 				warnx("message number was %s", errstr);
