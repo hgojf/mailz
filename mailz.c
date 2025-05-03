@@ -674,7 +674,7 @@ read_letters(const char *maildir, int ocur, int view_all,
 			goto letters;
 		}
 		if (content_proc_summary(&pr, &sm, fd) == -1) {
-			warnx("content_proc_summary");
+			warnx("content_proc_summary: %s/cur/%s", maildir, de->d_name);
 			goto letters;
 		}
 
