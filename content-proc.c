@@ -88,7 +88,6 @@ content_letter_getc(struct content_letter *letter, char buf[static 4])
 		default:
 			if (i == 0 && !isprint(ch) && !isspace(ch))
 				return -1;
-			/* FALLTHROUGH */
 			buf[i] = ch;
 			return i + 1;
 		}
