@@ -98,6 +98,7 @@ content_proc_letter_test(void)
 		{ "1" },
 		{ "2" },
 		{ "3" },
+		{ "4" },
 	};
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
