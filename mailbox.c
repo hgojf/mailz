@@ -83,6 +83,7 @@ mailbox_free(struct mailbox *mailbox)
 		free(mailbox->letters[i].path);
 		free(mailbox->letters[i].subject);
 	}
+	free(mailbox->letters);
 }
 
 /*
