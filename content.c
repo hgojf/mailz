@@ -448,6 +448,11 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				    references) == -1)
 		goto out;
 
+	if (fprintf(out, "Content-Transfer-Encoding: 8bit\n") < 0)
+		goto out;
+	if (fprintf(out, "Content-Type: text/plain; charset=utf-8\n") < 0)
+		goto out;
+
 	if (handle_reply_body(in, out, date, from_addr, from_name) == -1)
 		goto out;
 
