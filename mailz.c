@@ -822,7 +822,7 @@ main(int argc, char *argv[])
 		maildir = conf_mailbox->maildir;
 	}
 	else {
-		address = conf_mailbox->address;
+		address = conf.address;
 		maildir = argv[0];
 	}
 
