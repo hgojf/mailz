@@ -65,7 +65,7 @@ grammar: /* empty */
 	| grammar address '\n'
 	| grammar ignore '\n'
 	| grammar mailbox '\n'
-	| grammar '\n';
+	| grammar '\n'
 	;
 
 address: ADDRESS STRING {
