@@ -568,7 +568,7 @@ header_lex(FILE *fp, struct header_lex *lex)
 				goto eof;
 			if (ch != ' ' && ch != '\t') {
 				if (ungetc(ch, fp) == EOF)
-					return HEADER_EOF;
+					return HEADER_INPUT;
 				goto eof;
 			}
 		}

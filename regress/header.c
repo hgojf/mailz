@@ -396,6 +396,9 @@ header_lex_test(void)
 		if (*out != '\0')
 			errx(1, "wrong output");
 
+		if (tests[i].error == HEADER_OK && !feof(fp))
+			errx(1, "all input not consumed");
+
 		fclose(fp);
 	}
 }
