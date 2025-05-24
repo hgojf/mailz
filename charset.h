@@ -20,6 +20,7 @@
 #include "encoding.h"
 
 enum charset_type {
+	#define CHARSET_UNKNOWN -1
 	CHARSET_ASCII,
 	CHARSET_ISO_8859_1,
 	CHARSET_OTHER,
@@ -30,7 +31,7 @@ struct charset {
 	enum charset_type type;
 };
 
-int charset_from_name(struct charset *, const char *);
+int charset_from_name(const char *);
 void charset_from_type(struct charset *, enum charset_type);
 int charset_getc(struct charset *, struct encoding *, FILE *, char [static 4]);
 

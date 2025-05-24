@@ -237,7 +237,12 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 					return -1;
 
 				if (!vt.var_trunc && !strcasecmp(var, "charset")) {
-					if (vt.val_trunc || charset_from_name(&charset, val) == -1)
+					int ctype;
+
+					if (!vt.val_trunc
+					    && (ctype = charset_from_name(val)) != CHARSET_UNKNOWN)
+						charset_from_type(&charset, ctype);
+					else
 						charset_from_type(&charset, CHARSET_OTHER);
 				}
 			}

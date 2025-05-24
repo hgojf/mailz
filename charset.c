@@ -41,18 +41,16 @@ static const struct {
 };
 
 int
-charset_from_name(struct charset *c, const char *name)
+charset_from_name(const char *name)
 {
 	size_t i;
 
 	for (i = 0; i < nitems(charsets); i++) {
-		if (!strcasecmp(name, charsets[i].ident)) {
-			charset_from_type(c, charsets[i].type);
-			return 0;
-		}
+		if (!strcasecmp(name, charsets[i].ident))
+			return charsets[i].type;
 	}
 
-	return -1;
+	return CHARSET_UNKNOWN;
 }
 
 void
