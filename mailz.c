@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <dirent.h>
@@ -795,12 +796,12 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	char *slash, tmpdir[] = PATH_TMPDIR;
+	char *home, *slash, tmpdir[PATH_MAX];
 	const char *address, *maildir;
 	struct mailz_conf conf;
 	struct mailz_conf_mailbox *conf_mailbox;
 	struct mailbox mailbox;
-	int ch, cur, root, rv, view_all;
+	int ch, cur, n, root, rv, view_all;
 
 	rv = 1;
 
@@ -854,7 +855,21 @@ main(int argc, char *argv[])
 		goto root;
 	}
 
-	if (mkdtemp(tmpdir) == NULL) {
+	if ((home = getenv("HOME")) == NULL) {
+		warnx("HOME not set");
+		goto cur;
+	}
+
+	n = snprintf(tmpdir, sizeof(tmpdir), "%s/.mailz", home);
+	if (n < 0) {
+		warn("snprintf");
+		goto cur;
+	}
+	if ((size_t)n >= sizeof(tmpdir)) {
+		warnx("snprintf overflow due to large HOME");
+		goto cur;
+	}
+	if (mkdir(tmpdir, 0700) == -1 && errno != EEXIST) {
 		warn("%s", tmpdir);
 		goto cur;
 	}
