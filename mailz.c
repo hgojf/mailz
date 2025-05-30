@@ -108,16 +108,22 @@ commands_run(struct mailbox *mailbox, int cur,
 	for (;;) {
 		const struct command *cmd;
 		char buf[300];
-		int ch, gotnl;
+		int ch, error, gotnl;
+
+		if (feof(stdin))
+			break;
 
 		printf("> ");
 		fflush(stdout);
 
 		gotnl = 0;
-		if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1) {
+		error = commands_token(stdin, buf, sizeof(buf), &gotnl);
+		if (error == -1) {
 			warnx("argument too long");
 			goto bad;
 		}
+		if (error == 0) /* empty line */
+			continue;
 
 		if (strlen(buf) == 0 && feof(stdin))
 			break;
@@ -144,17 +150,25 @@ commands_run(struct mailbox *mailbox, int cur,
 			const char *errstr;
 			size_t idx;
 
-			if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1) {
+			error = commands_token(stdin, buf, sizeof(buf), &gotnl);
+			if (error == -1) {
 				warnx("argument too long");
 				goto bad;
 			}
+			if (error == 0)
+				break;
 
 			if (!strcmp(buf, "t")) {
 				struct mailbox_thread thread;
 				struct letter *lp;
 
-				if (commands_token(stdin, buf, sizeof(buf), &gotnl) == -1) {
+				error = commands_token(stdin, buf, sizeof(buf), &gotnl);
+				if (error == -1) {
 					warnx("argument too long");
+					goto bad;
+				}
+				if (error == 0) {
+					warnx("must provide a message number after 't'");
 					goto bad;
 				}
 				idx = strtonum(buf, 1, mailbox->nletter, &errstr);
@@ -210,11 +224,16 @@ commands_token(FILE *fp, char *buf, size_t buflen, int *gotnl)
 
 		if ((ch = fgetc(fp)) == EOF || ch == '\n') {
 			*gotnl = 1;
+			if (n == 0)
+				return 0;
 			break;
 		}
 
-		if (n != 0 && (ch == ' ' || ch == '\t'))
+		if (ch == ' ' || ch == '\t') {
+			if (n == 0)
+				continue;
 			break;
+		}
 
 		if (n == buflen - 1)
 			return -1;
@@ -222,7 +241,7 @@ commands_token(FILE *fp, char *buf, size_t buflen, int *gotnl)
 	}
 
 	buf[n] = '\0';
-	return 0;
+	return 1;
 }
 
 static const struct command *
