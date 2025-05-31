@@ -21,6 +21,5 @@
 #define PATH_MAILZ_CONTENT PREFIX "/libexec/mailz-content"
 #define PATH_LESS "/usr/bin/less"
 #define PATH_SENDMAIL "/usr/sbin/sendmail"
-#define PATH_TMPDIR "/tmp/mailz.XXXXXX"
 
 #endif /* ! PATHNAMES_H */
