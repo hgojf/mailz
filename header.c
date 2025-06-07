@@ -574,8 +574,10 @@ header_lex(FILE *fp, struct header_lex *lex)
 		}
 
 		if (lex->echo != NULL) {
-			if (fputc(ch, lex->echo) == EOF)
-				return HEADER_OUTPUT;
+			if (isspace(ch) || isprint(ch)) {
+				if (fputc(ch, lex->echo) == EOF)
+					return HEADER_OUTPUT;
+			}
 		}
 
 		if (lex->cstate != -1) {

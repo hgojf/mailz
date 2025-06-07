@@ -41,6 +41,7 @@ main(void)
 	header_date_test();
 	header_encoding_test();
 	header_lex_test();
+	header_lex_echo_test();
 	header_message_id_test();
 	header_name_test();
 	header_subject_test();

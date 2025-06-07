@@ -15,6 +15,7 @@
  */
 
 #include <err.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -399,6 +400,62 @@ header_lex_test(void)
 		if (tests[i].error == HEADER_OK && !feof(fp))
 			errx(1, "all input not consumed");
 
+		fclose(fp);
+	}
+}
+
+void
+header_lex_echo_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *echo;
+	} tests[] = {
+		{ "hello", "hello\n" },
+		{ "hello\x1b", "hello\n" },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		struct header_lex lex;
+		FILE *echo_in, *echo_out, *fp;
+		const char *echo;
+		int error, p[2];
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		if (pipe2(p, O_CLOEXEC) == -1)
+			err(1, "pipe2");
+		if ((echo_in = fdopen(p[0], "r")) == NULL)
+			err(1, "fdopen");
+		if ((echo_out = fdopen(p[1], "w")) == NULL)
+			err(1, "fdopen");
+
+		lex.echo = echo_out;
+		lex.cstate = 0;
+		lex.qstate = 0;
+		lex.skipws = 0;
+
+		while ((error = header_lex(fp, &lex)) != HEADER_EOF)
+			if (error < 0)
+				errx(1, "bad input");
+
+		fclose(echo_out);
+		for (echo = tests[i].echo; *echo != '\0'; echo++) {
+			int ch;
+
+			if ((ch = fgetc(echo_in)) == EOF)
+				errx(1, "early end of file");
+			if (ch != *echo)
+				errx(1, "wrong output");
+		}
+		if (fgetc(echo_in) != EOF)
+			errx(1, "too much output");
+
+		fclose(echo_in);
 		fclose(fp);
 	}
 }
