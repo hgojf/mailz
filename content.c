@@ -159,7 +159,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 	int got_content_type, got_encoding;
 
 	charset_from_type(&charset, CHARSET_ASCII);
-	encoding_from_type(&encoding, ENCODING_7BIT);
+	encoding_from_type(&encoding, ENCODING_7BIT, -1);
 	got_content_type = 0;
 	got_encoding = 0;
 	for (;;) {
@@ -193,10 +193,10 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			if (hv == HEADER_OK) {
 				if ((enc = encoding_from_name(buf)) == ENCODING_UNKNOWN)
 					enc = ENCODING_BINARY;
-				encoding_from_type(&encoding, enc);
+				encoding_from_type(&encoding, enc, -1);
 			}	
 			else if (hv == HEADER_TRUNC)
-				encoding_from_type(&encoding, ENCODING_BINARY);
+				encoding_from_type(&encoding, ENCODING_BINARY, -1);
 			else
 				return -1;
 			got_encoding = 1;
@@ -222,7 +222,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 
 			if (ct.type_trunc || strcasecmp(type, "text") != 0) {
 				charset_from_type(&charset, CHARSET_OTHER);
-				encoding_from_type(&encoding, ENCODING_BINARY);
+				encoding_from_type(&encoding, ENCODING_BINARY, -1);
 			}
 
 			vt.var = var;

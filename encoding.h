@@ -34,6 +34,7 @@ struct encoding {
 		} b64;
 	} v;
 
+	off_t left;
 	enum encoding_type type;
 };
 
@@ -41,6 +42,6 @@ struct encoding {
 #define ENCODING_ERR -130
 
 int encoding_from_name(const char *);
-void encoding_from_type(struct encoding *, enum encoding_type);
+void encoding_from_type(struct encoding *, enum encoding_type, off_t);
 int encoding_getc(struct encoding *, FILE *);
 #endif /* ! ENCODING_H */

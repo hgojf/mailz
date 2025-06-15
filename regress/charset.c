@@ -65,7 +65,7 @@ charset_getc_test(void)
 		if (fp == NULL)
 			err(1, "fmemopen");
 
-		encoding_from_type(&decoder, ENCODING_BINARY);
+		encoding_from_type(&decoder, ENCODING_BINARY, -1);
 		charset_from_type(&charset, tests[i].charset);
 		outi = 0;
 		outsz = strlen(tests[i].out);
