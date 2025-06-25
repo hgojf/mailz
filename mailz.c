@@ -838,7 +838,7 @@ main(int argc, char *argv[])
 		if (strlen(conf_mailbox->address) != 0)
 			address = conf_mailbox->address;
 		else
-			address = conf.address;
+			address = conf_mailbox->address;
 		maildir = conf_mailbox->maildir;
 	}
 	else {
