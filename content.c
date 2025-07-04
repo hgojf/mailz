@@ -114,7 +114,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	      struct ignore *ignore)
 {
 	FILE *in;
-	int binary, charset, done, encoding, ret;
+	int binary, charset, encoding, ret;
 
 	ret = -1;
 
@@ -217,8 +217,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	if (imsgbuf_flush(msgbuf) == -1)
 		goto in;
 
-	done = 0;
-	while (!done) {
+	for (;;) {
 		struct imsg msg2;
 		ssize_t n;
 		int error;
@@ -233,9 +232,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 
 		switch (imsg_get_type(&msg2)) {
 		case IMSG_CNT_LETTER_CLOSE:
-			done = 1;
-			error = 0;
-			break;
+			goto done;
 		case IMSG_CNT_LETTER_READ:
 			error = handle_letter_read(in, &msg2, ignore,
 						   charset, encoding);
@@ -258,6 +255,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 		if (imsgbuf_flush(msgbuf) == -1)
 			goto in;
 	}
+	done:
 
 	ret = 0;
 	in:
