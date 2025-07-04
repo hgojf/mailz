@@ -321,6 +321,7 @@ command_more(struct letter *letter, struct command_args *args)
 {
 	struct content_proc pr;
 	struct content_letter lr;
+	struct content_letter_reader rd;
 	FILE *fp;
 	int fd, p[2], rv;
 	pid_t pid;
@@ -338,20 +339,24 @@ command_more(struct letter *letter, struct command_args *args)
 		goto pr;
 	if (content_letter_init(&pr, &lr, fd) == -1)
 		goto pr;
+	if (content_letter_binary(&lr))
+		goto lr;
+	if (content_letter_reader_init(&rd, &lr) == -1)
+		goto lr;
 
 	if (pipe2(p, O_CLOEXEC) == -1)
-		goto lr;
+		goto rd;
 	if ((fp = fdopen(p[1], "w")) == NULL) {
 		close(p[1]);
 		close(p[0]);
-		goto lr;
+		goto rd;
 	}
 
 	switch (pid = fork()) {
 	case -1:
 		fclose(fp);
 		close(p[0]);
-		goto lr;
+		goto rd;
 	case 0:
 		if (dup2(p[0], STDIN_FILENO) == -1)
 			_err(1, "dup2");
@@ -366,7 +371,7 @@ command_more(struct letter *letter, struct command_args *args)
 		char buf[4];
 		int n;
 
-		if ((n = content_letter_getc(&lr, buf)) == -1)
+		if ((n = content_letter_reader_getc(&rd, buf)) == -1)
 			goto pid;
 		if (n == 0)
 			break;
@@ -378,7 +383,7 @@ command_more(struct letter *letter, struct command_args *args)
 		}
 	}
 
-	if (content_letter_finish(&lr) == -1)
+	if (content_letter_reader_finish(&rd) == -1)
 		goto pid;
 
 	if (command_read(letter, args) == -1)
@@ -388,6 +393,8 @@ command_more(struct letter *letter, struct command_args *args)
 	pid:
 	fclose(fp);
 	waitpid(pid, NULL, 0);
+	rd:
+	content_letter_reader_close(&rd);
 	lr:
 	content_letter_close(&lr);
 	pr:
@@ -410,6 +417,7 @@ command_reply(struct letter *letter, struct command_args *args)
 static int
 command_reply1(struct letter *letter, struct command_args *args, int group)
 {
+	struct content_letter lr;
 	struct content_proc pr;
 	char path[PATH_MAX];
 	FILE *fp;
@@ -435,20 +443,24 @@ command_reply1(struct letter *letter, struct command_args *args, int group)
 
 	if ((lfd = openat(args->cur, letter->path, O_RDONLY | O_CLOEXEC)) == -1)
 		goto fp;
-	if (content_proc_reply(&pr, fp, args->addr, group, lfd) == -1)
+	if (content_letter_init(&pr, &lr, lfd) == -1)
 		goto fp;
+	if (content_letter_binary(&lr))
+		goto lr;
+	if (content_letter_reply(&lr, fp, args->addr, group) == -1)
+		goto lr;
 
 	if (fflush(fp) == EOF)
-		goto fp;
+		goto lr;
 
 	if (printf("message located at %s\n"
 		   "press enter to send or q to cancel: ", path) < 0)
-		goto fp;
+		goto lr;
 	if (fflush(stdout) == EOF)
-		goto fp;
+		goto lr;
 
 	if ((ch = fgetc(stdin)) == EOF)
-		goto fp;
+		goto lr;
 
 	if (ch != '\n') {
 		int any, c;
@@ -458,15 +470,15 @@ command_reply1(struct letter *letter, struct command_args *args, int group)
 			any = 1;
 		if (ch == 'q' && !any)
 			rv = 0;
-		goto fp;
+		goto lr;
 	}
 
 	lfd = fileno(fp);
 	if (lseek(lfd, 0, SEEK_SET) == -1)
-		goto fp;
+		goto lr;
 	switch (pid = fork()) {
 	case -1:
-		goto fp;
+		goto lr;
 	case 0:
 		if (dup2(lfd, STDIN_FILENO) == -1)
 			_err(1, "dup2");
@@ -477,11 +489,13 @@ command_reply1(struct letter *letter, struct command_args *args, int group)
 	}
 
 	if (waitpid(pid, &status, 0) == -1)
-		goto fp;
+		goto lr;
 	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
-		goto fp;
+		goto lr;
 
 	rv = 0;
+	lr:
+	content_letter_close(&lr);
 	fp:
 	fclose(fp);
 	unlink(path);
@@ -500,6 +514,7 @@ static int
 command_save(struct letter *letter, struct command_args *args)
 {
 	struct content_proc pr;
+	struct content_letter_reader rd;
 	struct content_letter lr;
 	char path[PATH_MAX];
 	FILE *fp;
@@ -518,24 +533,26 @@ command_save(struct letter *letter, struct command_args *args)
 		goto pr;
 	if (content_letter_init(&pr, &lr, lfd) == -1)
 		goto pr;
+	if (content_letter_reader_init(&rd, &lr) == -1)
+		goto lr;
 
 	n = snprintf(path, sizeof(path), "%s/save.XXXXXX", args->tmpdir);
 	if (n < 0 || (size_t)n >= sizeof(path))
-		goto lr;
+		goto rd;
 
 	if ((fd = mkostemp(path, O_CLOEXEC)) == -1)
-		goto lr;
+		goto rd;
 	if ((fp = fdopen(fd, "w")) == NULL) {
 		unlink(path);
 		close(fd);
-		goto lr;
+		goto rd;
 	}
 
 	for (;;) {
 		char buf[4];
 		int n;
 
-		if ((n = content_letter_getc(&lr, buf)) == -1)
+		if ((n = content_letter_reader_getc(&rd, buf)) == -1)
 			goto fp;
 		if (n == 0)
 			break;
@@ -544,7 +561,7 @@ command_save(struct letter *letter, struct command_args *args)
 			goto fp;
 	}
 
-	if (content_letter_finish(&lr) == -1)
+	if (content_letter_reader_finish(&rd) == -1)
 		goto fp;
 
 	if (fflush(fp) == EOF)
@@ -558,6 +575,8 @@ command_save(struct letter *letter, struct command_args *args)
 	fclose(fp);
 	if (rv == -1)
 		unlink(path);
+	rd:
+	content_letter_reader_close(&rd);
 	lr:
 	content_letter_close(&lr);
 	pr:

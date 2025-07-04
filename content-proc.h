@@ -34,17 +34,27 @@ struct content_proc {
 int content_proc_ignore(struct content_proc *, const char *, int);
 int content_proc_init(struct content_proc *, const char *);
 int content_proc_kill(struct content_proc *);
-int content_proc_reply(struct content_proc *, FILE *, const char *, int, int);
 int content_proc_summary(struct content_proc *, struct content_summary *, int);
 
 struct content_letter {
 	struct content_proc *pr;
+	int binary;
+};
+
+int content_letter_binary(struct content_letter *);
+void content_letter_close(struct content_letter *);
+int content_letter_init(struct content_proc *, struct content_letter *, int);
+int content_letter_reply(struct content_letter *, FILE *, const char *, int);
+
+struct content_letter_reader {
+	struct imsgbuf *msgbuf;
 	FILE *fp;
 };
 
-void content_letter_close(struct content_letter *);
-int content_letter_finish(struct content_letter *);
-int content_letter_getc(struct content_letter *, char [static 4]);
-int content_letter_init(struct content_proc *, struct content_letter *, int);
+void content_letter_reader_close(struct content_letter_reader *);
+int content_letter_reader_finish(struct content_letter_reader *);
+int content_letter_reader_getc(struct content_letter_reader *, char [static 4]);
+int content_letter_reader_init(struct content_letter_reader *,
+			       struct content_letter *);
 
 #endif /* ! CONTENT_PROC_H */

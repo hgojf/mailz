@@ -34,14 +34,66 @@
 #include "imsg-blocking.h"
 #include "printable.h"
 
+int
+content_letter_binary(struct content_letter *letter)
+{
+	return letter->binary;
+}
+
 void
 content_letter_close(struct content_letter *letter)
+{
+	imsg_compose(&letter->pr->msgbuf, IMSG_CNT_LETTER_CLOSE, 0,
+		     -1, -1, NULL, 0);
+	imsgbuf_flush(&letter->pr->msgbuf);
+}
+
+int
+content_letter_init(struct content_proc *pr,
+		    struct content_letter *letter, int fd)
+{
+	struct imsg msg;
+	ssize_t n;
+	int ret;
+
+	ret = -1;
+
+	if (imsg_compose(&pr->msgbuf, IMSG_CNT_LETTER, 0, -1, fd,
+			 NULL, 0) == -1) {
+		close(fd);
+		return -1;
+	}
+
+	if (imsgbuf_flush(&pr->msgbuf) == -1)
+		return -1;
+
+	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
+		return -1;
+	if (n == 0)
+		return -1;
+	if (imsg_get_type(&msg) != IMSG_CNT_LETTER_BINARY)
+		goto msg;
+	if (imsg_get_data(&msg, &letter->binary, sizeof(letter->binary)) == -1)
+		goto msg;
+	if (letter->binary != 0 && letter->binary != 1)
+		goto msg;
+
+	letter->pr = pr;
+
+	ret = 0;
+	msg:
+	imsg_free(&msg);
+	return ret;
+}
+
+void
+content_letter_reader_close(struct content_letter_reader *letter)
 {
 	fclose(letter->fp);
 }
 
 int
-content_letter_finish(struct content_letter *letter)
+content_letter_reader_finish(struct content_letter_reader *letter)
 {
 	struct imsg msg;
 	ssize_t n;
@@ -50,8 +102,9 @@ content_letter_finish(struct content_letter *letter)
 	while (fgetc(letter->fp) != EOF)
 		;
 
-	n = imsg_get_blocking(&letter->pr->msgbuf, &msg);
-	if (n <= 0)
+	if ((n = imsg_get_blocking(letter->msgbuf, &msg)) == -1)
+		return -1;
+	if (n == 0)
 		return -1;
 
 	rv = imsg_get_type(&msg) == IMSG_CNT_OK ? 0 : -1;
@@ -60,7 +113,7 @@ content_letter_finish(struct content_letter *letter)
 }
 
 int
-content_letter_getc(struct content_letter *letter, char buf[static 4])
+content_letter_reader_getc(struct content_letter_reader *letter, char buf[static 4])
 {
 	mbstate_t mbs;
 	int i;
@@ -97,41 +150,122 @@ content_letter_getc(struct content_letter *letter, char buf[static 4])
 	return -1;
 }
 
+
 int
-content_letter_init(struct content_proc *pr,
-		    struct content_letter *letter, int fd)
+content_letter_reader_init(struct content_letter_reader *rp,
+			   struct content_letter *lp)
 {
+	struct imsgbuf *msgbuf;
+	FILE *fp;
 	int p[2];
 
 	if (pipe2(p, O_CLOEXEC) == -1)
-		goto fd;
+		return -1;
 
-	if (imsg_compose(&pr->msgbuf, IMSG_CNT_LETTER, 0, -1, fd,
+	msgbuf = &lp->pr->msgbuf;
+	if (imsg_compose(msgbuf, IMSG_CNT_LETTER_READ, 0, -1, p[1],
 			 NULL, 0) == -1)
-		goto p;
-	fd = -1;
-
-	if (imsg_compose(&pr->msgbuf, IMSG_CNT_LETTERPIPE, 0, -1,
-			 p[1], NULL, 0) == -1)
 		goto p;
 	p[1] = -1;
 
-	if (imsgbuf_flush(&pr->msgbuf) == -1)
+	if (imsgbuf_flush(msgbuf) == -1)
 		goto p;
 
-	if ((letter->fp = fdopen(p[0], "r")) == NULL)
+	if ((fp = fdopen(p[0], "r")) == NULL)
 		goto p;
-	letter->pr = pr;
+	rp->fp = fp;
+	rp->msgbuf = msgbuf;
 	return 0;
 
 	p:
 	close(p[0]);
 	if (p[1] != -1)
 		close(p[1]);
-	fd:
-	if (fd != -1)
-		close(fd);
 	return -1;
+}
+
+int
+content_letter_reply(struct content_letter *lr, FILE *out,
+		   const char *from, int group)
+{
+	struct imsg msg;
+	mbstate_t mbs;
+	struct content_reply_setup setup;
+	FILE *in;
+	ssize_t n;
+	int i, p[2], rv;
+
+	rv = -1;
+
+	memset(&setup, 0, sizeof(setup));
+	if (strlcpy(setup.addr, from, sizeof(setup.addr))
+		    >= sizeof(setup.addr))
+		return -1;
+	setup.group = group;
+
+	if (pipe2(p, O_CLOEXEC) == -1)
+		return -1;
+	if ((in = fdopen(p[0], "r")) == NULL) {
+		close(p[0]);
+		close(p[1]);
+		return -1;
+	}
+
+	if (imsg_compose(&lr->pr->msgbuf, IMSG_CNT_LETTER_REPLY, 0, -1, p[1],
+			 &setup, sizeof(setup)) == -1) {
+		close(p[1]);
+		fclose(in);
+		return -1;
+	}
+
+	if (imsgbuf_flush(&lr->pr->msgbuf) == -1)
+		goto in;
+
+	i = 0;
+	memset(&mbs, 0, sizeof(mbs));
+	for (;;) {
+		int ch;
+		char cc;
+
+		if ((ch = fgetc(in)) == EOF) {
+			if (i == 0)
+				break;
+			goto in;
+		}
+
+		cc = ch;
+		switch (mbrtowc(NULL, &cc, 1, &mbs)) {
+		case -1:
+		case -3:
+		case 0:
+			goto in;
+		case -2:
+			i++;
+			break;
+		default:
+			if (i == 0 && !isprint(ch) && !isspace(ch))
+				goto in;
+			i = 0;
+			break;
+		}
+
+		if (fputc(ch, out) == EOF)
+			goto in;
+	}
+
+	if ((n = imsg_get_blocking(&lr->pr->msgbuf, &msg)) == -1)
+		goto in;
+	if (n == 0)
+		goto in;
+	if (imsg_get_type(&msg) != IMSG_CNT_OK)
+		goto msg;
+
+	rv = 0;
+	msg:
+	imsg_free(&msg);
+	in:
+	fclose(in);
+	return rv;
 }
 
 int
@@ -214,97 +348,6 @@ content_proc_kill(struct content_proc *pr)
 	if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
 		return -1;
 	return 0;
-}
-
-int
-content_proc_reply(struct content_proc *pr, FILE *out,
-		   const char *from, int group, int lfd)
-{
-	struct imsg msg;
-	mbstate_t mbs;
-	struct content_reply_setup setup;
-	FILE *in;
-	ssize_t n;
-	int i, p[2], rv;
-
-	rv = -1;
-
-	memset(&setup, 0, sizeof(setup));
-	if (strlcpy(setup.addr, from, sizeof(setup.addr))
-		    >= sizeof(setup.addr))
-		goto lfd;
-	setup.group = group;
-	if (imsg_compose(&pr->msgbuf, IMSG_CNT_REPLY, 0, -1, lfd,
-			 &setup, sizeof(setup)) == -1)
-		goto lfd;
-
-	if (pipe2(p, O_CLOEXEC) == -1)
-		return -1;
-	if ((in = fdopen(p[0], "r")) == NULL) {
-		close(p[0]);
-		close(p[1]);
-		return -1;
-	}
-
-	if (imsg_compose(&pr->msgbuf, IMSG_CNT_REPLYPIPE, 0, -1, p[1],
-			 NULL, 0) == -1) {
-		close(p[1]);
-		fclose(in);
-		return -1;
-	}
-
-	if (imsgbuf_flush(&pr->msgbuf) == -1)
-		goto in;
-
-	i = 0;
-	memset(&mbs, 0, sizeof(mbs));
-	for (;;) {
-		int ch;
-		char cc;
-
-		if ((ch = fgetc(in)) == EOF) {
-			if (i == 0)
-				break;
-			goto in;
-		}
-
-		cc = ch;
-		switch (mbrtowc(NULL, &cc, 1, &mbs)) {
-		case -1:
-		case -3:
-		case 0:
-			goto in;
-		case -2:
-			i++;
-			break;
-		default:
-			if (i == 0 && !isprint(ch) && !isspace(ch))
-				goto in;
-			i = 0;
-			break;
-		}
-
-		if (fputc(ch, out) == EOF)
-			goto in;
-	}
-
-	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
-		goto in;
-	if (n == 0)
-		goto in;
-	if (imsg_get_type(&msg) != IMSG_CNT_REPLY)
-		goto msg;
-
-	rv = 0;
-	msg:
-	imsg_free(&msg);
-	in:
-	fclose(in);
-	return rv;
-
-	lfd:
-	close(lfd);
-	return -1;
 }
 
 int

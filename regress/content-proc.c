@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <locale.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,49 @@
 #include "../pathnames.h"
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
+
+void
+content_proc_letter_binary_test(void)
+{
+	size_t i;
+	const struct {
+		const char *in;
+		int binary;
+	} tests[] = {
+		{ "1", 0 },
+		{ "2", 0 },
+		{ "3", 0 },
+		{ "4", 1 },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		struct content_letter lr;
+		struct content_proc pr;
+		char path[PATH_MAX];
+		int in, n;
+
+		if (content_proc_init(&pr, "./mailz-content") == -1)
+			err(1, "content_proc_init");
+
+		n = snprintf(path, sizeof(path),
+			     "regress/letters/letter_binary_%s",
+			     tests[i].in);
+		if (n < 0)
+			err(1, "snprintf");
+		if ((size_t)n >= sizeof(path))
+			errx(1, "snprintf overflow");
+		if ((in = open(path, O_RDONLY | O_CLOEXEC)) == -1)
+			err(1, "%s", path);
+
+		if (content_letter_init(&pr, &lr, in) == -1)
+			errx(1, "content_letter_init");
+		if (content_letter_binary(&lr) != tests[i].binary)
+			errx(1, "wrong binary state");
+
+		content_letter_close(&lr);
+		content_proc_kill(&pr);
+	}
+}
 
 void
 content_proc_letter_error_test(void)
@@ -41,8 +85,10 @@ content_proc_letter_error_test(void)
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		err(1, "setlocale");
+	signal(SIGPIPE, SIG_IGN);
 
 	for (i = 0; i < nitems(tests); i++) {
+		struct content_letter_reader rd;
 		struct content_letter lr;
 		struct content_proc pr;
 		char path[PATH_MAX];
@@ -63,12 +109,14 @@ content_proc_letter_error_test(void)
 
 		if (content_letter_init(&pr, &lr, in) == -1)
 			errx(1, "content_letter_init");
+		if (content_letter_reader_init(&rd, &lr) == -1)
+			errx(1, "content_letter_reader_init");
 
 		got_error = 0;
 		for (;;) {
 			char buf[4];
 
-			n = content_letter_getc(&lr, buf);
+			n = content_letter_reader_getc(&rd, buf);
 			if (n == 0)
 				break;
 			if (n == -1) {
@@ -77,12 +125,13 @@ content_proc_letter_error_test(void)
 			}
 		}
 
-		if (content_letter_finish(&lr) == -1)
+		if (content_letter_reader_finish(&rd) == -1)
 			got_error = 1;
 
 		if (!got_error)
 			errx(1, "no error");
 
+		content_letter_reader_close(&rd);
 		content_letter_close(&lr);
 		content_proc_kill(&pr);
 	}
@@ -103,8 +152,10 @@ content_proc_letter_test(void)
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		err(1, "setlocale");
+	signal(SIGPIPE, SIG_IGN);
 
 	for (i = 0; i < nitems(tests); i++) {
+		struct content_letter_reader rd;
 		struct content_letter lr;
 		struct content_proc pr;
 		char path[PATH_MAX];
@@ -126,6 +177,8 @@ content_proc_letter_test(void)
 
 		if (content_letter_init(&pr, &lr, in) == -1)
 			errx(1, "content_letter_init");
+		if (content_letter_reader_init(&rd, &lr) == -1)
+			errx(1, "content_letter_reader_init");
 
 		n = snprintf(path, sizeof(path),
 			     "regress/letters/letter_out_%s",
@@ -140,9 +193,9 @@ content_proc_letter_test(void)
 		for (;;) {
 			char buf[4], buf2[4];
 
-			n = content_letter_getc(&lr, buf);
+			n = content_letter_reader_getc(&rd, buf);
 			if (n == -1)
-				errx(1, "content_letter_getc");
+				errx(1, "content_letter_reader_getc");
 			if (n == 0) {
 				if (fgetc(out) != EOF)
 					errx(1, "wrong output");
@@ -155,9 +208,10 @@ content_proc_letter_test(void)
 				errx(1, "wrong output");
 		}
 
-		if (content_letter_finish(&lr) == -1)
-			errx(1, "content_letter_finish");
+		if (content_letter_reader_finish(&rd) == -1)
+			errx(1, "content_letter_reader_finish");
 
+		content_letter_reader_close(&rd);
 		content_letter_close(&lr);
 		content_proc_kill(&pr);
 		fclose(out);
@@ -183,6 +237,7 @@ content_proc_reply_test(void)
 	setenv("TZ", "UTC", 1);
 
 	for (i = 0; i < nitems(tests); i++) {
+		struct content_letter lr;
 		struct content_proc pr;
 		char path[PATH_MAX];
 		FILE *out, *pin, *pout;
@@ -218,8 +273,10 @@ content_proc_reply_test(void)
 		if ((pout = fdopen(p[1], "w")) == NULL)
 			err(1, "fdopen");
 
-		error = content_proc_reply(&pr, pout, tests[i].exclude,
-					   tests[i].group, in);
+		if (content_letter_init(&pr, &lr, in) == -1)
+			errx(1, "content_letter_init");
+		error = content_letter_reply(&lr, pout, tests[i].exclude,
+					   tests[i].group);
 		if (error != tests[i].error)
 			errx(1, "wrong error");
 		fclose(pout);
@@ -245,6 +302,7 @@ content_proc_reply_test(void)
 			}
 		}
 
+		content_letter_close(&lr);
 		content_proc_kill(&pr);
 		fclose(pin);
 		fclose(out);

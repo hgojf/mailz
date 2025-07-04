@@ -65,13 +65,13 @@ struct ignore {
 
 static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
-static int handle_letter_under(FILE *, FILE *, struct ignore *, int);
-static int handle_reply(struct imsgbuf *, struct imsg *);
-static int handle_reply_body(FILE *, FILE *, time_t, const char *,
-			     const char *);
-static int handle_reply_references(FILE *, FILE *, const char *,
+static int handle_letter_read(FILE *, struct imsg *, struct ignore *, int, int);
+static int handle_letter_reply(FILE *, struct imsg *, int, int);
+static int handle_letter_reply_body(FILE *, FILE *, time_t, const char *,
+			     const char *, int, int);
+static int handle_letter_reply_references(FILE *, FILE *, const char *,
 				   const char *, off_t);
-static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
+static int handle_letter_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
@@ -113,102 +113,53 @@ static int
 handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	      struct ignore *ignore)
 {
-	struct imsg msg2;
-	FILE *in, *out;
-	ssize_t n;
-	int rv;
+	FILE *in;
+	int binary, charset, done, encoding, ret;
 
-	rv = -1;
-
-	if ((n = imsg_get_blocking(msgbuf, &msg2)) == -1)
-		return -1;
-	if (n == 0)
-		return -1;
-
-	if (imsg_get_type(&msg2) != IMSG_CNT_LETTERPIPE)
-		goto msg2;
-	if ((out = imsg_get_fp(&msg2, "w")) == NULL)
-		goto msg2;
+	ret = -1;
 
 	if ((in = imsg_get_fp(msg, "r")) == NULL)
-		goto out;
+		return -1;
 
-	if (handle_letter_under(in, out, ignore, 0) == -1)
-		goto in;
-
-	if (imsg_compose(msgbuf, IMSG_CNT_OK, 0, -1, -1, NULL, 0) == -1)
-		goto in;
-	if (imsgbuf_flush(msgbuf) == -1)
-		goto in;
-
-	in:
-	fclose(in);
-	out:
-	fclose(out);
-	msg2:
-	imsg_free(&msg2);
-	return rv;
-}
-
-static int
-handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
-		    int reply)
-{
-	struct charset charset;
-	struct encoding encoding;
-	int got_content_type, got_encoding;
-
-	charset_from_type(&charset, CHARSET_ASCII);
-	encoding_from_type(&encoding, ENCODING_7BIT, -1);
-	got_content_type = 0;
-	got_encoding = 0;
+	charset = CHARSET_UNKNOWN;
+	encoding = ENCODING_UNKNOWN;
+	binary = 0;
 	for (;;) {
-		char buf[HEADER_NAME_LEN];
-		FILE *echo;
-		int hv;
+		char name[HEADER_NAME_LEN];
+		int error;
 
-		if ((hv = header_name(in, buf, sizeof(buf))) == HEADER_EOF)
+		error = header_name(in, name, sizeof(name));
+		if (error == HEADER_EOF)
 			break;
-		if (hv != HEADER_OK)
-			return -1;
+		if (error < 0)
+			goto in;
 
-		if (reply || (ignore != NULL && ignore_header(buf, ignore)))
-			echo = NULL;
-		else
-			echo = out;
-
-		if (echo) {
-			if (fprintf(out, "%s:", buf) < 0)
-				return -1;
-		}
-
-		if (!strcasecmp(buf, "content-transfer-encoding")) {
+		if (!strcasecmp(name, "content-transfer-encoding")) {
 			char buf[17];
 			int enc;
 
-			if (got_encoding)
-				return -1;
-			hv = header_encoding(in, echo, buf,
+			if (encoding != ENCODING_UNKNOWN)
+				goto in;
+			error = header_encoding(in, NULL, buf,
 						  sizeof(buf));
-			if (hv == HEADER_OK) {
+			if (error == HEADER_OK) {
 				if ((enc = encoding_from_name(buf)) == ENCODING_UNKNOWN)
 					enc = ENCODING_BINARY;
-				encoding_from_type(&encoding, enc, -1);
 			}	
-			else if (hv == HEADER_TRUNC)
-				encoding_from_type(&encoding, ENCODING_BINARY, -1);
+			else if (error == HEADER_TRUNC)
+				enc = ENCODING_BINARY;
 			else
-				return -1;
-			got_encoding = 1;
+				goto in;
+			encoding = enc;
 		}
-		else if (!strcasecmp(buf, "content-type")) {
+		else if (!strcasecmp(name, "content-type")) {
 			struct content_type ct;
 			struct content_type_var vt;
-			char type[5], var[8], val[11];
+			char type[10], var[8], val[11];
 			int eof;
 
-			if (got_content_type)
-				return -1;
+			if (charset != CHARSET_UNKNOWN)
+				goto in;
 
 			ct.type = type;
 			ct.typesz = sizeof(type);
@@ -216,13 +167,15 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			ct.subtypesz = 0;
 
 			eof = 0;
-			hv = header_content_type(in, echo, &ct, &eof);
-			if (hv < 0)
-				return -1;
+			error = header_content_type(in, NULL, &ct, &eof);
+			if (error < 0)
+				goto in;
 
 			if (ct.type_trunc || strcasecmp(type, "text") != 0) {
-				charset_from_type(&charset, CHARSET_OTHER);
-				encoding_from_type(&encoding, ENCODING_BINARY, -1);
+				if (strcasecmp(type, "multipart") != 0)
+					binary = 1;
+				charset = CHARSET_OTHER;
+				encoding = ENCODING_BINARY;
 			}
 
 			vt.var = var;
@@ -230,39 +183,129 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			vt.val = val;
 			vt.valsz = sizeof(val);
 			for (;;) {
-				hv = header_content_type_var(in, echo, &vt, &eof);
-				if (hv == HEADER_EOF)
+				error = header_content_type_var(in, NULL, &vt, &eof);
+				if (error == HEADER_EOF)
 					break;
-				if (hv < 0)
-					return -1;
+				if (error < 0)
+					goto in;
 
 				if (!vt.var_trunc && !strcasecmp(var, "charset")) {
 					int ctype;
 
 					if (!vt.val_trunc
 					    && (ctype = charset_from_name(val)) != CHARSET_UNKNOWN)
-						charset_from_type(&charset, ctype);
+						charset = ctype;
 					else
-						charset_from_type(&charset, CHARSET_OTHER);
+						charset = CHARSET_OTHER;
 				}
 			}
-
-			got_content_type = 1;
 		}
 		else {
-			if (header_skip(in, echo) < 0)
-				return -1;
+			if (header_skip(in, NULL) < 0)
+				goto in;
 		}
 	}
 
-	if (reply) {
-		if (fprintf(out, "> ") < 0)
-			return -1;
+	if (charset == CHARSET_UNKNOWN)
+		charset = CHARSET_ASCII;
+	if (encoding == ENCODING_UNKNOWN)
+		encoding = ENCODING_7BIT;
+
+	if (imsg_compose(msgbuf, IMSG_CNT_LETTER_BINARY, 0, -1, -1,
+			 &binary, sizeof(binary)) == -1)
+		goto in;
+	if (imsgbuf_flush(msgbuf) == -1)
+		goto in;
+
+	done = 0;
+	while (!done) {
+		struct imsg msg2;
+		ssize_t n;
+		int error;
+
+		if (fseek(in, 0, SEEK_SET) == -1)
+			goto in;
+
+		if ((n = imsg_get_blocking(msgbuf, &msg2)) == -1)
+			goto in;
+		if (n == 0)
+			goto in;
+
+		switch (imsg_get_type(&msg2)) {
+		case IMSG_CNT_LETTER_CLOSE:
+			done = 1;
+			error = 0;
+			break;
+		case IMSG_CNT_LETTER_READ:
+			error = handle_letter_read(in, &msg2, ignore,
+						   charset, encoding);
+			break;
+		case IMSG_CNT_LETTER_REPLY:
+			error = handle_letter_reply(in, &msg2, charset,
+						    encoding);
+			break;
+		default:
+			error = -1;
+			break;
+		}
+
+		imsg_free(&msg2);
+		if (error == -1)
+			goto in;
+
+		if (imsg_compose(msgbuf, IMSG_CNT_OK, 0, -1, -1, NULL, 0) == -1)
+			goto in;
+		if (imsgbuf_flush(msgbuf) == -1)
+			goto in;
 	}
-	else {
-		if (fputc('\n', out) == EOF)
-			return -1;
+
+	ret = 0;
+	in:
+	fclose(in);
+	return ret;
+}
+
+static int
+handle_letter_read(FILE *in, struct imsg *msg, struct ignore *ignore,
+		   int charset_type, int encoding_type)
+{
+	struct charset charset;
+	struct encoding encoding;
+	FILE *out;
+	int ret;
+
+	ret = -1;
+
+	if ((out = imsg_get_fp(msg, "w")) == NULL)
+		return -1;
+
+	for (;;) {
+		FILE *echo;
+		int error;
+		char name[HEADER_NAME_LEN];
+
+		error = header_name(in, name, sizeof(name));
+		if (error == HEADER_EOF)
+			break;
+		if (error < 0)
+			goto out;
+
+		echo = ignore_header(name, ignore) ? NULL : out;
+
+		if (echo != NULL) {
+			if (fprintf(echo, "%s:", name) < 0)
+				goto out;
+		}
+
+		if (header_skip(in, echo) < 0)
+			goto out;
 	}
+
+	if (fprintf(out, "\n") < 0)
+		goto out;
+
+	charset_from_type(&charset, charset_type);
+	encoding_from_type(&encoding, encoding_type, -1);
 
 	for (;;) {
 		char buf[4];
@@ -270,7 +313,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 
 		if ((n = charset_getc(&charset, &encoding, in,
 				      buf)) == -1)
-			return -1;
+			goto out;
 		if (n == 0)
 			break;
 
@@ -286,48 +329,34 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 		}
 
 		if (fwrite(buf, n, 1, out) != 1)
-			return -1;
-
-		if (reply && n == 1 && buf[0] == '\n')
-			if (fprintf(out, "> ") < 0)
-				return -1;
+			goto out;
 	}
 
-	return 0;
+	ret = 0;
+	out:
+	fclose(out);
+	return ret;
 }
 
 static int
-handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
+handle_letter_reply(FILE *in, struct imsg *msg, int charset, int encoding)
 {
 	struct content_reply_setup setup;
-	struct imsg msg2;
-	FILE *in, *out;
+	FILE *out;
 	char addr_buf[255], *addr, in_reply_to[MSGID_LEN], msgid[MSGID_LEN];
 	char from_addr[255], from_name[65];
-	ssize_t n;
 	time_t date;
-	off_t from, references, reply_to, to;
+	off_t body, from, references, reply_to, to;
 	int rv;
 
 	rv = -1;
 
-	if ((in = imsg_get_fp(msg, "r")) == NULL)
-		return -1;
-
 	if (imsg_get_data(msg, &setup, sizeof(setup)) == -1)
-		goto in;
+		return -1;
 	if (memchr(setup.addr, '\0', sizeof(setup.addr)) == NULL)
-		goto in;
-
-	if ((n = imsg_get_blocking(msgbuf, &msg2)) == -1)
-		goto in;
-	if (n == 0)
-		goto in;
-
-	if (imsg_get_type(&msg2) != IMSG_CNT_REPLYPIPE)
-		goto msg2;
-	if ((out = imsg_get_fp(&msg2, "w")) == NULL)
-		goto msg2;
+		return -1;
+	if ((out = imsg_get_fp(msg, "w")) == NULL)
+		return -1;
 
 	if ((addr = strchr(setup.addr, '<')) != NULL) {
 		size_t n;
@@ -444,12 +473,15 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	if (date == -1 || from == -1)
 		goto out;
 
+	if ((body = ftello(in)) == -1)
+		goto out;
+
 	if (fprintf(out, "From: %s\n", setup.addr) < 0)
 		goto out;
 
-	if (handle_reply_to(in, out, addr, from, to, reply_to) == -1)
+	if (handle_letter_reply_to(in, out, addr, from, to, reply_to) == -1)
 		goto out;
-	if (handle_reply_references(in, out, msgid, in_reply_to,
+	if (handle_letter_reply_references(in, out, msgid, in_reply_to,
 				    references) == -1)
 		goto out;
 
@@ -458,29 +490,24 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	if (fprintf(out, "Content-Type: text/plain; charset=utf-8\n") < 0)
 		goto out;
 
-	if (handle_reply_body(in, out, date, from_addr, from_name) == -1)
+	if (fseeko(in, body, SEEK_SET) == -1)
 		goto out;
-
-	if (imsg_compose(msgbuf, IMSG_CNT_REPLY, 0, -1, -1,
-			 NULL, 0) == -1)
-		goto out;
-	if (imsgbuf_flush(msgbuf) == -1)
+	if (handle_letter_reply_body(in, out, date, from_addr, from_name,
+			      charset, encoding) == -1)
 		goto out;
 
 	rv = 0;
 	out:
 	fclose(out);
-	msg2:
-	imsg_free(&msg2);
-	in:
-	fclose(in);
 	return rv;
 }
 
 static int
-handle_reply_body(FILE *in, FILE *out, time_t date, const char *addr,
-		  const char *name)
+handle_letter_reply_body(FILE *in, FILE *out, time_t date, const char *addr,
+		  const char *name, int charset_type, int encoding_type)
 {
+	struct charset charset;
+	struct encoding encoding;
 	char datebuf[39];
 	struct tm tm;
 
@@ -505,13 +532,45 @@ handle_reply_body(FILE *in, FILE *out, time_t date, const char *addr,
 			return -1;
 	}
 
-	if (fseeko(in, 0, SEEK_SET) == -1)
+	if (fprintf(out, "> ") < 0)
 		return -1;
-	return handle_letter_under(in, out, NULL, 1);
+
+	charset_from_type(&charset, charset_type);
+	encoding_from_type(&encoding, encoding_type, -1);
+	for (;;) {
+		char buf[4];
+		int n;
+
+		if ((n = charset_getc(&charset, &encoding, in,
+				      buf)) == -1)
+			return -1;
+		if (n == 0)
+			break;
+
+		if (n == 1) {
+			int ch;
+
+			ch = (unsigned char)buf[0];
+			if (!isprint(ch) && !isspace(ch)) {
+				/* UTF-8 replacement character */
+				memcpy(buf, "\xEF\xBF\xBD", 3);
+				n = 3;
+			}
+		}
+
+		if (fwrite(buf, n, 1, out) != 1)
+			return -1;
+
+		if (n == 1 && buf[0] == '\n')
+			if (fprintf(out, "> ") < 0)
+				return -1;
+	}
+
+	return 0;
 }
 
 static int
-handle_reply_references(FILE *in, FILE *out, const char *msgid,
+handle_letter_reply_references(FILE *in, FILE *out, const char *msgid,
 			const char *in_reply_to, off_t refs)
 {
 	int putref;
@@ -555,7 +614,7 @@ handle_reply_references(FILE *in, FILE *out, const char *msgid,
 }
 
 static int
-handle_reply_to(FILE *in, FILE *out, const char *addr, off_t from,
+handle_letter_reply_to(FILE *in, FILE *out, const char *addr, off_t from,
 		off_t to, off_t reply_to)
 {
 	int any;
@@ -771,9 +830,6 @@ main(int argc, char *argv[])
 			break;
 		case IMSG_CNT_LETTER:
 			hv = handle_letter(&msgbuf, &msg, &ignore);
-			break;
-		case IMSG_CNT_REPLY:
-			hv = handle_reply(&msgbuf, &msg);
 			break;
 		case IMSG_CNT_RETAIN:
 			hv = handle_ignore(&msg, &ignore, IGNORE_RETAIN);
