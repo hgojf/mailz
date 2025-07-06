@@ -1,3 +1,4 @@
+compat/*.[od]
 regress/*.[od]
 *.[od]
 lex.c

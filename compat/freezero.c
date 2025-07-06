@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Henry Ford <fordhenry2299@gmail.com>
+ * Copyright (c) 2025 Henry Ford <fordhenry2299@gmail.com>
 
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,8 +14,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef ERR_FORK_H
-#define ERR_FORK_H
-void err_fork(int, const char *, ...)
-	__attribute__((__format__(printf, 2, 3)));
-#endif /* ! ERR_FORK_H */
+#include <stdlib.h>
+#include <string.h>
+
+void
+freezero(void *p, size_t sz)
+{
+	if (p == NULL)
+		return;
+	explicit_bzero(p, sz);
+	free(p);
+}
