@@ -14,8 +14,20 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _ERR_H
-#define _ERR_H
-__dead void _err(int, const char *, ...)
-	__attribute__((__format__(printf, 2, 3)));
-#endif /* ! _ERR_H */
+#include <err.h>
+#include <stdarg.h>
+#include <unistd.h>
+
+#include "err-fork.h"
+
+void
+err_fork(int eval, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	vwarn(fmt, ap);
+	_exit(eval);
+	/* NOTREACHED */
+	va_end(ap);
+}

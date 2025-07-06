@@ -31,9 +31,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "_err.h"
 #include "conf.h"
 #include "content-proc.h"
+#include "err-fork.h"
 #include "mailbox.h"
 #include "maildir.h"
 #include "pathnames.h"
@@ -354,9 +354,9 @@ command_more(struct letter *letter, struct command_args *args)
 		goto lr;
 	case 0:
 		if (dup2(p[0], STDIN_FILENO) == -1)
-			_err(1, "dup2");
+			err_fork(1, "dup2");
 		execl(PATH_LESS, "less", NULL);
-		_err(1, "%s", PATH_LESS);
+		err_fork(1, "%s", PATH_LESS);
 	default:
 		break;
 	}
@@ -469,9 +469,9 @@ command_reply1(struct letter *letter, struct command_args *args, int group)
 		goto fp;
 	case 0:
 		if (dup2(lfd, STDIN_FILENO) == -1)
-			_err(1, "dup2");
+			err_fork(1, "dup2");
 		execl(PATH_SENDMAIL, "sendmail", "-t", NULL);
-		_err(1, "%s", PATH_SENDMAIL);
+		err_fork(1, "%s", PATH_SENDMAIL);
 	default:
 		break;
 	}

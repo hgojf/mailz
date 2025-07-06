@@ -28,9 +28,9 @@
 #include <unistd.h>
 #include <wchar.h>
 
-#include "_err.h"
 #include "content.h"
 #include "content-proc.h"
+#include "err-fork.h"
 #include "imsg-blocking.h"
 #include "printable.h"
 
@@ -183,9 +183,9 @@ content_proc_init(struct content_proc *pr, const char *exe)
 		goto msgbuf;
 	case 0:
 		if (dup2(sv[1], CNT_PFD) == -1)
-			_err(1, "dup2");
+			err_fork(1, "dup2");
 		execl(exe, "mailz-content", "-r", NULL);
-		_err(1, "%s", exe);
+		err_fork(1, "%s", exe);
 	default:
 		break;
 	}
