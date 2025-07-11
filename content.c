@@ -232,6 +232,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 
 		switch (imsg_get_type(&msg2)) {
 		case IMSG_CNT_LETTER_CLOSE:
+			imsg_free(&msg2);
 			goto done;
 		case IMSG_CNT_LETTER_READ:
 			error = handle_letter_read(in, &msg2, ignore,
