@@ -37,7 +37,34 @@
 int
 content_letter_binary(struct content_letter *letter)
 {
-	return letter->binary;
+	struct imsg msg;
+	ssize_t n;
+	int binary, ret;
+
+	ret = -1;
+
+	if (imsg_compose(&letter->pr->msgbuf, IMSG_CNT_LETTER_BINARY, 0,
+			 -1, -1, NULL, 0) == -1)
+		return -1;
+	if (imsgbuf_flush(&letter->pr->msgbuf) == -1)
+		return -1;
+
+	if ((n = imsg_get_blocking(&letter->pr->msgbuf, &msg)) == -1)
+		return -1;
+	if (n == 0)
+		return -1;
+
+	if (imsg_get_type(&msg) != IMSG_CNT_LETTER_BINARY)
+		goto msg;
+	if (imsg_get_data(&msg, &binary, sizeof(binary)) == -1)
+		goto msg;
+	if (binary != 0 && binary != 1)
+		goto msg;
+
+	ret = binary;
+	msg:
+	imsg_free(&msg);
+	return ret;
 }
 
 void
@@ -52,38 +79,16 @@ int
 content_letter_init(struct content_proc *pr,
 		    struct content_letter *letter, int fd)
 {
-	struct imsg msg;
-	ssize_t n;
-	int ret;
-
-	ret = -1;
-
 	if (imsg_compose(&pr->msgbuf, IMSG_CNT_LETTER, 0, -1, fd,
 			 NULL, 0) == -1) {
 		close(fd);
 		return -1;
 	}
-
 	if (imsgbuf_flush(&pr->msgbuf) == -1)
 		return -1;
 
-	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
-		return -1;
-	if (n == 0)
-		return -1;
-	if (imsg_get_type(&msg) != IMSG_CNT_LETTER_BINARY)
-		goto msg;
-	if (imsg_get_data(&msg, &letter->binary, sizeof(letter->binary)) == -1)
-		goto msg;
-	if (letter->binary != 0 && letter->binary != 1)
-		goto msg;
-
 	letter->pr = pr;
-
-	ret = 0;
-	msg:
-	imsg_free(&msg);
-	return ret;
+	return 0;
 }
 
 void

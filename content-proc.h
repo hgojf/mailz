@@ -38,7 +38,6 @@ int content_proc_summary(struct content_proc *, struct content_summary *, int);
 
 struct content_letter {
 	struct content_proc *pr;
-	int binary;
 };
 
 int content_letter_binary(struct content_letter *);

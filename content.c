@@ -65,8 +65,8 @@ struct ignore {
 
 static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
-static int handle_letter_read(FILE *, struct imsg *, struct ignore *, int, int);
-static int handle_letter_reply(FILE *, struct imsg *, int, int);
+static int handle_letter_read(FILE *, struct imsgbuf *, struct imsg *, struct ignore *, int, int);
+static int handle_letter_reply(FILE *, struct imsgbuf *, struct imsg *, int, int);
 static int handle_letter_reply_body(FILE *, FILE *, time_t, const char *,
 			     const char *, int, int);
 static int handle_letter_reply_references(FILE *, FILE *, const char *,
@@ -211,12 +211,6 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	if (encoding == ENCODING_UNKNOWN)
 		encoding = ENCODING_7BIT;
 
-	if (imsg_compose(msgbuf, IMSG_CNT_LETTER_BINARY, 0, -1, -1,
-			 &binary, sizeof(binary)) == -1)
-		goto in;
-	if (imsgbuf_flush(msgbuf) == -1)
-		goto in;
-
 	for (;;) {
 		struct imsg msg2;
 		ssize_t n;
@@ -231,15 +225,22 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 			goto in;
 
 		switch (imsg_get_type(&msg2)) {
+		case IMSG_CNT_LETTER_BINARY:
+			error = imsg_compose(msgbuf,
+					     IMSG_CNT_LETTER_BINARY, 0, -1, -1,
+					     &binary, sizeof(binary));
+			if (error != -1)
+				error |= imsgbuf_flush(msgbuf);
+			break;
 		case IMSG_CNT_LETTER_CLOSE:
 			imsg_free(&msg2);
 			goto done;
 		case IMSG_CNT_LETTER_READ:
-			error = handle_letter_read(in, &msg2, ignore,
+			error = handle_letter_read(in, msgbuf, &msg2, ignore,
 						   charset, encoding);
 			break;
 		case IMSG_CNT_LETTER_REPLY:
-			error = handle_letter_reply(in, &msg2, charset,
+			error = handle_letter_reply(in, msgbuf, &msg2, charset,
 						    encoding);
 			break;
 		default:
@@ -249,11 +250,6 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 
 		imsg_free(&msg2);
 		if (error == -1)
-			goto in;
-
-		if (imsg_compose(msgbuf, IMSG_CNT_OK, 0, -1, -1, NULL, 0) == -1)
-			goto in;
-		if (imsgbuf_flush(msgbuf) == -1)
 			goto in;
 	}
 	done:
@@ -265,15 +261,15 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 }
 
 static int
-handle_letter_read(FILE *in, struct imsg *msg, struct ignore *ignore,
-		   int charset_type, int encoding_type)
+handle_letter_read(FILE *in, struct imsgbuf *msgbuf, struct imsg *msg,
+		   struct ignore *ignore, int charset_type, int encoding_type)
 {
 	struct charset charset;
 	struct encoding encoding;
 	FILE *out;
-	int ret;
+	int error, ret;
 
-	ret = -1;
+	error = 1;
 
 	if ((out = imsg_get_fp(msg, "w")) == NULL)
 		return -1;
@@ -331,14 +327,19 @@ handle_letter_read(FILE *in, struct imsg *msg, struct ignore *ignore,
 			goto out;
 	}
 
-	ret = 0;
+	error = 0;
 	out:
 	fclose(out);
+	ret = imsg_compose(msgbuf, error ? IMSG_CNT_ERROR : IMSG_CNT_OK,
+			 0, -1, -1, NULL, 0);
+	if (ret != -1)
+		ret |= imsgbuf_flush(msgbuf);
 	return ret;
 }
 
 static int
-handle_letter_reply(FILE *in, struct imsg *msg, int charset, int encoding)
+handle_letter_reply(FILE *in, struct imsgbuf *msgbuf, struct imsg *msg,
+		    int charset, int encoding)
 {
 	struct content_reply_setup setup;
 	FILE *out;
@@ -346,9 +347,9 @@ handle_letter_reply(FILE *in, struct imsg *msg, int charset, int encoding)
 	char from_addr[255], from_name[65];
 	time_t date;
 	off_t body, from, references, reply_to, to;
-	int rv;
+	int error, ret;
 
-	rv = -1;
+	error = 1;
 
 	if (imsg_get_data(msg, &setup, sizeof(setup)) == -1)
 		return -1;
@@ -495,10 +496,14 @@ handle_letter_reply(FILE *in, struct imsg *msg, int charset, int encoding)
 			      charset, encoding) == -1)
 		goto out;
 
-	rv = 0;
+	error = 0;
 	out:
 	fclose(out);
-	return rv;
+	ret = imsg_compose(msgbuf, error ? IMSG_CNT_ERROR : IMSG_CNT_OK,
+			 0, -1, -1, NULL, 0);
+	if (ret != -1)
+		ret |= imsgbuf_flush(msgbuf);
+	return ret;
 }
 
 static int
