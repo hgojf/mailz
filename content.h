@@ -42,6 +42,8 @@ struct content_summary {
 	time_t date;
 	char from[255];
 	char subject[245];
+	char thread[998];
 	int have_subject;
+	int thread_is_reply;
 };
 #endif /* ! CONTENT_H */

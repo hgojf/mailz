@@ -46,6 +46,8 @@ mailbox_thread_test(void)
 			letter.from = "bogus";
 			letter.path = "bogus";
 			letter.subject = tests[i].subjects[j];
+			letter.thread = NULL;
+			letter.thread_is_reply = 0;
 
 			if (mailbox_add_letter(&mailbox, &letter) == -1)
 				err(1, "mailbox_add_letter");

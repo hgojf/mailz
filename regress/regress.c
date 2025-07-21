@@ -44,6 +44,7 @@ main(void)
 	header_lex_echo_test();
 	header_message_id_test();
 	header_name_test();
+	header_references_test();
 	header_subject_test();
 	header_subject_reply_test();
 	mailbox_thread_test();

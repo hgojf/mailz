@@ -46,21 +46,30 @@ mailbox_add_letter(struct mailbox *mailbox, struct letter *letter)
 	}
 	else
 		copy.subject = NULL;
+	if (letter->thread != NULL) {
+		if ((copy.thread = strdup(letter->thread)) == NULL)
+			goto subject;
+	}
+	else
+		copy.thread = NULL;
+	copy.thread_is_reply = letter->thread_is_reply;
 
 	if (mailbox->nletter == SIZE_MAX) {
 		errno = ENOMEM;
-		goto subject;
+		goto thread;
 	}
 	letters = reallocarray(mailbox->letters, mailbox->nletter + 1,
 			       sizeof(*mailbox->letters));
 	if (letters == NULL)
-		goto subject;
+		goto thread;
 
 	mailbox->letters = letters;
 	mailbox->letters[mailbox->nletter++] = copy;
 
 	return 0;
 
+	thread:
+	free(copy.thread);
 	subject:
 	free(copy.subject);
 	path:
@@ -143,7 +152,7 @@ mailbox_thread_next(struct mailbox *mailbox,
 {
 	size_t i;
 
-	if (thread->subject == NULL) {
+	if (thread->subject == NULL && thread->letter->thread == NULL) {
 		struct letter *letter;
 
 		letter = thread->letter;
@@ -152,28 +161,36 @@ mailbox_thread_next(struct mailbox *mailbox,
 	}
 
 	for (i = thread->idx; i < mailbox->nletter; i++) {
-		const char *subject;
+		const char *subject, *cthread, *othread;
 
-		subject = mailbox->letters[i].subject;
-		if (subject == NULL)
-			continue;
-
-		if (!strncmp(subject, "Re: ", 4)) {
-			if (!strcmp(&subject[4], thread->subject)) {
+		cthread = mailbox->letters[i].thread;
+		othread = thread->letter->thread;
+		if (cthread != NULL && othread != NULL) {
+			if (!strcmp(cthread, othread)) {
 				thread->idx = i + 1;
 				return &mailbox->letters[i];
 			}
 		}
 
-		if (!strcmp(subject, thread->subject)) {
-			if (thread->have_first) {
-				thread->idx = mailbox->nletter;
-				return NULL;
+		subject = mailbox->letters[i].subject;
+		if (subject != NULL && thread->subject != NULL) {
+			if (!strncmp(subject, "Re: ", 4)) {
+				if (!strcmp(&subject[4], thread->subject)) {
+					thread->idx = i + 1;
+					return &mailbox->letters[i];
+				}
 			}
 
-			thread->have_first = 1;
-			thread->idx = i + 1;
-			return &mailbox->letters[i];
+			if (!strcmp(subject, thread->subject)) {
+				if (thread->have_first) {
+					thread->idx = mailbox->nletter;
+					return NULL;
+				}
+
+				thread->have_first = 1;
+				thread->idx = i + 1;
+				return &mailbox->letters[i];
+			}
 		}
 	}
 

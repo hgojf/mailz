@@ -27,6 +27,7 @@ void header_lex_test(void);
 void header_lex_echo_test(void);
 void header_message_id_test(void);
 void header_name_test(void);
+void header_references_test(void);
 void header_subject_test(void);
 void header_subject_reply_test(void);
 

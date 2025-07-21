@@ -5,7 +5,9 @@ struct letter {
 	char *from;
 	char *path;
 	char *subject;
+	char *thread;
 	time_t date;
+	int thread_is_reply;
 };
 
 struct mailbox {

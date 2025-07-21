@@ -702,6 +702,8 @@ read_letters(const char *maildir, int ocur, int view_all,
 		letter.from = sm.from;
 		letter.path = de->d_name;
 		letter.subject = sm.have_subject ? sm.subject : NULL;
+		letter.thread = strlen(sm.thread) != 0 ? sm.thread : NULL;
+		letter.thread_is_reply = sm.thread_is_reply;
 
 		if (mailbox_add_letter(mailbox, &letter) == -1) {
 			warn(NULL); /* errno == ENOMEM */

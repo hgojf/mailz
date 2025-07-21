@@ -28,6 +28,7 @@
 static long header_date_timezone(const char *);
 static long header_date_timezone_std(const char *, size_t);
 static long header_date_timezone_usa(const char *, size_t);
+static int header_message_id_next(FILE *, char *, size_t);
 static int header_token(FILE *, struct header_lex *, char *, size_t, int *);
 static size_t strip_trailing(const char *, size_t);
 
@@ -624,11 +625,11 @@ header_lex(FILE *fp, struct header_lex *lex)
 	return HEADER_EOF;
 }
 
-
-int
-header_message_id(FILE *fp, char *buf, size_t bufsz)
+static int
+header_message_id_next(FILE *fp, char *buf, size_t bufsz)
 {
 	struct header_lex lex;
+	const char *undefined, *up;
 	size_t n;
 	int state;
 
@@ -640,6 +641,33 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 	lex.qstate = 0;
 	lex.skipws = 1;
 
+	/*
+	 * Snappymail intersperses the string "undefined" with the
+	 * message-ids in its References field, so ignore this.
+	 */
+	undefined = "undefined";
+	up = undefined;
+	for (;;) {
+		int ch;
+
+		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
+			return ch;
+		if (ch == HEADER_EOF) {
+			if (up == undefined)
+				return HEADER_EOF;
+			return HEADER_INVALID;
+		}
+		if (ch != *up++) {
+			if (fseeko(fp, -(up - undefined), SEEK_CUR) == -1)
+				return HEADER_INPUT;
+			break;
+		}
+		if (*up == '\0')
+			return HEADER_UNDEFINED_MESSAGE_ID;
+	}
+
+	lex.skipws = 1;
+
 	n = 0;
 	state = 0;
 	for (;;) {
@@ -648,14 +676,11 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
 			return ch;
 
-		if (state == 2) {
-			if (ch == HEADER_EOF)
-				break;
-			continue;
-		}
-
-		if (ch == HEADER_EOF)
+		if (ch == HEADER_EOF) {
+			if (n == 0)
+				return HEADER_EOF;
 			return HEADER_INVALID;
+		}
 
 		if (state == 0) {
 			if (ch != '<')
@@ -664,10 +689,8 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 			continue;
 		}
 
-		if (ch == '>') {
-			state = 2;
-			continue;
-		}
+		if (ch == '>')
+			break;
 
 		if (!isprint(ch) && !isspace(ch))
 			return HEADER_INVALID;
@@ -677,6 +700,22 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 	}
 
 	buf[n] = '\0';
+	return HEADER_OK;
+}
+
+int
+header_message_id(FILE *fp, char *buf, size_t bufsz)
+{
+	int error;
+
+	if ((error = header_message_id_next(fp, buf, bufsz)) < 0) {
+		if (error == HEADER_EOF)
+			error = HEADER_INVALID;
+		return error;
+	}
+
+	if ((error = header_skip(fp, NULL)) < 0)
+		return error;
 	return HEADER_OK;
 }
 
@@ -709,6 +748,27 @@ header_name(FILE *fp, char *buf, size_t bufsz)
 
 	buf[n] = '\0';
 	return HEADER_OK;
+}
+
+int
+header_references(FILE *fp, char *buf, size_t bufsz)
+{
+	for (;;) {
+		int error;
+
+		if ((error = header_message_id_next(fp, buf, bufsz)) < 0) {
+			if (error == HEADER_EOF)
+				error = HEADER_EMPTY;
+			if (error == HEADER_UNDEFINED_MESSAGE_ID)
+				continue;
+			return error;
+		}
+
+		if ((error = header_skip(fp, NULL)) < 0)
+			return error;
+
+		return HEADER_OK;
+	}
 }
 
 int

@@ -357,6 +357,11 @@ content_proc_summary(struct content_proc *pr,
 		goto bad;
 	}
 
+	if (!string_printable(sm->thread, sizeof(sm->thread)))
+		goto bad;
+	if (sm->thread_is_reply != 0 && sm->thread_is_reply != 1)
+		goto bad;
+
 	rv = 0;
 	bad:
 	imsg_free(&msg);

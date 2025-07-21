@@ -541,6 +541,50 @@ header_name_test(void)
 }
 
 void
+header_references_test(void)
+{
+	size_t i;
+	const struct {
+		char *in;
+		const char *out;
+		size_t bufsz;
+		int error;
+	} tests[] = {
+		{ "<uniq>", "uniq", 10, HEADER_OK },
+		{ "<uniq>", "uniq", 5, HEADER_OK },
+
+		{ "undefined <uniq>", "uniq", 5, HEADER_OK },
+		{ "undefined undefined <uniq>", "uniq", 5, HEADER_OK },
+		{ "undefined undefined", NULL, 5, HEADER_EMPTY },
+		{ "undefin <uniq>", "uniq", 5, HEADER_INVALID },
+
+		{ "<uniq", NULL, 10, HEADER_INVALID },
+		{ "<uniq>", NULL, 4, HEADER_INVALID },
+	};
+
+	for (i = 0; i < nitems(tests); i++) {
+		char buf[10];
+		FILE *fp;
+		int error;
+
+		fp = fmemopen(tests[i].in, strlen(tests[i].in),
+			      "r");
+		if (fp == NULL)
+			err(1, "fmemopen");
+
+		error = header_references(fp, buf, tests[i].bufsz);
+		if (error != tests[i].error)
+			errx(1, "wrong error %d", error);
+		if (error == HEADER_OK)
+			if (strcmp(buf, tests[i].out) != 0)
+				errx(1, "wrong output");
+
+		fclose(fp);
+	}
+}
+
+
+void
 header_subject_test(void)
 {
 	size_t i;

@@ -7,6 +7,8 @@
 #define HEADER_OUTPUT -3
 #define HEADER_TRUNC -4
 #define HEADER_INPUT -5
+#define HEADER_UNDEFINED_MESSAGE_ID -6
+#define HEADER_EMPTY -7
 
 struct header_address {
 	char *addr;
@@ -51,6 +53,7 @@ int header_from(FILE *, struct header_address *);
 int header_name(FILE *, char *, size_t);
 int header_message_id(FILE *, char *, size_t);
 int header_lex(FILE *, struct header_lex *);
+int header_references(FILE *, char *, size_t);
 int header_skip(FILE *, FILE *);
 int header_subject(FILE *, char *, size_t);
 int header_subject_reply(FILE *, FILE *);

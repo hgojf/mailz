@@ -611,6 +611,8 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 
 	memset(&sm, 0, sizeof(sm));
 	sm.date = -1;
+	sm.thread_is_reply = 0;
+	sm.thread[0] = '\0';
 	for (;;) {
 		char buf[HEADER_NAME_LEN];
 		int n;
@@ -643,6 +645,27 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 			if (strlen(sm.from) == 0)
 				goto fp;
 		}
+		else if (!strcasecmp(buf, "message-id")) {
+			if (sm.thread_is_reply) {
+				if (header_skip(fp, NULL) < 0)
+					goto fp;
+			}
+			else {
+				if (header_message_id(fp, sm.thread, sizeof(sm.thread)) < 0)
+					goto fp;
+			}
+		}
+		else if (!strcasecmp(buf, "references")) {
+			int error;
+
+			error = header_references(fp, sm.thread, sizeof(sm.thread));
+			if (error < 0) {
+				if (error != HEADER_EMPTY)
+					goto fp;
+			}
+			else
+				sm.thread_is_reply = 1;
+		}
 		else if (!strcasecmp(buf, "subject")) {
 			if (sm.have_subject)
 				goto fp;
@@ -658,7 +681,8 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 		}
 
 		if (sm.date != -1 && strlen(sm.from) != 0
-				  && sm.have_subject)
+				  && sm.have_subject
+				  && sm.thread_is_reply)
 			break;
 	}
 
@@ -750,9 +774,11 @@ main(int argc, char *argv[])
 
 	if ((null = open(PATH_DEV_NULL, O_RDWR)) == -1)
 		err(1, "%s", PATH_DEV_NULL);
+	#if 0
 	for (i = 0; i < 3; i++)
 		if (dup2(null, i) == -1)
 			err(1, "dup2");
+	#endif
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		errx(1, "setlocale");
