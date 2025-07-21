@@ -41,6 +41,7 @@ header_address_test(void)
 	} tests[] = {
 		#define test_addr(in, addr) { in, addr, "", 255, 0, HEADER_OK }
 		#define test_bad(in) { in, NULL, NULL, 255, 65, HEADER_INVALID }
+		#define test_eof(in) { in, NULL, NULL, 255, 65, HEADER_EOF }
 		#define test_lim(in, addr, name) { in, addr, name, \
 						   sizeof(addr), sizeof(name), \
 						   HEADER_OK }
@@ -54,7 +55,10 @@ header_address_test(void)
 		test_ok("dave@fake.invalid", "dave@fake.invalid", ""),
 		test_ok("dave@fake.invalid   ", "dave@fake.invalid", ""),
 		test_ok("<dave@fake.invalid>", "dave@fake.invalid", ""),
-		test_ok("<>", "", ""),
+
+		test_bad("<>"),
+		test_bad(","),
+		test_eof("\n"),
 
 		test_bad("Dave <"),
 

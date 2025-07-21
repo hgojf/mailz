@@ -78,6 +78,9 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 						return HEADER_EOF;
 				}
 
+				if (ch == ',' && n == 0)
+					return HEADER_INVALID;
+
 				return HEADER_OK;
 			}
 
@@ -103,6 +106,8 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 			if (ch == HEADER_EOF)
 				return HEADER_INVALID;
 			if (ch == '>') {
+				if (n == 0)
+					return HEADER_INVALID;
 				state = 2;
 				continue;
 			}

@@ -640,8 +640,6 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 
 			if (header_from(fp, &from) < 0)
 				goto fp;
-			if (strlen(sm.from) == 0)
-				goto fp;
 		}
 		else if (!strcasecmp(buf, "subject")) {
 			if (sm.have_subject)
