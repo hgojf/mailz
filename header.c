@@ -638,7 +638,7 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 	lex.cstate = 0;
 	lex.echo = NULL;
 	lex.qstate = 0;
-	lex.skipws = 0;
+	lex.skipws = 1;
 
 	n = 0;
 	state = 0;
@@ -658,8 +658,9 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 			return HEADER_INVALID;
 
 		if (state == 0) {
-			if (ch == '<')
-				state = 1;
+			if (ch != '<')
+				return HEADER_INVALID;
+			state = 1;
 			continue;
 		}
 
