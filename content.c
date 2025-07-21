@@ -307,7 +307,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	ssize_t n;
 	time_t date;
 	off_t from, references, reply_to, to;
-	int rv;
+	int got_subject, rv;
 
 	rv = -1;
 
@@ -345,6 +345,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 
 	date = -1;
 	from = -1;
+	got_subject = 0;
 	in_reply_to[0] = '\0';
 	msgid[0] = '\0';
 	references = -1;
@@ -424,8 +425,11 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "subject")) {
+			if (got_subject)
+				goto out;
 			if (header_subject_reply(in, out) < 0)
 				goto out;
+			got_subject = 1;
 		}
 		else if (setup.group && !strcasecmp(buf, "to")) {
 			if (to != -1)
@@ -443,6 +447,10 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 
 	if (date == -1 || from == -1)
 		goto out;
+
+	if (!got_subject)
+		if (fprintf(out, "Subject: Re: No Subject\n") < 0)
+			goto out;
 
 	if (fprintf(out, "From: %s\n", setup.addr) < 0)
 		goto out;
