@@ -66,7 +66,7 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 			return ch;
 
 		if (state == 0) {
-			if (ch == HEADER_EOF || ch == ',') {
+			if (ch == HEADER_EOF || (ch == ',' && lex.qstate == 0)) {
 				n = strip_trailing(from->addr, n);
 				from->addr[n] = '\0';
 				if (from->namesz != 0)
@@ -118,7 +118,7 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 		}
 
 		if (state == 2) {
-			if (ch == HEADER_EOF || ch == ',') {
+			if (ch == HEADER_EOF || (ch == ',' && lex.qstate == 0)) {
 				from->addr[n] = '\0';
 
 				if (ch == HEADER_EOF)

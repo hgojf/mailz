@@ -52,6 +52,7 @@ header_address_test(void)
 						   255, 65, HEADER_OK }
 		test_addr("Dave <dave@fake.invalid>", "dave@fake.invalid"),
 		test_ok("Dave <dave@fake.invalid>", "dave@fake.invalid", "Dave"),
+		test_ok("\"Bond, James\" <dave@fake.invalid>", "dave@fake.invalid", "Bond, James"),
 		test_ok("dave@fake.invalid", "dave@fake.invalid", ""),
 		test_ok("dave@fake.invalid   ", "dave@fake.invalid", ""),
 		test_ok("<dave@fake.invalid>", "dave@fake.invalid", ""),
