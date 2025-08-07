@@ -17,6 +17,17 @@
 #ifndef CONF_H
 #define CONF_H
 
+/*
+ * This is needed because libbsd does not define __unused
+ * but uses it in sys/tree.h.
+ * This is fixed in libbsd master but no release currently
+ * includes that change.
+ * XXX: once a release is made and used in debian, drop this
+ */
+#ifndef __unused
+#define __unused __attribute__((__unused__))
+#endif /* ! __unused */
+
 #include <sys/tree.h>
 
 struct mailz_conf_mailbox {
