@@ -612,21 +612,13 @@ content_proc_ex_ignore(struct content_proc *pr,
 static int
 letter_print(size_t nth, struct letter *letter)
 {
-	struct tm ctm, tm;
+	struct tm tm;
 	char date[33];
-	const char *fmt, *subject;
-	time_t now;
+	const char *subject;
 
-	now = time(NULL);
-	if (localtime_r(&now, &ctm) == NULL)
-		return -1;
 	if (localtime_r(&letter->date, &tm) == NULL)
 		return -1;
-	if (ctm.tm_year == tm.tm_year)
-		fmt = "%a %b %d %H:%M";
-	else
-		fmt = "%a %b %d %H:%M %Y";
-	if (strftime(date, sizeof(date), fmt, &tm) == 0)
+	if (strftime(date, sizeof(date), "%a %b %d %H:%M %Y", &tm) == 0)
 		return -1;
 
 	if ((subject = letter->subject) == NULL)
