@@ -41,6 +41,7 @@ header_address_test(void)
 	} tests[] = {
 		#define test_addr(in, addr) { in, addr, "", 255, 0, HEADER_OK }
 		#define test_bad(in) { in, NULL, NULL, 255, 65, HEADER_INVALID }
+		#define test_eof(in) { in, NULL, NULL, 255, 65, HEADER_EOF }
 		#define test_lim(in, addr, name) { in, addr, name, \
 						   sizeof(addr), sizeof(name), \
 						   HEADER_OK }
@@ -51,10 +52,14 @@ header_address_test(void)
 						   255, 65, HEADER_OK }
 		test_addr("Dave <dave@fake.invalid>", "dave@fake.invalid"),
 		test_ok("Dave <dave@fake.invalid>", "dave@fake.invalid", "Dave"),
+		test_ok("\"Bond, James\" <dave@fake.invalid>", "dave@fake.invalid", "Bond, James"),
 		test_ok("dave@fake.invalid", "dave@fake.invalid", ""),
 		test_ok("dave@fake.invalid   ", "dave@fake.invalid", ""),
 		test_ok("<dave@fake.invalid>", "dave@fake.invalid", ""),
-		test_ok("<>", "", ""),
+
+		test_bad("<>"),
+		test_bad(","),
+		test_eof("\n"),
 
 		test_bad("Dave <"),
 
@@ -474,6 +479,7 @@ header_message_id_test(void)
 		{ "<uniq>", "uniq", 10, HEADER_OK },
 		{ "<uniq>", "uniq", 5, HEADER_OK },
 
+		{ "hello<uniq", NULL, 10, HEADER_INVALID },
 		{ "<uniq", NULL, 10, HEADER_INVALID },
 		{ "<uniq>", NULL, 4, HEADER_INVALID },
 	};

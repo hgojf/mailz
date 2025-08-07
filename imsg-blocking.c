@@ -16,7 +16,6 @@
 
 #include <sys/queue.h>
 
-#include <errno.h>
 #include <imsg.h>
 
 #include "imsg-blocking.h"

@@ -29,7 +29,7 @@ static int encoding_qp(FILE *);
 static int encoding_raw(FILE *, int, int);
 static int hexdigcaps(int);
 
-struct {
+static struct {
 	const char *ident;
 	enum encoding_type type;
 } encodings[] = {
