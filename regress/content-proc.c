@@ -37,6 +37,8 @@ content_proc_letter_error_test(void)
 		const char *in;
 	} tests[] = {
 		{ "1" },
+		{ "2" },
+		{ "3" },
 	};
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)

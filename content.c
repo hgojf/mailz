@@ -190,15 +190,12 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 				return -1;
 			hv = header_encoding(in, echo, buf,
 						  sizeof(buf));
-			if (hv == HEADER_OK) {
-				if ((enc = encoding_from_name(buf)) == ENCODING_UNKNOWN)
-					enc = ENCODING_BINARY;
-				encoding_from_type(&encoding, enc);
-			}	
-			else if (hv == HEADER_TRUNC)
-				encoding_from_type(&encoding, ENCODING_BINARY);
-			else
+			if (hv < 0)
 				return -1;
+			if ((enc = encoding_from_name(buf)) == ENCODING_UNKNOWN)
+				return -1;
+			encoding_from_type(&encoding, enc);
+
 			got_encoding = 1;
 		}
 		else if (!strcasecmp(buf, "content-type")) {
