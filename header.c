@@ -849,7 +849,7 @@ header_token(FILE *fp, struct header_lex *lex, char *buf,
 	return HEADER_OK;
 }
 
-size_t
+static size_t
 strip_trailing(const char *s, size_t n)
 {
 	while (n > 0 && (s[n - 1] == ' ' || s[n - 1] == '\t'))
