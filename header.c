@@ -135,7 +135,6 @@ header_content_type(FILE *in, FILE *echo, struct content_type *ct,
 {
 	struct header_lex lex;
 	size_t n;
-	int state;
 
 	lex.cstate = 0;
 	lex.echo = echo;
@@ -143,9 +142,25 @@ header_content_type(FILE *in, FILE *echo, struct content_type *ct,
 	lex.skipws = 1;
 
 	n = 0;
-	state = 0;
-
 	ct->type_trunc = 0;
+	for (;;) {
+		int ch;
+
+		ch = header_lex(in, &lex);
+		if (ch == HEADER_EOF)
+			return HEADER_INVALID;
+		if (ch < 0)
+			return ch;
+
+		if (n == ct->typesz)
+			ct->type_trunc = 1;
+		else
+			ct->type[n++] = (ch == '/') ? '\0' : ch;
+		if (ch == '/')
+			break;
+	}
+
+	n = 0;
 	ct->subtype_trunc = 0;
 	for (;;) {
 		int ch;
@@ -153,46 +168,18 @@ header_content_type(FILE *in, FILE *echo, struct content_type *ct,
 		ch = header_lex(in, &lex);
 		if (ch != HEADER_EOF && ch < 0)
 			return ch;
-
-		switch (state) {
-		case 0:
+		if (n == ct->subtypesz)
+			ct->subtype_trunc = 1;
+		else
+			ct->subtype[n++] = (ch == ';' || ch == HEADER_EOF) ? '\0' : ch;
+		if (ch == HEADER_EOF || ch == ';') {
 			if (ch == HEADER_EOF)
-				return HEADER_INVALID;
-			if (!ct->type_trunc) {
-				if (n == ct->typesz)
-					ct->type_trunc = 1;
-				else
-					ct->type[n++] = ch == '/' ? '\0' : ch;
-			}
-
-			if (ch == '/') {
-				n = 0;
-				state = 1;
-			}
-			break;
-		case 1:
-			if (!ct->subtype_trunc) {
-				if (n == ct->subtypesz)
-					ct->subtype_trunc = 1;
-				else {
-					int nch;
-
-					if (ch == ';' || ch == HEADER_EOF)
-						nch = '\0';
-					else
-						nch = ch;
-					ct->subtype[n++] = nch;
-				}
-			}
-
-			if (ch == ';' || ch == HEADER_EOF) {
-				if (ch == HEADER_EOF)
-					*eof = 1;
-				return HEADER_OK;
-			}
+				*eof = 1;
 			break;
 		}
 	}
+
+	return HEADER_OK;
 }
 
 int
@@ -201,7 +188,6 @@ header_content_type_var(FILE *in, FILE *echo,
 {
 	struct header_lex lex;
 	size_t n;
-	int state;
 
 	if (*eof)
 		return HEADER_EOF;
@@ -212,58 +198,47 @@ header_content_type_var(FILE *in, FILE *echo,
 	lex.skipws = 1;
 
 	n = 0;
-	state = 0;
-
 	vp->var_trunc = 0;
+
+	for (;;) {
+		int ch;
+
+		ch = header_lex(in, &lex);
+		if (ch == HEADER_EOF) {
+			if (n == 0)
+				return HEADER_EOF;
+			return HEADER_INVALID;
+		}
+
+		if (n == vp->varsz)
+			vp->var_trunc = 1;
+		else
+			vp->var[n++] = (ch == '=') ? '\0' : ch;
+		if (ch == '=')
+			break;
+	}
+
+	n = 0;
 	vp->val_trunc = 0;
+
 	for (;;) {
 		int ch;
 
 		ch = header_lex(in, &lex);
 		if (ch != HEADER_EOF && ch < 0)
 			return ch;
-
-		switch (state) {
-		case 0:
-			if (ch == HEADER_EOF) {
-				if (n == 0)
-					return HEADER_EOF;
-				return HEADER_INVALID;
-			}
-			if (!vp->var_trunc) {
-				if (n == vp->varsz)
-					vp->var_trunc = 1;
-				else
-					vp->var[n++] = ch == '=' ? '\0' : ch;
-			}
-			if (ch == '=') {
-				state = 1;
-				n = 0;
-			}
-			break;
-		case 1:
-			if (!vp->val_trunc) {
-				if (n == vp->valsz)
-					vp->val_trunc = 1;
-				else {
-					int nch;
-
-					if (ch == ';' || ch == HEADER_EOF)
-						nch = '\0';
-					else
-						nch = ch;
-					vp->val[n++] = nch;
-				}
-			}
-
-			if (ch == ';' || ch == HEADER_EOF) {
-				if (ch == HEADER_EOF)
-					*eof = 1;
-				return HEADER_OK;
-			}
+		if (n == vp->valsz)
+			vp->val_trunc = 1;
+		else
+			vp->val[n++] = (ch == ';' || ch == HEADER_EOF) ? '\0' : ch;
+		if (ch == ';' || ch == HEADER_EOF) {
+			if (ch == HEADER_EOF)
+				*eof = 1;
 			break;
 		}
 	}
+
+	return HEADER_OK;
 }
 
 int
