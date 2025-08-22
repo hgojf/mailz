@@ -635,7 +635,7 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 {
 	struct header_lex lex;
 	size_t n;
-	int state;
+	int ch;
 
 	if (bufsz == 0)
 		return HEADER_INVALID;
@@ -645,40 +645,37 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 	lex.qstate = 0;
 	lex.skipws = 1;
 
+	ch = header_lex(fp, &lex);
+	if (ch == HEADER_EOF)
+		return HEADER_INVALID;
+	if (ch < 0)
+		return ch;
+	if (ch != '<')
+		return HEADER_INVALID;
+
 	n = 0;
-	state = 0;
 	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
-			return ch;
-
-		if (state == 2) {
-			if (ch == HEADER_EOF)
-				break;
-			continue;
-		}
-
+		ch = header_lex(fp, &lex);
 		if (ch == HEADER_EOF)
 			return HEADER_INVALID;
-
-		if (state == 0) {
-			if (ch != '<')
-				return HEADER_INVALID;
-			state = 1;
-			continue;
-		}
-
-		if (ch == '>') {
-			state = 2;
-			continue;
-		}
+		if (ch < 0)
+			return ch;
+		if (ch == '>')
+			break;
 
 		if (!isprint(ch) && !isspace(ch))
 			return HEADER_INVALID;
 		if (n == bufsz - 1)
 			return HEADER_INVALID;
 		buf[n++] = ch;
+	}
+
+	for (;;) {
+		ch = header_lex(fp, &lex);
+		if (ch == HEADER_EOF)
+			break;
+		if (ch < 0)
+			return ch;
 	}
 
 	buf[n] = '\0';
