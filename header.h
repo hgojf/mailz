@@ -5,7 +5,8 @@
 #define HEADER_EOF -1
 #define HEADER_INVALID -2
 #define HEADER_OUTPUT -3
-#define HEADER_INPUT -4
+#define HEADER_TRUNC -4
+#define HEADER_INPUT -5
 
 struct header_address {
 	char *addr;

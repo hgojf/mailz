@@ -502,9 +502,6 @@ header_encoding(FILE *fp, FILE *echo, char *buf, size_t bufsz)
 	size_t n;
 	int ch;
 
-	if (bufsz == 0)
-		return HEADER_INVALID;
-
 	lex.cstate = 0;
 	lex.echo = echo;
 	lex.qstate = 0;
@@ -514,13 +511,13 @@ header_encoding(FILE *fp, FILE *echo, char *buf, size_t bufsz)
 	while ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
 		if (ch < 0)
 			return ch;
-		if (n == bufsz - 1)
-			return HEADER_INVALID;
-		buf[n++] = ch;
+		if (n != bufsz)
+			buf[n++] = ch;
 	}
 
-	buf[n] = '\0';
-	return HEADER_OK;
+	if (n != bufsz)
+		buf[n] = '\0';
+	return n == bufsz ? HEADER_TRUNC : HEADER_OK;
 }
 
 int

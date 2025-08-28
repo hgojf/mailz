@@ -332,7 +332,7 @@ header_encoding_test(void)
 	} tests[] = {
 		{ "Quoted-Printable", "Quoted-Printable", 20, HEADER_OK },
 		{ "Quoted-Printable", "Quoted-Printable", 17, HEADER_OK },
-		{ "Quoted-Printable", "Quoted-Printable", 16, HEADER_INVALID },
+		{ "Quoted-Printable", "Quoted-Printable", 16, HEADER_TRUNC },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {
