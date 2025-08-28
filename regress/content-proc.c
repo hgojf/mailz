@@ -56,9 +56,7 @@ content_proc_letter_error_test(void)
 		n = snprintf(path, sizeof(path),
 			     "regress/letters/letter_error_%s",
 			     tests[i].in);
-		if (n < 0)
-			err(1, "snprintf");
-		if ((size_t)n >= sizeof(path))
+		if (n < 0 || (size_t)n >= sizeof(path))
 			errx(1, "snprintf overflow");
 		if ((in = open(path, O_RDONLY | O_CLOEXEC)) == -1)
 			err(1, "%s", path);
@@ -119,9 +117,7 @@ content_proc_letter_test(void)
 		n = snprintf(path, sizeof(path),
 			     "regress/letters/letter_in_%s",
 			     tests[i].in);
-		if (n < 0)
-			err(1, "snprintf");
-		if ((size_t)n >= sizeof(path))
+		if (n < 0 || (size_t)n >= sizeof(path))
 			errx(1, "snprintf overflow");
 		if ((in = open(path, O_RDONLY | O_CLOEXEC)) == -1)
 			err(1, "%s", path);
@@ -132,9 +128,7 @@ content_proc_letter_test(void)
 		n = snprintf(path, sizeof(path),
 			     "regress/letters/letter_out_%s",
 			     tests[i].in);
-		if (n < 0)
-			err(1, "snprintf");
-		if ((size_t)n >= sizeof(path))
+		if (n < 0 || (size_t)n >= sizeof(path))
 			errx(1, "snprintf overflow");
 		if ((out = fopen(path, "r")) == NULL)
 			err(1, "%s", path);
@@ -196,9 +190,7 @@ content_proc_reply_test(void)
 
 		n = snprintf(path, sizeof(path),
 			     "regress/letters/reply_in_%s", tests[i].in);
-		if (n < 0)
-			err(1, "snprintf");
-		if ((size_t)n >= sizeof(path))
+		if (n < 0 || (size_t)n >= sizeof(path))
 			errx(1, "snprintf overflow");
 
 		if ((in = open(path, O_RDONLY | O_CLOEXEC)) == -1)
@@ -206,9 +198,7 @@ content_proc_reply_test(void)
 
 		n = snprintf(path, sizeof(path),
 			     "regress/letters/reply_out_%s", tests[i].in);
-		if (n < 0)
-			err(1, "snprintf");
-		if ((size_t)n >= sizeof(path))
+		if (n < 0 || (size_t)n >= sizeof(path))
 			errx(1, "snprintf overflow");
 
 		if ((out = fopen(path, "r")) == NULL)
@@ -280,9 +270,7 @@ content_proc_summary_test(void)
 
 		n = snprintf(path, sizeof(path), "regress/letters/summary_%s",
 			     tests[i].in);
-		if (n < 0)
-			err(1, "snprintf");
-		if ((size_t)n >= sizeof(path))
+		if (n < 0 || (size_t)n >= sizeof(path))
 			errx(1, "snprintf overflow");
 
 		fd = open(path, O_RDONLY | O_CLOEXEC);

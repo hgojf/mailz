@@ -751,11 +751,7 @@ setup_letters(const char *maildir, int root, int cur)
 			int n;
 
 			n = snprintf(name, sizeof(name), "%s:2,", de->d_name);
-			if (n < 0) {
-				warn("snprintf");
-				goto new;
-			}
-			if ((size_t)n >= sizeof(name)) {
+			if (n < 0 || (size_t)n >= sizeof(name)) {
 				warnc(ENAMETOOLONG, "rename %s/new/%s to %s/cur/%s:2,",
 				     maildir, de->d_name, maildir, de->d_name);
 				goto new;
@@ -853,11 +849,7 @@ main(int argc, char *argv[])
 	}
 
 	n = snprintf(tmpdir, sizeof(tmpdir), "%s/.mailz", home);
-	if (n < 0) {
-		warn("snprintf");
-		goto cur;
-	}
-	if ((size_t)n >= sizeof(tmpdir)) {
+	if (n < 0 || (size_t)n >= sizeof(tmpdir)) {
 		warnx("snprintf overflow due to large HOME");
 		goto cur;
 	}
