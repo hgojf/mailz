@@ -41,7 +41,7 @@ struct content_reply_setup {
 struct content_summary {
 	time_t date;
 	char from[255];
-	char subject[245];
+	char subject[80];
 	int have_subject;
 };
 #endif /* ! CONTENT_H */
