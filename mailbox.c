@@ -130,7 +130,6 @@ mailbox_thread_init(struct mailbox *mailbox,
 		thread->subject = letter->subject;
 	}
 	thread->letter = letter;
-
 }
 
 /*
