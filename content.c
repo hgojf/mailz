@@ -800,4 +800,5 @@ main(int argc, char *argv[])
 		free(ignore.headers[i]);
 	free(ignore.headers);
 	close(CNT_PFD);
+	close(null);
 }
