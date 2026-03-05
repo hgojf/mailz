@@ -44,14 +44,12 @@ int
 content_letter_finish(struct content_letter *letter)
 {
 	struct imsg msg;
-	ssize_t n;
 	int rv;
 
 	while (fgetc(letter->fp) != EOF)
 		;
 
-	n = imsg_get_blocking(&letter->pr->msgbuf, &msg);
-	if (n <= 0)
+	if (imsgbuf_get_blocking(&letter->pr->msgbuf, &msg) != 1)
 		return -1;
 
 	rv = imsg_get_type(&msg) == IMSG_CNT_OK ? 0 : -1;
@@ -224,7 +222,6 @@ content_proc_reply(struct content_proc *pr, FILE *out,
 	mbstate_t mbs;
 	struct content_reply_setup setup;
 	FILE *in;
-	ssize_t n;
 	int i, p[2], rv;
 
 	rv = -1;
@@ -288,9 +285,7 @@ content_proc_reply(struct content_proc *pr, FILE *out,
 			goto in;
 	}
 
-	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
-		goto in;
-	if (n == 0)
+	if (imsgbuf_get_blocking(&pr->msgbuf, &msg) != 1)
 		goto in;
 	if (imsg_get_type(&msg) != IMSG_CNT_REPLY)
 		goto msg;
@@ -313,7 +308,6 @@ content_proc_summary(struct content_proc *pr,
 {
 	struct imsg msg;
 	struct tm tm;
-	ssize_t n;
 	int rv;
 
 	rv = -1;
@@ -327,9 +321,7 @@ content_proc_summary(struct content_proc *pr,
 	if (imsgbuf_flush(&pr->msgbuf) == -1)
 		return -1;
 
-	if ((n = imsg_get_blocking(&pr->msgbuf, &msg)) == -1)
-		return -1;
-	if (n == 0)
+	if (imsgbuf_get_blocking(&pr->msgbuf, &msg) != 1)
 		return -1;
 
 	if (imsg_get_type(&msg) != IMSG_CNT_SUMMARY)

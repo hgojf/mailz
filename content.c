@@ -115,14 +115,11 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 {
 	struct imsg msg2;
 	FILE *in, *out;
-	ssize_t n;
 	int rv;
 
 	rv = -1;
 
-	if ((n = imsg_get_blocking(msgbuf, &msg2)) == -1)
-		return -1;
-	if (n == 0)
+	if (imsgbuf_get_blocking(msgbuf, &msg2) != 1)
 		return -1;
 
 	if (imsg_get_type(&msg2) != IMSG_CNT_LETTERPIPE)
@@ -301,7 +298,6 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	FILE *in, *out;
 	char addr_buf[255], *addr, in_reply_to[MSGID_LEN], msgid[MSGID_LEN];
 	char from_addr[255], from_name[65];
-	ssize_t n;
 	time_t date;
 	off_t from, references, reply_to, to;
 	int got_subject, rv;
@@ -316,9 +312,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	if (memchr(setup.addr, '\0', sizeof(setup.addr)) == NULL)
 		goto in;
 
-	if ((n = imsg_get_blocking(msgbuf, &msg2)) == -1)
-		goto in;
-	if (n == 0)
+	if (imsgbuf_get_blocking(msgbuf, &msg2) != 1)
 		goto in;
 
 	if (imsg_get_type(&msg2) != IMSG_CNT_REPLYPIPE)
@@ -760,10 +754,9 @@ main(int argc, char *argv[])
 	imsgbuf_allow_fdpass(&msgbuf);
 	for (;;) {
 		struct imsg msg;
-		ssize_t n;
-		int hv;
+		int hv, n;
 
-		if ((n = imsg_get_blocking(&msgbuf, &msg)) == -1)
+		if ((n = imsgbuf_get_blocking(&msgbuf, &msg)) == -1)
 			goto msgbuf;
 		if (n == 0)
 			break;
