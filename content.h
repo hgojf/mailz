@@ -16,6 +16,7 @@
 
 #ifndef CONTENT_H
 #define CONTENT_H
+
 enum {
 	IMSG_CNT_IGNORE,
 	IMSG_CNT_OK,
@@ -44,4 +45,5 @@ struct content_summary {
 	char subject[80];
 	int have_subject;
 };
+
 #endif /* ! CONTENT_H */

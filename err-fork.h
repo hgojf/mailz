@@ -16,6 +16,8 @@
 
 #ifndef ERR_FORK_H
 #define ERR_FORK_H
+
 __dead void err_fork(int, const char *, ...)
 	__attribute__((__format__(printf, 2, 3)));
+
 #endif /* ! ERR_FORK_H */

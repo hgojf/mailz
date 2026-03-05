@@ -16,6 +16,7 @@
 
 #ifndef ENCODING_H
 #define ENCODING_H
+
 enum encoding_type {
 	#define ENCODING_UNKNOWN -1
 	ENCODING_7BIT,
@@ -43,4 +44,5 @@ struct encoding {
 int encoding_from_name(const char *);
 void encoding_from_type(struct encoding *, enum encoding_type);
 int encoding_getc(struct encoding *, FILE *);
+
 #endif /* ! ENCODING_H */

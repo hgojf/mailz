@@ -16,5 +16,7 @@
 
 #ifndef IMSG_BLOCKING_H
 #define IMSG_BLOCKING_H
+
 ssize_t imsg_get_blocking(struct imsgbuf *, struct imsg *);
+
 #endif /* ! IMSG_BLOCKING_H */
