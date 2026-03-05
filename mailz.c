@@ -147,7 +147,7 @@ commands_run(struct mailbox *mailbox, int cur,
 			}
 		}
 
-		while (!gotnl) {
+		for (;;) {
 			const char *errstr;
 			size_t idx;
 
@@ -215,6 +215,9 @@ static int
 commands_token(FILE *fp, char *buf, size_t buflen, int *gotnl)
 {
 	size_t n;
+
+	if (*gotnl)
+		return 0;
 
 	if (buflen == 0)
 		return -1;

@@ -648,12 +648,10 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 		buf[n++] = ch;
 	}
 
-	for (;;) {
-		ch = header_lex(fp, &lex);
-		if (ch == HEADER_EOF)
-			break;
+	if ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
 		if (ch < 0)
 			return ch;
+		return HEADER_INVALID;
 	}
 
 	buf[n] = '\0';
