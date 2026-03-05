@@ -20,12 +20,12 @@
 
 #include "imsg-blocking.h"
 
-ssize_t
-imsg_get_blocking(struct imsgbuf *msgbuf, struct imsg *msg)
+int
+imsgbuf_get_blocking(struct imsgbuf *msgbuf, struct imsg *msg)
 {
-	ssize_t n;
+	int n;
 
-	while ((n = imsg_get(msgbuf, msg)) == 0) {
+	while ((n = imsgbuf_get(msgbuf, msg)) == 0) {
 		if ((n = imsgbuf_read(msgbuf)) == -1)
 			return -1;
 
