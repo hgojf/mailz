@@ -17,6 +17,7 @@
 #include <stdio.h>
 
 #include "charset.h"
+#include "command.h"
 #include "content-proc.h"
 #include "encoding.h"
 #include "header.h"
@@ -28,6 +29,7 @@ int
 main(void)
 {
 	charset_getc_test();
+	command_test();
 	content_proc_letter_error_test();
 	content_proc_letter_test();
 	content_proc_reply_test();

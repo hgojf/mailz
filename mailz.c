@@ -31,6 +31,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "command.h"
 #include "conf.h"
 #include "content-proc.h"
 #include "err-fork.h"
@@ -53,7 +54,6 @@ struct command_args {
 
 static void commands_run(struct mailbox *, int, const char *,
 			 const char *, struct mailz_ignore *, const char *);
-static int commands_token(FILE *, char *, size_t, int *);
 static const struct command *commands_search(const char *);
 static int command_delete(struct letter *, struct command_args *);
 static int command_flag(struct letter *, struct command_args *, int,
@@ -94,6 +94,7 @@ commands_run(struct mailbox *mailbox, int cur,
 	     struct mailz_ignore *ignore, const char *maildir)
 {
 	struct command_args args;
+	struct command_lexer lex;
 	struct letter *letter;
 
 	args.addr = addr;
@@ -105,147 +106,104 @@ commands_run(struct mailbox *mailbox, int cur,
 	args.maildir = maildir;
 	args.tmpdir = tmpdir;
 
+	command_init(&lex, stdin);
 	letter = NULL;
 	for (;;) {
 		const struct command *cmd;
-		char buf[300];
-		int ch, error, gotnl;
-
-		if (feof(stdin))
-			break;
+		char buf[8];
+		int any, error;
 
 		printf("> ");
 		fflush(stdout);
 
-		gotnl = 0;
-		error = commands_token(stdin, buf, sizeof(buf), &gotnl);
-		if (error == -1) {
-			warnx("argument too long");
-			goto bad;
-		}
-		if (error == 0) /* empty line */
-			continue;
-
-		if (strlen(buf) == 0 && feof(stdin))
+		error = command_name(&lex, buf, sizeof(buf));
+		if (error == COMMAND_EOF)
 			break;
-		if (strlen(buf) == 0 && gotnl)
+		if (error != COMMAND_OK) {
+			switch (error) {
+			case COMMAND_EMPTY:
+				break;
+			case COMMAND_LONG:
+				warnx("command name too long");
+				break;
+			default:
+				warnx("invalid command name");
+				break;
+			}
+
 			continue;
+		}
 
 		if ((cmd = commands_search(buf)) == NULL) {
 			warnx("unknown command");
-			goto bad;
+			continue;
 		}
 
-		if (gotnl) {
-			if (letter == NULL) {
-				warnx("no current letter");
-				goto bad;
-			}
-			if (cmd->fn(letter, &args) == -1) {
-				warnx("command '%s' failed", cmd->ident);
-				goto bad;
-			}
-		}
-
+		any = 0;
 		for (;;) {
-			const char *errstr;
-			size_t idx;
+			struct command_letter cmd_letter;
 
-			error = commands_token(stdin, buf, sizeof(buf), &gotnl);
-			if (error == -1) {
-				warnx("argument too long");
-				goto bad;
-			}
-			if (error == 0)
+			error = command_letter(&lex, &cmd_letter);
+			if (error == COMMAND_EOF)
 				break;
-
-			if (!strcmp(buf, "t")) {
-				struct mailbox_thread thread;
-				struct letter *lp;
-
-				error = commands_token(stdin, buf, sizeof(buf), &gotnl);
-				if (error == -1) {
-					warnx("argument too long");
-					goto bad;
-				}
-				if (error == 0) {
+			any = 1;
+			if (error != COMMAND_OK) {
+				switch (error) {
+				case COMMAND_INVALID:
+					warnx("letter number invalid");
+					break;
+				case COMMAND_LONG:
+					warnx("letter number too long");
+					break;
+				case COMMAND_THREAD_EOF:
 					warnx("must provide a message number after 't'");
-					goto bad;
+					break;
 				}
-				idx = strtonum(buf, 1, mailbox->nletter, &errstr);
-				if (errstr != NULL) {
-					warnx("message number was %s", errstr);
-					goto bad;
-				}
-				letter = &mailbox->letters[idx - 1];
+
+				break;
+			}
+
+			/* These are numbered from 1, so no = */
+			if (cmd_letter.num > mailbox->nletter) {
+				warnx("letter number too large");
+				break;
+			}
+			letter = &mailbox->letters[cmd_letter.num - 1];
+
+			if (cmd_letter.thread) {
+				struct letter *lp;
+				struct mailbox_thread thread;
 
 				mailbox_thread_init(mailbox, &thread, letter);
 				while ((lp = mailbox_thread_next(mailbox, &thread)) != NULL) {
 					if (cmd->fn(lp, &args) == -1) {
 						warnx("command '%s' failed", cmd->ident);
-						goto bad;
+						goto next;
 					}
 				}
-				continue;
 			}
-
-			idx = strtonum(buf, 1, mailbox->nletter, &errstr);
-			if (errstr != NULL) {
-				warnx("message number was %s", errstr);
-				goto bad;
-			}
-
-			letter = &mailbox->letters[idx - 1];
-			if (cmd->fn(&mailbox->letters[idx - 1], &args) == -1) {
-				warnx("command '%s' failed", cmd->ident);
-				goto bad;
+			else {
+				if (cmd->fn(letter, &args) == -1) {
+					warnx("command '%s' failed", cmd->ident);
+					break;
+				}
 			}
 		}
 
-		bad:
-		if (!gotnl)
-			while ((ch = fgetc(stdin)) != EOF && ch != '\n')
-				;
+		if (!any) {
+			if (letter == NULL) {
+				warnx("no current letter");
+				continue;
+			}
+			if (cmd->fn(letter, &args) == -1)
+				warnx("command '%s' failed", cmd->ident);
+		}
+
+		next:
+		continue;
 	}
 
 	printf("\n");
-}
-
-static int
-commands_token(FILE *fp, char *buf, size_t buflen, int *gotnl)
-{
-	size_t n;
-
-	if (*gotnl)
-		return 0;
-
-	if (buflen == 0)
-		return -1;
-
-	n = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = fgetc(fp)) == EOF || ch == '\n') {
-			*gotnl = 1;
-			if (n == 0)
-				return 0;
-			break;
-		}
-
-		if (ch == ' ' || ch == '\t') {
-			if (n == 0)
-				continue;
-			break;
-		}
-
-		if (n == buflen - 1)
-			return -1;
-		buf[n++] = ch;
-	}
-
-	buf[n] = '\0';
-	return 1;
 }
 
 static const struct command *
