@@ -502,9 +502,6 @@ header_encoding(FILE *fp, FILE *echo, char *buf, size_t bufsz)
 	size_t n;
 	int ch;
 
-	if (bufsz == 0)
-		return HEADER_INVALID;
-
 	lex.cstate = 0;
 	lex.echo = echo;
 	lex.qstate = 0;
@@ -514,11 +511,13 @@ header_encoding(FILE *fp, FILE *echo, char *buf, size_t bufsz)
 	while ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
 		if (ch < 0)
 			return ch;
-		if (n == bufsz - 1)
+		if (n == bufsz)
 			return HEADER_INVALID;
 		buf[n++] = ch;
 	}
 
+	if (n == bufsz)
+		return HEADER_INVALID;
 	buf[n] = '\0';
 	return HEADER_OK;
 }
@@ -615,9 +614,6 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 	size_t n;
 	int ch;
 
-	if (bufsz == 0)
-		return HEADER_INVALID;
-
 	lex.cstate = 0;
 	lex.echo = NULL;
 	lex.qstate = 0;
@@ -643,7 +639,7 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 
 		if (!isprint(ch) && !isspace(ch))
 			return HEADER_INVALID;
-		if (n == bufsz - 1)
+		if (n == bufsz)
 			return HEADER_INVALID;
 		buf[n++] = ch;
 	}
@@ -654,6 +650,8 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 		return HEADER_INVALID;
 	}
 
+	if (n == bufsz)
+		return HEADER_INVALID;
 	buf[n] = '\0';
 	return HEADER_OK;
 }
@@ -662,9 +660,6 @@ int
 header_name(FILE *fp, char *buf, size_t bufsz)
 {
 	size_t n;
-
-	if (bufsz == 0)
-		return HEADER_INVALID;
 
 	n = 0;
 	for (;;) {
@@ -680,11 +675,13 @@ header_name(FILE *fp, char *buf, size_t bufsz)
 		if (ch < 33 || ch > 126)
 			return HEADER_INVALID;
 
-		if (n == bufsz - 1)
+		if (n == bufsz)
 			return HEADER_INVALID;
 		buf[n++] = ch;
 	}
 
+	if (n == bufsz)
+		return HEADER_INVALID;
 	buf[n] = '\0';
 	return HEADER_OK;
 }
@@ -793,8 +790,6 @@ header_token(FILE *fp, struct header_lex *lex, char *buf,
 	if (*eof)
 		return HEADER_EOF;
 
-	if (bufsz == 0)
-		return HEADER_INVALID;
 	lex->skipws = 1;
 
 	n = 0;
@@ -813,11 +808,13 @@ header_token(FILE *fp, struct header_lex *lex, char *buf,
 		if (ch == ' ' || ch == '\t')
 			break;
 
-		if (n == bufsz -1)
+		if (n == bufsz)
 			return HEADER_INVALID;
 		buf[n++] = ch;
 	}
 
+	if (n == bufsz)
+		return HEADER_INVALID;
 	buf[n] = '\0';
 	return HEADER_OK;
 }
