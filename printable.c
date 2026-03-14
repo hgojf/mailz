@@ -30,7 +30,7 @@ string_printable(const char *s, size_t sz)
 		ch = (unsigned char)s[i];
 		if (ch == '\0')
 			return 1;
-		if (!isprint(ch) && !isspace(ch))
+		if (!isprint(ch) && ch != ' ' && ch != '\t')
 			return 0;
 	}
 

@@ -35,6 +35,12 @@ string_printable_test(void)
 		test("hi", 1),
 		test("hi\xFF", 0),
 		{ "hi", 2, 0 },
+
+		test("hi\f", 0),
+		test("hi\n", 0),
+		test("hi\r", 0),
+		test("hi\v", 0),
+
 		#undef test
 	};
 
