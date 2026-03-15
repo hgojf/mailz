@@ -35,6 +35,7 @@ struct encoding {
 		} b64;
 	} v;
 
+	off_t left;
 	enum encoding_type type;
 };
 
