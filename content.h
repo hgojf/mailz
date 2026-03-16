@@ -18,11 +18,13 @@
 #define CONTENT_H
 
 enum {
+	IMSG_CNT_CHOICE,
 	IMSG_CNT_IGNORE,
 	IMSG_CNT_OK,
 	IMSG_CNT_RETAIN,
 	IMSG_CNT_LETTER,
 	IMSG_CNT_LETTERPIPE,
+	IMSG_CNT_PART,
 	IMSG_CNT_REPLY,
 	IMSG_CNT_REPLYPIPE,
 	IMSG_CNT_SUMMARY
@@ -32,6 +34,12 @@ enum {
 
 struct content_header {
 	char name[996];
+};
+
+struct content_part {
+	char name[64];
+	char type[64];
+	char subtype[64];
 };
 
 struct content_reply_setup {

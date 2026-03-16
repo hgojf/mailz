@@ -1,6 +1,14 @@
 #ifndef HEADER_H
 #define HEADER_H
 
+/*
+ * Email lines should be at max 998 bytes, excluding the CRLF.
+ * One byte is used for the ':', the rest are available for header
+ * identifiers.
+ * This length includes the terminating NUL byte.
+ */
+#define HEADER_NAME_LEN 998
+
 #define HEADER_OK 0
 #define HEADER_EOF -1
 #define HEADER_INVALID -2
@@ -12,6 +20,13 @@ struct header_address {
 	char *name;
 	size_t addrsz;
 	size_t namesz;
+};
+
+struct content_disposition_var {
+	char *var;
+	char *val;
+	size_t varsz;
+	size_t valsz;
 };
 
 struct content_type {
@@ -40,6 +55,9 @@ struct header_lex {
 };
 
 int header_address(FILE *, struct header_address *, int *);
+int header_content_disposition(FILE *, char *, size_t, int *);
+int header_content_disposition_var(FILE *, struct content_disposition_var *,
+				   int *);
 int header_content_type(FILE *, FILE *, struct content_type *, int *);
 int header_content_type_var(FILE *, FILE *, struct content_type_var *, int *);
 int header_copy(FILE *, FILE *);

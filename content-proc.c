@@ -34,6 +34,17 @@
 #include "imsg-blocking.h"
 #include "printable.h"
 
+int
+content_letter_choose(struct content_letter *letter, size_t choice)
+{
+	if (imsg_compose(&letter->pr->msgbuf, IMSG_CNT_CHOICE, 0, -1, -1,
+			 &choice, sizeof(choice)) == -1)
+		return -1;
+	if (imsgbuf_flush(&letter->pr->msgbuf) == -1)
+		return -1;
+	return 0;
+}
+
 void
 content_letter_close(struct content_letter *letter)
 {
@@ -73,6 +84,9 @@ content_letter_getc(struct content_letter *letter, char buf[static 4])
 				return 0;
 			return -1;
 		}
+
+		if (ch <= 0x7F && !isprint(ch) && !isspace(ch))
+			return -1;
 
 		c = ch;
 		switch (mbrtowc(NULL, &c, 1, &mbs)) {
@@ -130,6 +144,39 @@ content_letter_init(struct content_proc *pr,
 	if (fd != -1)
 		close(fd);
 	return -1;
+}
+
+int
+content_letter_part(struct content_letter *letter, struct content_part *pr)
+{
+	struct imsg msg;
+	int ret;
+
+	ret = -1;
+
+	if (imsgbuf_get_blocking(&letter->pr->msgbuf, &msg) != 1)
+		return -1;
+
+	if (imsg_get_type(&msg) != IMSG_CNT_PART)
+		goto msg;
+	if (imsg_get_data(&msg, pr, sizeof(*pr)) == -1) {
+		if (imsg_get_len(&msg) == 0)
+			ret = 0; /* EOF */
+		goto msg;
+	}
+
+	if (!string_printable(pr->type, sizeof(pr->type)))
+		goto msg;
+	if (!string_printable(pr->subtype, sizeof(pr->subtype)))
+		goto msg;
+
+	if (!string_printable(pr->name, sizeof(pr->name)))
+		goto msg;
+
+	ret = 1;
+	msg:
+	imsg_free(&msg);
+	return ret;
 }
 
 int

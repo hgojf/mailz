@@ -23,11 +23,15 @@
 #include "header.h"
 #include "mailbox.h"
 #include "maildir.h"
+#include "multipart.h"
 #include "printable.h"
 
 int
 main(void)
 {
+	multipart_test();
+	return 0;
+
 	charset_getc_test();
 	command_test();
 	content_proc_letter_error_test();
@@ -52,6 +56,7 @@ main(void)
 	maildir_get_flag_test();
 	maildir_set_flag_test();
 	maildir_unset_flag_test();
+	multipart_test();
 	string_printable_test();
 
 	puts("Ok.");

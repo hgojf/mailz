@@ -66,6 +66,7 @@ static int command_respond(struct letter *, struct command_args *);
 static int command_save(struct letter *, struct command_args *);
 static int command_thread(struct letter *, struct command_args *);
 static int command_unread(struct letter *, struct command_args *);
+static int content_letter_ex_choose(struct content_letter *);
 static int content_proc_ex_ignore(struct content_proc *,
 				  const struct mailz_ignore *);
 static int letter_print(size_t, struct letter *);
@@ -299,6 +300,8 @@ command_more(struct letter *letter, struct command_args *args)
 		goto pr;
 	if (content_letter_init(&pr, &lr, fd) == -1)
 		goto pr;
+	if (content_letter_ex_choose(&lr) == -1)
+		goto lr;
 
 	if (pipe2(p, O_CLOEXEC) == -1)
 		goto lr;
@@ -479,6 +482,8 @@ command_save(struct letter *letter, struct command_args *args)
 		goto pr;
 	if (content_letter_init(&pr, &lr, lfd) == -1)
 		goto pr;
+	if (content_letter_ex_choose(&lr) == -1)
+		goto lr;
 
 	n = snprintf(path, sizeof(path), "%s/save.XXXXXX", args->tmpdir);
 	if (n < 0 || (size_t)n >= sizeof(path))
@@ -549,6 +554,77 @@ static int
 command_unread(struct letter *letter, struct command_args *args)
 {
 	return command_flag(letter, args, 'S', 0);
+}
+
+static int
+content_letter_ex_choose(struct content_letter *letter)
+{
+	/*
+	 * XXX: This wont work with multiple messages, because there will
+	 * XXX: still be message numbers in the stdin buffer that we will
+	 * XXX: end up reading instead of the users choice.
+	 * XXX: The command parsing code needs to be changed to read all
+	 * XXX: the message numbers in one go.
+	 */
+
+	for (;;) {
+		size_t choice, nl, npart;
+		char buf[21];
+		const char *errstr;
+
+		npart = 0;
+		for (;;) {
+			struct content_part part;
+			int error;
+
+			if ((error = content_letter_part(letter, &part)) == -1)
+				return -1;
+			if (error == 0)
+				break;
+			if (npart == SIZE_MAX)
+				return -1;
+			npart++;
+
+			printf("\t%zu Content-Type: %s/%s", npart, part.type, part.subtype);
+			if (strlen(part.name) != 0)
+				printf(" name=%s", part.name);
+			printf("\n");
+		}
+
+		if (npart == 0)
+			break;
+
+		printf("This is a multipart message, select the part: ");
+		fflush(stdout);
+		if (fgets(buf, sizeof(buf), stdin) == NULL) {
+			warnx("choice was invalid");
+			return -1;
+		}
+		nl = strcspn(buf, "\n");
+		if (buf[nl] != '\n') {
+			int any, ch;
+
+			any = 0;
+			while ((ch = fgetc(stdin)) != EOF && ch != '\n')
+				any = 1;
+			if (!any) {
+				warnx("choice was invalid");
+				return -1;
+			}
+		}
+		buf[nl] = '\0';
+
+		choice = strtonum(buf, 1, npart, &errstr);
+		if (errstr != NULL) {
+			warnx("choice was %s", errstr);
+			return -1;
+		}
+
+		if (content_letter_choose(letter, choice - 1) == -1)
+			return -1;
+	}
+
+	return 0;
 }
 
 static int

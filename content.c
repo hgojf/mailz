@@ -36,15 +36,8 @@
 #include "encoding.h"
 #include "header.h"
 #include "imsg-blocking.h"
+#include "multipart.h"
 #include "pathnames.h"
-
-/*
- * Email lines should be at max 998 bytes, excluding the CRLF.
- * One byte is used for the ':', the rest are available for header
- * identifiers.
- * This length includes the terminating NUL byte.
- */
-#define HEADER_NAME_LEN 998
 
 /*
  * Email lines should be at max 998 bytes, excluding the CRLF.
@@ -65,15 +58,15 @@ struct ignore {
 
 static int handle_ignore(struct imsg *, struct ignore *, int);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
-static int handle_letter_under(FILE *, FILE *, struct ignore *, int);
+static int handle_letter_under(struct imsgbuf *, FILE *, FILE *, struct ignore *, int);
 static int handle_reply(struct imsgbuf *, struct imsg *);
-static int handle_reply_body(FILE *, FILE *, time_t, const char *,
-			     const char *);
+static int handle_reply_body(struct imsgbuf *, FILE *, FILE *, time_t,
+			     const char *, const char *);
 static int handle_reply_references(FILE *, FILE *, const char *,
 				   const char *, off_t);
 static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
-static int ignore_header(const char *, struct ignore *);
+static int ignore_header(const char *, void *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
 static void usage(void);
 
@@ -130,7 +123,7 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 	if ((in = imsg_get_fp(msg, "r")) == NULL)
 		goto out;
 
-	if (handle_letter_under(in, out, ignore, 0) == -1)
+	if (handle_letter_under(msgbuf, in, out, ignore, 0) == -1)
 		goto in;
 
 	if (imsg_compose(msgbuf, IMSG_CNT_OK, 0, -1, -1, NULL, 0) == -1)
@@ -148,123 +141,77 @@ handle_letter(struct imsgbuf *msgbuf, struct imsg *msg,
 }
 
 static int
-handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
-		    int reply)
+handle_letter_under(struct imsgbuf *msgbuf, FILE *in, FILE *out,
+		    struct ignore *ignore, int reply)
 {
-	struct charset charset;
-	struct encoding encoding;
-	int got_content_type, got_encoding;
+	struct multipart mp;
+	int ret;
 
-	charset_from_type(&charset, CHARSET_ASCII);
-	encoding_from_type(&encoding, ENCODING_7BIT);
-	got_content_type = 0;
-	got_encoding = 0;
+	ret = -1;
+
+	if (multipart_init(&mp, in, out,
+			   reply ? NULL : ignore_header, ignore) == -1)
+		return -1;
+
 	for (;;) {
-		char buf[HEADER_NAME_LEN];
-		FILE *echo;
-		int hv;
+		struct imsg msg;
+		size_t choice;
 
-		if ((hv = header_name(in, buf, sizeof(buf))) == HEADER_EOF)
+		for (;;) {
+			struct content_part cpart;
+			struct part part;
+			int error;
+
+			if ((error = multipart_next(&mp, &part)) == -1)
+				goto mp;
+			if (error == 0)
+				break;
+
+			memset(&cpart, 0, sizeof(cpart));
+			strlcpy(cpart.type, part.type, sizeof(cpart.type));
+			strlcpy(cpart.subtype, part.subtype, sizeof(cpart.subtype));
+			strlcpy(cpart.name, part.name, sizeof(cpart.name));
+			if (imsg_compose(msgbuf, IMSG_CNT_PART, 0, -1, -1,
+					 &cpart, sizeof(cpart)) == -1)
+				goto mp;
+		}
+
+		if (imsg_compose(msgbuf, IMSG_CNT_PART, 0, -1, -1, NULL, 0) == -1)
+			goto mp;
+		if (imsgbuf_flush(msgbuf) == -1)
+			goto mp;
+
+		if (multipart_npart(&mp) == 0)
 			break;
-		if (hv != HEADER_OK)
-			return -1;
 
-		if (reply || (ignore != NULL && ignore_header(buf, ignore)))
-			echo = NULL;
-		else
-			echo = out;
-
-		if (echo) {
-			if (fprintf(out, "%s:", buf) < 0)
-				return -1;
+		if (imsgbuf_get_blocking(msgbuf, &msg) != 1)
+			goto mp;
+		if (imsg_get_type(&msg) != IMSG_CNT_CHOICE
+		    || imsg_get_data(&msg, &choice, sizeof(choice)) == -1) {
+			imsg_free(&msg);
+			goto mp;
 		}
+		imsg_free(&msg);
 
-		if (!strcasecmp(buf, "content-transfer-encoding")) {
-			char buf[17];
-			int enc;
-
-			if (got_encoding)
-				return -1;
-			hv = header_encoding(in, echo, buf,
-						  sizeof(buf));
-			if (hv < 0)
-				return -1;
-			if ((enc = encoding_from_name(buf)) == ENCODING_UNKNOWN)
-				return -1;
-			encoding_from_type(&encoding, enc);
-
-			got_encoding = 1;
-		}
-		else if (!strcasecmp(buf, "content-type")) {
-			struct content_type ct;
-			struct content_type_var vt;
-			char type[5], var[8], val[11];
-			int eof;
-
-			if (got_content_type)
-				return -1;
-
-			ct.type = type;
-			ct.typesz = sizeof(type);
-			ct.subtype = NULL;
-			ct.subtypesz = 0;
-
-			eof = 0;
-			hv = header_content_type(in, echo, &ct, &eof);
-			if (hv < 0)
-				return -1;
-
-			if (ct.type_trunc || strcasecmp(type, "text") != 0) {
-				charset_from_type(&charset, CHARSET_OTHER);
-				encoding_from_type(&encoding, ENCODING_BINARY);
-			}
-
-			vt.var = var;
-			vt.varsz = sizeof(var);
-			vt.val = val;
-			vt.valsz = sizeof(val);
-			for (;;) {
-				hv = header_content_type_var(in, echo, &vt, &eof);
-				if (hv == HEADER_EOF)
-					break;
-				if (hv < 0)
-					return -1;
-
-				if (!vt.var_trunc && !strcasecmp(var, "charset")) {
-					int ctype;
-
-					if (!vt.val_trunc
-					    && (ctype = charset_from_name(val)) != CHARSET_UNKNOWN)
-						charset_from_type(&charset, ctype);
-					else
-						charset_from_type(&charset, CHARSET_OTHER);
-				}
-			}
-
-			got_content_type = 1;
-		}
-		else {
-			if (header_skip(in, echo) < 0)
-				return -1;
-		}
+		if (multipart_choose(&mp, choice) == -1)
+			goto mp;
 	}
 
 	if (reply) {
 		if (fprintf(out, "> ") < 0)
-			return -1;
+			goto mp;
 	}
 	else {
 		if (fputc('\n', out) == EOF)
-			return -1;
+			goto mp;
 	}
 
 	for (;;) {
 		char buf[4];
 		int n;
 
-		if ((n = charset_getc(&charset, &encoding, in,
-				      buf)) == -1)
-			return -1;
+		if ((n = multipart_getc(&mp, buf)) == -1)
+			goto mp;
 		if (n == 0)
 			break;
 
@@ -280,14 +227,17 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 		}
 
 		if (fwrite(buf, n, 1, out) != 1)
-			return -1;
+			goto mp;
 
 		if (reply && n == 1 && buf[0] == '\n')
 			if (fprintf(out, "> ") < 0)
-				return -1;
+				goto mp;
 	}
 
-	return 0;
+	ret = 0;
+	mp:
+	multipart_free(&mp);
+	return ret;
 }
 
 static int
@@ -457,7 +407,8 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	if (fprintf(out, "Content-Type: text/plain; charset=utf-8\n") < 0)
 		goto out;
 
-	if (handle_reply_body(in, out, date, from_addr, from_name) == -1)
+	if (handle_reply_body(msgbuf, in, out, date, from_addr,
+			      from_name) == -1)
 		goto out;
 
 	if (imsg_compose(msgbuf, IMSG_CNT_REPLY, 0, -1, -1,
@@ -477,8 +428,8 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 }
 
 static int
-handle_reply_body(FILE *in, FILE *out, time_t date, const char *addr,
-		  const char *name)
+handle_reply_body(struct imsgbuf *msgbuf, FILE *in, FILE *out, time_t date,
+		  const char *addr, const char *name)
 {
 	char datebuf[39];
 	struct tm tm;
@@ -506,7 +457,7 @@ handle_reply_body(FILE *in, FILE *out, time_t date, const char *addr,
 
 	if (fseeko(in, 0, SEEK_SET) == -1)
 		return -1;
-	return handle_letter_under(in, out, NULL, 1);
+	return handle_letter_under(msgbuf, in, out, NULL, 1);
 }
 
 static int
@@ -669,10 +620,13 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 }
 
 static int
-ignore_header(const char *name, struct ignore *ignore)
+ignore_header(const char *name, void *cookie)
 {
+	const struct ignore *ignore;
 	size_t i;
 	int rv;
+
+	ignore = cookie;
 
 	if (ignore->type == IGNORE_RETAIN)
 		rv = 0;
@@ -739,9 +693,11 @@ main(int argc, char *argv[])
 
 	if ((null = open(PATH_DEV_NULL, O_RDWR)) == -1)
 		err(1, "%s", PATH_DEV_NULL);
+	#if 0
 	for (i = 0; i < 3; i++)
 		if (dup2(null, i) == -1)
 			err(1, "dup2");
+	#endif
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		errx(1, "setlocale");
