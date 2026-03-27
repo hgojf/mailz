@@ -644,10 +644,11 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 		buf[n++] = ch;
 	}
 
-	if ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
+	while ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
 		if (ch < 0)
 			return ch;
-		return HEADER_INVALID;
+		if (ch != ' ' && ch != '\t')
+			return HEADER_INVALID;
 	}
 
 	if (n == bufsz)

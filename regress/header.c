@@ -479,6 +479,8 @@ header_message_id_test(void)
 		{ "<uniq>", "uniq", 10, HEADER_OK },
 		{ "<uniq>", "uniq", 5, HEADER_OK },
 
+		{ "<uniq>   ", "uniq", 10, HEADER_OK },
+
 		{ "<hello\xFF>", NULL, 10, HEADER_INVALID },
 		{ "hello<uniq", NULL, 10, HEADER_INVALID },
 		{ "<uniq", NULL, 10, HEADER_INVALID },
