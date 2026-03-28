@@ -172,6 +172,7 @@ content_proc_reply_test(void)
 	} tests[] = {
 		{ "1", "frank@bogus.invalid", 0, 0 },
 		{ "2", "frank@bogus.invalid", 0, 0 },
+		{ "3", "frank@bogus.invalid", 0, 0 },
 	};
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)

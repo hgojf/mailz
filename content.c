@@ -69,8 +69,7 @@ static int handle_letter_under(FILE *, FILE *, struct ignore *, int);
 static int handle_reply(struct imsgbuf *, struct imsg *);
 static int handle_reply_body(FILE *, FILE *, time_t, const char *,
 			     const char *);
-static int handle_reply_references(FILE *, FILE *, const char *,
-				   const char *, off_t);
+static int handle_reply_references(FILE *, FILE *, const char *, off_t, off_t);
 static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static int ignore_header(const char *, struct ignore *);
@@ -296,10 +295,10 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	struct content_reply_setup setup;
 	struct imsg msg2;
 	FILE *in, *out;
-	char addr_buf[255], *addr, in_reply_to[MSGID_LEN], msgid[MSGID_LEN];
+	char addr_buf[255], *addr, msgid[MSGID_LEN];
 	char from_addr[255], from_name[65];
 	time_t date;
-	off_t from, references, reply_to, to;
+	off_t from, in_reply_to, references, reply_to, to;
 	int got_subject, rv;
 
 	rv = -1;
@@ -337,7 +336,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	date = -1;
 	from = -1;
 	got_subject = 0;
-	in_reply_to[0] = '\0';
+	in_reply_to = -1;
 	msgid[0] = '\0';
 	references = -1;
 	reply_to = -1;
@@ -386,10 +385,11 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "in-reply-to")) {
-			if (strlen(in_reply_to) != 0)
+			if (in_reply_to != -1)
 				goto out;
-			if (header_message_id(in, in_reply_to,
-					      sizeof(in_reply_to)) < 0)
+			if ((in_reply_to = ftello(in)) == -1)
+				goto out;
+			if (header_skip(in, NULL) < 0)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "message-id")) {
@@ -511,7 +511,7 @@ handle_reply_body(FILE *in, FILE *out, time_t date, const char *addr,
 
 static int
 handle_reply_references(FILE *in, FILE *out, const char *msgid,
-			const char *in_reply_to, off_t refs)
+			off_t in_reply_to, off_t refs)
 {
 	int putref;
 
@@ -530,8 +530,12 @@ handle_reply_references(FILE *in, FILE *out, const char *msgid,
 			return -1;
 		putref = 1;
 	}
-	else if (strlen(in_reply_to) != 0) {
-		if (fprintf(out, "References: <%s>", in_reply_to) < 0)
+	else if (in_reply_to != -1) {
+		if (fprintf(out, "References:") < 0)
+			return -1;
+		if (fseeko(in, in_reply_to, SEEK_SET) == -1)
+			return -1;
+		if (header_copy(in, out) < 0)
 			return -1;
 		putref = 1;
 	}
