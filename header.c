@@ -265,7 +265,7 @@ header_copy(FILE *in, FILE *out)
 int
 header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
 {
-	char addr[255], name[65];
+	char addr[255], name[256];
 	struct header_address from;
 	int eof, n;
 

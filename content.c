@@ -296,7 +296,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	struct imsg msg2;
 	FILE *in, *out;
 	char addr_buf[255], *addr, msgid[MSGID_LEN];
-	char from_addr[255], from_name[65];
+	char from_addr[255], from_name[256];
 	time_t date;
 	off_t from, in_reply_to, references, reply_to, to;
 	int got_subject, rv;
