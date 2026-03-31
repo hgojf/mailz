@@ -753,7 +753,7 @@ main(int argc, char *argv[])
 		err(1, "pledge");
 
 	memset(&ignore, 0, sizeof(ignore));
-	if (imsgbuf_init(&msgbuf, CNT_PFD) == -1)
+	if (imsgbuf_init(&msgbuf, CONTENT_PARENT_SOCKET) == -1)
 		err(1, "imsgbuf_init");
 	imsgbuf_allow_fdpass(&msgbuf);
 	for (;;) {
@@ -796,6 +796,6 @@ main(int argc, char *argv[])
 	for (i = 0; i < ignore.nheader; i++)
 		free(ignore.headers[i]);
 	free(ignore.headers);
-	close(CNT_PFD);
+	close(CONTENT_PARENT_SOCKET);
 	close(null);
 }

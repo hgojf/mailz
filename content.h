@@ -28,7 +28,7 @@ enum {
 	IMSG_CNT_SUMMARY
 };
 
-#define CNT_PFD 3
+#define CONTENT_PARENT_SOCKET 3
 
 struct content_header {
 	char name[996];

@@ -180,7 +180,7 @@ content_proc_init(struct content_proc *pr, const char *exe)
 	case -1:
 		goto msgbuf;
 	case 0:
-		if (dup2(sv[1], CNT_PFD) == -1)
+		if (dup2(sv[1], CONTENT_PARENT_SOCKET) == -1)
 			err_fork(1, "dup2");
 		execl(exe, "mailz-content", "-r", NULL);
 		err_fork(1, "%s", exe);
