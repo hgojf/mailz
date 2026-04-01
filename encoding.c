@@ -24,9 +24,9 @@
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-static int encoding_b64(struct encoding_b64 *, FILE *);
-static int encoding_qp(FILE *);
-static int encoding_raw(FILE *, int, int);
+static int encoding_getc_base64(struct encoding_base64 *, FILE *);
+static int encoding_getc_qp(FILE *);
+static int encoding_getc_raw(FILE *, int, int);
 static int hexdigcaps(int);
 
 static const struct {
@@ -40,15 +40,64 @@ static const struct {
 	{ "quoted-printable",	ENCODING_QP },
 };
 
+int
+encoding_from_name(const char *name)
+{
+	size_t i;
+
+	for (i = 0; i < nitems(encodings); i++) {
+		if (!strcasecmp(name, encodings[i].ident))
+			return i;
+	}
+
+	return ENCODING_UNKNOWN;
+}
+
+void
+encoding_from_type(struct encoding *ep, enum encoding_type type)
+{
+	switch (type) {
+	case ENCODING_7BIT:
+	case ENCODING_8BIT:
+	case ENCODING_BINARY:
+	case ENCODING_QP:
+		break;
+	case ENCODING_BASE64:
+		memset(&ep->state.base64, 0, sizeof(ep->state.base64));
+		break;
+	}
+
+	ep->type = type;
+}
+
+int
+encoding_getc(struct encoding *ep, FILE *fp)
+{
+	switch (ep->type) {
+	case ENCODING_7BIT:
+		return encoding_getc_raw(fp, 0, 0);
+	case ENCODING_8BIT:
+		return encoding_getc_raw(fp, 1, 0);
+	case ENCODING_BASE64:
+		return encoding_getc_base64(&ep->state.base64, fp);
+	case ENCODING_BINARY:
+		return encoding_getc_raw(fp, 1, 1);
+	case ENCODING_QP:
+		return encoding_getc_qp(fp);
+	}
+
+	return ENCODING_ERR;
+}
+
 static int
-encoding_b64(struct encoding_b64 *b64, FILE *fp)
+encoding_getc_base64(struct encoding_base64 *base64, FILE *fp)
 {
 	char buf[5];
 	unsigned char obuf[3];
 	int i, n;
 
-	if (b64->start != b64->end)
-		return b64->buf[b64->start++];
+	if (base64->start != base64->end)
+		return base64->buf[base64->start++];
 
 	for (i = 0; i < 4;) {
 		int ch;
@@ -72,63 +121,14 @@ encoding_b64(struct encoding_b64 *b64, FILE *fp)
 	if ((n = b64_pton(buf, obuf, sizeof(obuf))) == -1)
 		return ENCODING_ERR;
 
-	memcpy(b64->buf, &obuf[1], n - 1);
-	b64->start = 0;
-	b64->end = n - 1;
+	memcpy(base64->buf, &obuf[1], n - 1);
+	base64->start = 0;
+	base64->end = n - 1;
 	return obuf[0];
 }
 
-int
-encoding_from_name(const char *name)
-{
-	size_t i;
-
-	for (i = 0; i < nitems(encodings); i++) {
-		if (!strcasecmp(name, encodings[i].ident))
-			return i;
-	}
-
-	return ENCODING_UNKNOWN;
-}
-
-void
-encoding_from_type(struct encoding *e, enum encoding_type type)
-{
-	switch (type) {
-	case ENCODING_7BIT:
-	case ENCODING_8BIT:
-	case ENCODING_BINARY:
-	case ENCODING_QP:
-		break;
-	case ENCODING_BASE64:
-		memset(&e->v.b64, 0, sizeof(e->v.b64));
-		break;
-	}
-
-	e->type = type;
-}
-
-int
-encoding_getc(struct encoding *e, FILE *fp)
-{
-	switch (e->type) {
-	case ENCODING_7BIT:
-		return encoding_raw(fp, 0, 0);
-	case ENCODING_8BIT:
-		return encoding_raw(fp, 1, 0);
-	case ENCODING_BASE64:
-		return encoding_b64(&e->v.b64, fp);
-	case ENCODING_BINARY:
-		return encoding_raw(fp, 1, 1);
-	case ENCODING_QP:
-		return encoding_qp(fp);
-	}
-
-	return ENCODING_ERR;
-}
-
 static int
-encoding_qp(FILE *fp)
+encoding_getc_qp(FILE *fp)
 {
 	for (;;) {
 		int ch, hi, lo;
@@ -166,7 +166,7 @@ encoding_qp(FILE *fp)
 }
 
 static int
-encoding_raw(FILE *fp, int high, int nul)
+encoding_getc_raw(FILE *fp, int high, int nul)
 {
 	int ch;
 

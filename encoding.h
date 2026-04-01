@@ -28,12 +28,12 @@ enum encoding_type {
 
 struct encoding {
 	union {
-		struct encoding_b64 {
+		struct encoding_base64 {
 			char buf[2];
 			int start;
 			int end;
-		} b64;
-	} v;
+		} base64;
+	} state;
 
 	enum encoding_type type;
 };
