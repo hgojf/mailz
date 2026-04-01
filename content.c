@@ -522,9 +522,9 @@ handle_reply_references(FILE *in, FILE *out, const char *msgid,
 
 	putref = 0;
 	if (refs != -1) {
-		if (fseeko(in, refs, SEEK_SET) == -1)
-			return -1;
 		if (fprintf(out, "References:") < 0)
+			return -1;
+		if (fseeko(in, refs, SEEK_SET) == -1)
 			return -1;
 		if (header_copy(in, out) < 0)
 			return -1;
