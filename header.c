@@ -65,6 +65,9 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 		if ((ch = header_lex(fp, &lex)) < 0 && ch != HEADER_EOF)
 			return ch;
 
+		if (ch == '\0')
+			return HEADER_INVALID;
+
 		if (state == 0) {
 			if (ch == HEADER_EOF || (ch == ',' && lex.qstate == 0)) {
 				n = strip_trailing(from->addr, n);
