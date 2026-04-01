@@ -733,7 +733,9 @@ main(int argc, char *argv[])
 	}
 
 	argc -= optind;
-	/* No argv += optind; because we dont use argv. */
+	argv += optind;
+
+	(void)argv; /* Suppress set-but-unused variable warning */
 
 	if (argc != 0)
 		usage();
