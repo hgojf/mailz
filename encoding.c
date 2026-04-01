@@ -24,10 +24,9 @@
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-static int encoding_b64(struct encoding *, FILE *);
-static int encoding_getc_lower(struct encoding *, FILE *);
-static int encoding_qp(struct encoding *, FILE *);
-static int encoding_raw(struct encoding *, FILE *, int, int);
+static int encoding_b64(struct encoding_b64 *, FILE *);
+static int encoding_qp(FILE *);
+static int encoding_raw(FILE *, int, int);
 static int hexdigcaps(int);
 
 static const struct {
@@ -42,14 +41,11 @@ static const struct {
 };
 
 static int
-encoding_b64(struct encoding *e, FILE *fp)
+encoding_b64(struct encoding_b64 *b64, FILE *fp)
 {
-	struct encoding_b64 *b64;
 	char buf[5];
 	unsigned char obuf[3];
 	int i, n;
-
-	b64 = &e->v.b64;
 
 	if (b64->start != b64->end)
 		return b64->buf[b64->start++];
@@ -57,9 +53,7 @@ encoding_b64(struct encoding *e, FILE *fp)
 	for (i = 0; i < 4;) {
 		int ch;
 
-		if ((ch = encoding_getc_lower(e, fp)) == ENCODING_ERR)
-			return ENCODING_ERR;
-		if (ch == ENCODING_EOF) {
+		if ((ch = fgetc(fp)) == EOF) {
 			if (i == 0)
 				return ENCODING_EOF;
 			return ENCODING_ERR;
@@ -111,7 +105,6 @@ encoding_from_type(struct encoding *e, enum encoding_type type)
 		break;
 	}
 
-	e->left = -1;
 	e->type = type;
 }
 
@@ -120,48 +113,28 @@ encoding_getc(struct encoding *e, FILE *fp)
 {
 	switch (e->type) {
 	case ENCODING_7BIT:
-		return encoding_raw(e, fp, 0, 0);
+		return encoding_raw(fp, 0, 0);
 	case ENCODING_8BIT:
-		return encoding_raw(e, fp, 1, 0);
+		return encoding_raw(fp, 1, 0);
 	case ENCODING_BASE64:
-		return encoding_b64(e, fp);
+		return encoding_b64(&e->v.b64, fp);
 	case ENCODING_BINARY:
-		return encoding_raw(e, fp, 1, 1);
+		return encoding_raw(fp, 1, 1);
 	case ENCODING_QP:
-		return encoding_qp(e, fp);
+		return encoding_qp(fp);
 	}
 
 	return ENCODING_ERR;
 }
 
 static int
-encoding_getc_lower(struct encoding *e, FILE *fp)
-{
-	int ch;
-
-	if (e->left == 0)
-		return ENCODING_EOF;
-
-	if ((ch = fgetc(fp)) == EOF) {
-		if (e->left != -1)
-			return ENCODING_ERR;
-		return ENCODING_EOF;
-	}
-
-	if (e->left != -1)
-		e->left--;
-	return ch;
-}
-
-static int
-encoding_qp(struct encoding *e, FILE *fp)
+encoding_qp(FILE *fp)
 {
 	for (;;) {
 		int ch, hi, lo;
 
-		if ((ch = encoding_getc_lower(e, fp)) == ENCODING_ERR ||
-		     ch == ENCODING_EOF)
-			return ch;
+		if ((ch = fgetc(fp)) == EOF)
+			return ENCODING_EOF;
 
 		if (ch != '=') {
 			switch (ch) {
@@ -176,16 +149,14 @@ encoding_qp(struct encoding *e, FILE *fp)
 			return ch;
 		}
 
-		if ((hi = encoding_getc_lower(e, fp)) == ENCODING_ERR ||
-		     hi == ENCODING_EOF)
+		if ((hi = fgetc(fp)) == EOF)
 			return ENCODING_ERR;
 		if (hi == '\n')
 			continue;
 		if ((hi = hexdigcaps(hi)) == -1)
 			return ENCODING_ERR;
 
-		if ((lo = encoding_getc_lower(e, fp)) == ENCODING_ERR ||
-		     lo == ENCODING_EOF)
+		if ((lo = fgetc(fp)) == EOF)
 			return ENCODING_ERR;
 		if ((lo = hexdigcaps(lo)) == -1)
 			return ENCODING_ERR;
@@ -195,13 +166,12 @@ encoding_qp(struct encoding *e, FILE *fp)
 }
 
 static int
-encoding_raw(struct encoding *e, FILE *fp, int high, int nul)
+encoding_raw(FILE *fp, int high, int nul)
 {
 	int ch;
 
-	if ((ch = encoding_getc_lower(e, fp)) == ENCODING_ERR ||
-	     ch == ENCODING_EOF)
-		return ch;
+	if ((ch = fgetc(fp)) == EOF)
+		return ENCODING_EOF;
 	if (!high && (ch & 0x80))
 		return ENCODING_ERR;
 	if (!nul && ch == '\0')

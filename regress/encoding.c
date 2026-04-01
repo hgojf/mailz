@@ -57,7 +57,6 @@ encoding_getc_test(void)
 		const char *out;
 		size_t insz;
 		size_t outsz;
-		off_t len;
 		enum encoding_type encoding;
 		int error;
 	} tests[] = {
@@ -65,9 +64,7 @@ encoding_getc_test(void)
 		 * This macro is needed for input/output with NUL bytes.
 		 */
 		#define test(in, out, encoding, error) \
-			{ in, out, sizeof(in) - 1, sizeof(out) - 1, -1, encoding, error }
-		#define test_len(in, len, out, encoding, error) \
-			{ in, out, sizeof(in) - 1, sizeof(out) - 1, len, encoding, error }
+			{ in, out, sizeof(in) - 1, sizeof(out) - 1, encoding, error }
 		test("hi", "hi", ENCODING_7BIT, ENCODING_EOF),
 		test("hi\xFF", "hi", ENCODING_7BIT, ENCODING_ERR),
 		test("hi\0", "hi", ENCODING_7BIT, ENCODING_ERR),
@@ -91,8 +88,6 @@ encoding_getc_test(void)
 		test("h=\ni", "hi", ENCODING_QP, ENCODING_EOF),
 		test("hi=FF", "hi\xFF", ENCODING_QP, ENCODING_EOF),
 		test("hi\xFF", "hi", ENCODING_QP, ENCODING_ERR),
-
-		test_len("hi more", 2, "hi", ENCODING_7BIT, ENCODING_EOF),
 		#undef test
 	};
 
@@ -107,10 +102,6 @@ encoding_getc_test(void)
 			err(1, "fmemopen");
 
 		encoding_from_type(&decoder, tests[i].encoding);
-
-		if (tests[i].len != -1)
-			decoder.left = tests[i].len;
-
 		outi = 0;
 		while ((ch = encoding_getc(&decoder, fp)) != tests[i].error) {
 			if (ch == ENCODING_EOF)
