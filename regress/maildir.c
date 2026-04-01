@@ -104,7 +104,9 @@ maildir_unset_flag_test(void)
 		{ "hi:2,S", "hi:2,", 5, 'S', MAILDIR_LONG },
 
 		{ "hi:2,", NULL, 255, 'S', MAILDIR_UNCHANGED },
-		{ "hi", NULL, 255, 'S', MAILDIR_UNCHANGED },
+
+		{ "hi", NULL, 255, 'S', MAILDIR_INVALID },
+		{ "hi:99,{Seen}", NULL, 255, 'S', MAILDIR_INVALID },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {

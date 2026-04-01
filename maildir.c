@@ -97,7 +97,7 @@ maildir_unset_flag(const char *name, int flag, char *buf, size_t bufsz)
 	size_t i, j;
 
 	if (maildir_get_info(name, &info) == -1)
-		return MAILDIR_UNCHANGED;;
+		return MAILDIR_INVALID;
 
 	for (i = 0, j = 0; name[i] != '\0'; i++) {
 		if (&name[i] >= info.flags && name[i] == flag)
