@@ -223,28 +223,28 @@ conf_mailbox_cmp(struct mailz_conf_mailbox *one, struct mailz_conf_mailbox *two)
 static char *
 maildir_expand(const char *maildir)
 {
-	struct passwd *pwd;
+	const char *home;
 	char *buf;
-	size_t dirlen, n, sz;
+	size_t homelen, n, sz;
 
-	if ((pwd = getpwuid(getuid())) == NULL)
-		err(1, "getpwuid");
-	dirlen = strlen(pwd->pw_dir);
+	if ((home = getenv("HOME")) == NULL)
+		errx(1, "HOME not set");
+	homelen = strlen(home);
 
-	sz = strlen(maildir) + dirlen + 1;
+	sz = strlen(maildir) + homelen + 1;
 	if ((buf = malloc(sz)) == NULL)
 		err(1, NULL);
 
 	n = 0;
 	for (;;) {
 		if (*maildir == '~') {
-			if (sz - n <= dirlen) {
-				sz += dirlen;
+			if (sz - n <= homelen) {
+				sz += homelen;
 				if ((buf = realloc(buf, sz)) == NULL)
 					err(1, NULL);
 			}
-			memcpy(&buf[n], pwd->pw_dir, dirlen);
-			n += strlen(pwd->pw_dir);
+			memcpy(&buf[n], home, homelen);
+			n += homelen;
 		}
 		else {
 			if (sz == n) {
