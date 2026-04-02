@@ -45,8 +45,6 @@ struct command_args {
 	const char *tmpdir;
 	struct mailz_ignore *ignore;
 	struct mailbox *mailbox;
-	struct letter *letters;
-	size_t nletter;
 	int cur;
 };
 
@@ -100,8 +98,6 @@ commands_run(struct mailbox *mailbox, int cur,
 	args.addr = addr;
 	args.cur = cur;
 	args.ignore = ignore;
-	args.letters = mailbox->letters;
-	args.nletter = mailbox->nletter;
 	args.mailbox = mailbox;
 	args.maildir = maildir;
 	args.tmpdir = tmpdir;
