@@ -79,7 +79,7 @@ command_letter(struct command_lexer *lex, struct command_letter *lp)
 		return COMMAND_LONG;
 	buf[n] = '\0';
 
-	num = strtonum(buf, 0, LLONG_MAX, &errstr);
+	num = strtonum(buf, 1, LLONG_MAX, &errstr);
 	if (errstr != NULL)
 		return COMMAND_INVALID;
 
