@@ -298,8 +298,8 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	char addr_buf[255], *addr, msgid[MSGID_LEN];
 	char from_addr[255], from_name[256];
 	time_t date;
-	off_t from, in_reply_to, references, reply_to, to;
-	int got_subject, rv;
+	off_t cc, from, in_reply_to, references, reply_to, subject, to;
+	int rv;
 
 	rv = -1;
 
@@ -333,13 +333,14 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	else
 		addr = setup.addr;
 
+	cc = -1;
 	date = -1;
 	from = -1;
-	got_subject = 0;
 	in_reply_to = -1;
 	msgid[0] = '\0';
 	references = -1;
 	reply_to = -1;
+	subject = -1;
 	to = -1;
 	for (;;) {
 		char buf[HEADER_NAME_LEN];
@@ -350,15 +351,12 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 		if (hv != HEADER_OK)
 			goto out;
 
-		if (setup.group && !strcasecmp(buf, "cc")) {
-			int any;
-
-			if (fprintf(out, "Cc:") < 0)
+		if (!strcasecmp(buf, "cc")) {
+			if (cc != -1)
 				goto out;
-			any = 0;
-			if (header_copy_addresses(in, out, addr, &any) < 0)
+			if ((cc = ftello(in)) == -1)
 				goto out;
-			if (fprintf(out, "\n") < 0)
+			if (header_skip(in, NULL) < 0)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "date")) {
@@ -416,11 +414,12 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "subject")) {
-			if (got_subject)
+			if (subject != -1)
 				goto out;
-			if (header_subject_reply(in, out) < 0)
+			if ((subject = ftello(in)) == -1)
 				goto out;
-			got_subject = 1;
+			if (header_skip(in, NULL) < 0)
+				goto out;
 		}
 		else if (setup.group && !strcasecmp(buf, "to")) {
 			if (to != -1)
@@ -439,15 +438,36 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 	if (date == -1 || from == -1)
 		goto out;
 
-	if (!got_subject)
+	if (subject != -1) {
+		if (fseeko(in, subject, SEEK_SET) == -1)
+			goto out;
+		if (header_subject_reply(in, out) < 0)
+			goto out;
+	}
+	else {
 		if (fprintf(out, "Subject: Re: No Subject\n") < 0)
 			goto out;
+	}
+
+	if (handle_reply_to(in, out, addr, from, to, reply_to) == -1)
+		goto out;
+	if (setup.group && cc != -1) {
+		int any;
+
+		if (fprintf(out, "Cc:") < 0)
+			goto out;
+		if (fseeko(in, cc, SEEK_SET) == -1)
+			goto out;
+		any = 0;
+		if (header_copy_addresses(in, out, addr, &any) < 0)
+			goto out;
+		if (fprintf(out, "\n") < 0)
+			goto out;
+	}
 
 	if (fprintf(out, "From: %s\n", setup.addr) < 0)
 		goto out;
 
-	if (handle_reply_to(in, out, addr, from, to, reply_to) == -1)
-		goto out;
 	if (handle_reply_references(in, out, msgid, in_reply_to,
 				    references) == -1)
 		goto out;
