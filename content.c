@@ -278,6 +278,16 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			}
 		}
 
+		if (reply && n == 1 && buf[0] == '\n') {
+			int ch;
+
+			/* Avoid ending the reply with an empty quoted line */
+			if ((ch = fgetc(in)) == EOF)
+				break;
+			if (ungetc(ch, in) == EOF)
+				return -1;
+		}
+
 		if (fwrite(buf, n, 1, out) != 1)
 			return -1;
 
