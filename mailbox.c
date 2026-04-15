@@ -165,10 +165,8 @@ mailbox_thread_next(struct mailbox *mailbox,
 		}
 
 		if (!strcmp(subject, thread->subject)) {
-			if (thread->have_first) {
-				thread->idx = mailbox->nletter;
+			if (thread->have_first)
 				return NULL;
-			}
 
 			thread->have_first = 1;
 			thread->idx = i + 1;
