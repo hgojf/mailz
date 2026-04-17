@@ -167,6 +167,8 @@ int
 content_proc_init(struct content_proc *pr, const char *exe)
 {
 	int sv[2];
+	char **ep, *envp[2];
+	extern char **environ;
 
 	if (socketpair(AF_UNIX,
 		       SOCK_STREAM | SOCK_CLOEXEC, PF_UNSPEC,
@@ -176,13 +178,26 @@ content_proc_init(struct content_proc *pr, const char *exe)
 		goto sv;
 	imsgbuf_allow_fdpass(&pr->msgbuf);
 
+	/*
+	 * Only pass the needed parts of the environment, in case the user
+	 * is (perhaps foolishly) storing sensitive data inside it.
+	 */
+	envp[0] = NULL;
+	for (ep = environ; *ep != NULL; ep++) {
+		if (!strncmp(*ep, "TZ=", 3)) {
+			envp[0] = *ep;
+			break;
+		}
+	}
+	envp[1] = NULL;
+
 	switch (pr->pid = fork()) {
 	case -1:
 		goto msgbuf;
 	case 0:
 		if (dup2(sv[1], CONTENT_PARENT_SOCKET) == -1)
 			err_fork(1, "dup2");
-		execl(exe, "mailz-content", "-r", NULL);
+		execle(exe, "mailz-content", "-r", NULL, envp);
 		err_fork(1, "%s", exe);
 	default:
 		break;
