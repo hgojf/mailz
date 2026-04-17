@@ -773,6 +773,11 @@ main(int argc, char *argv[])
 	if (!reexec)
 		errx(1, "mailz-content should not be executed directly");
 
+	/* Make sure the parent didn't forget to set a close-on-exec flag */
+	if (getdtablecount() != 4)
+		errx(1, "incorrect number of file descriptors "
+			"(leak from parent?)");
+
 	if ((null = open(PATH_DEV_NULL, O_RDWR)) == -1)
 		err(1, "%s", PATH_DEV_NULL);
 	for (i = 0; i < 3; i++)
