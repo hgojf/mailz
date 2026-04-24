@@ -50,8 +50,7 @@ struct command_args {
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-static void commands_run(struct mailbox *, int, const char *,
-			 const char *, struct mailz_ignore *, const char *);
+static void commands_run(struct command_args *);
 static const struct command *commands_search(const char *);
 static int command_delete(struct letter *, struct command_args *);
 static int command_flag(struct letter *, struct command_args *, int,
@@ -87,20 +86,10 @@ static const struct command {
 };
 
 static void
-commands_run(struct mailbox *mailbox, int cur,
-	     const char *tmpdir, const char *addr,
-	     struct mailz_ignore *ignore, const char *maildir)
+commands_run(struct command_args *args)
 {
-	struct command_args args;
 	struct command_lexer lex;
 	struct letter *letter;
-
-	args.addr = addr;
-	args.cur = cur;
-	args.ignore = ignore;
-	args.mailbox = mailbox;
-	args.maildir = maildir;
-	args.tmpdir = tmpdir;
 
 	command_init(&lex, stdin);
 	letter = NULL;
@@ -160,26 +149,26 @@ commands_run(struct mailbox *mailbox, int cur,
 			}
 
 			/* These are numbered from 1, so no = */
-			if (cmd_letter.num > mailbox->nletter) {
+			if (cmd_letter.num > args->mailbox->nletter) {
 				warnx("letter number too large");
 				break;
 			}
-			letter = &mailbox->letters[cmd_letter.num - 1];
+			letter = &args->mailbox->letters[cmd_letter.num - 1];
 
 			if (cmd_letter.thread) {
 				struct letter *lp;
 				struct mailbox_thread thread;
 
-				mailbox_thread_init(mailbox, &thread, letter);
-				while ((lp = mailbox_thread_next(mailbox, &thread)) != NULL) {
-					if (cmd->fn(lp, &args) == -1) {
+				mailbox_thread_init(args->mailbox, &thread, letter);
+				while ((lp = mailbox_thread_next(args->mailbox, &thread)) != NULL) {
+					if (cmd->fn(lp, args) == -1) {
 						warnx("command '%s' failed", cmd->ident);
 						goto next;
 					}
 				}
 			}
 			else {
-				if (cmd->fn(letter, &args) == -1) {
+				if (cmd->fn(letter, args) == -1) {
 					warnx("command '%s' failed", cmd->ident);
 					break;
 				}
@@ -191,7 +180,7 @@ commands_run(struct mailbox *mailbox, int cur,
 				warnx("no current letter");
 				continue;
 			}
-			if (cmd->fn(letter, &args) == -1)
+			if (cmd->fn(letter, args) == -1)
 				warnx("command '%s' failed", cmd->ident);
 		}
 
@@ -847,12 +836,20 @@ main(int argc, char *argv[])
 	if (mailbox.nletter == 0)
 		puts("No mail.");
 	else {
+		struct command_args args;
 		size_t i;
 
 		for (i = 0; i < mailbox.nletter; i++)
 			letter_print(i + 1, &mailbox.letters[i]);
-		commands_run(&mailbox, cur, tmpdir, address,
-			     &conf.ignore, maildir);
+
+		args.addr = address;
+		args.cur = cur;
+		args.ignore = &conf.ignore;
+		args.mailbox = &mailbox;
+		args.maildir = maildir;
+		args.tmpdir = tmpdir;
+
+		commands_run(&args);
 	}
 
 	rv = 0;
