@@ -727,7 +727,7 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 	while ((ch = header_lex(fp, &lex)) != HEADER_EOF) {
 		if (ch < 0)
 			return ch;
-		if (!isspace(ch) && !isprint(ch))
+		if (!isprint(ch) && ch != ' ' && ch != '\t')
 			continue; /* ignore */
 
 		if (n == bufsz - 1)

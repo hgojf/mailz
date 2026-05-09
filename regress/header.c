@@ -559,6 +559,7 @@ header_subject_test(void)
 	} tests[] = {
 		{ "hi", "hi", 10 },
 		{ "h\xFFi", "hi", 10 },
+		{ "h\x0bi", "hi", 10 },
 		{ "hello", "hello", 6 },
 		{ "hello", "hell", 5 },
 	};
