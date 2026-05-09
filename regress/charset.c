@@ -72,7 +72,7 @@ charset_getc_test(void)
 
 		while ((n = charset_getc(&charset, &decoder, fp, buf)) != tests[i].error) {
 			if (n == 0)
-				errx(1, "early end-of-file %zu", i);
+				errx(1, "early end-of-file");
 			if (n == -1)
 				errx(1, "invalid input");
 			if (outi + n > outsz)
