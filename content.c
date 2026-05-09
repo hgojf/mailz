@@ -271,7 +271,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 			int ch;
 
 			ch = (unsigned char)buf[0];
-			if (!isprint(ch) && !isspace(ch)) {
+			if (!isprint(ch) && ch != ' ' && ch != '\t' && ch != '\n') {
 				/* UTF-8 replacement character */
 				memcpy(buf, "\xEF\xBF\xBD", 3);
 				n = 3;

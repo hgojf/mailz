@@ -559,7 +559,7 @@ header_lex(FILE *fp, struct header_lex *lex)
 		}
 
 		if (lex->echo != NULL) {
-			if (isspace(ch) || isprint(ch)) {
+			if (isprint(ch) || ch == ' ' || ch == '\t') {
 				if (fputc(ch, lex->echo) == EOF)
 					return HEADER_OUTPUT;
 			}
@@ -640,7 +640,7 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 		if (ch == '>')
 			break;
 
-		if (!isprint(ch) && !isspace(ch))
+		if (!isprint(ch) && ch != ' ' && ch != '\t')
 			return HEADER_INVALID;
 		if (n == bufsz)
 			return HEADER_INVALID;

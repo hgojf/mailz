@@ -84,7 +84,8 @@ content_letter_getc(struct content_letter *letter, char buf[static 4])
 			buf[i] = ch;
 			break;
 		default:
-			if (i == 0 && !isprint(ch) && !isspace(ch))
+			if (i == 0 && !isprint(ch) && ch != ' ' && ch != '\t' &&
+			    ch != '\n')
 				return -1;
 			buf[i] = ch;
 			return i + 1;
@@ -290,7 +291,8 @@ content_proc_reply(struct content_proc *pr, FILE *out,
 			i++;
 			break;
 		default:
-			if (i == 0 && !isprint(ch) && !isspace(ch))
+			if (i == 0 && !isprint(ch) && ch != ' ' && ch != '\t' &&
+			    ch != '\n')
 				goto in;
 			i = 0;
 			break;
