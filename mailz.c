@@ -824,7 +824,7 @@ main(int argc, char *argv[])
 		warn("%s", PATH_SENDMAIL);
 		goto tmpdir;
 	}
-	if (pledge("stdio rpath cpath wpath proc exec sendfd", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath sendfd proc exec", NULL) == -1)
 		err(1, "pledge");
 
 	if (setup_letters(maildir, root, cur) == -1)
