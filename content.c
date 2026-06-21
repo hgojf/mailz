@@ -88,8 +88,7 @@ handle_ignore(struct imsg *msg, struct ignore *ignore, int type)
 	if (imsg_get_data(msg, &header, sizeof(header)) == -1)
 		return -1;
 
-	if (strnlen(header.name, sizeof(header.name))
-			== sizeof(header.name))
+	if (memchr(header.name, '\0', sizeof(header.name)) == NULL)
 		return -1;
 
 	if ((s = strdup(header.name)) == NULL)
