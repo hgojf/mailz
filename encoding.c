@@ -24,7 +24,7 @@
 
 #define nitems(a) (sizeof((a)) / sizeof(*(a)))
 
-static int encoding_getc_base64(struct encoding_base64 *, FILE *);
+static int encoding_getc_base64(FILE *, struct encoding_base64 *);
 static int encoding_getc_qp(FILE *);
 static int encoding_getc_raw(FILE *, int, int);
 static int hexdigcaps(int);
@@ -79,7 +79,7 @@ encoding_getc(struct encoding *ep, FILE *fp)
 	case ENCODING_8BIT:
 		return encoding_getc_raw(fp, 1, 0);
 	case ENCODING_BASE64:
-		return encoding_getc_base64(&ep->state.base64, fp);
+		return encoding_getc_base64(fp, &ep->state.base64);
 	case ENCODING_BINARY:
 		return encoding_getc_raw(fp, 1, 1);
 	case ENCODING_QP:
@@ -90,7 +90,7 @@ encoding_getc(struct encoding *ep, FILE *fp)
 }
 
 static int
-encoding_getc_base64(struct encoding_base64 *base64, FILE *fp)
+encoding_getc_base64(FILE *fp, struct encoding_base64 *base64)
 {
 	char buf[5];
 	unsigned char obuf[3];
