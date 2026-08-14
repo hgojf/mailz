@@ -558,6 +558,7 @@ header_subject_test(void)
 		size_t bufsz;
 	} tests[] = {
 		{ "hi", "hi", 10 },
+		{ "hello ", "hello", 10 },
 		{ "h\xFFi", "hi", 10 },
 		{ "h\x0bi", "hi", 10 },
 		{ "hello", "hello", 6 },

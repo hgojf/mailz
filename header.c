@@ -735,6 +735,7 @@ header_subject(FILE *fp, char *buf, size_t bufsz)
 		buf[n++] = ch;
 	}
 
+	n = strip_trailing(buf, n);
 	buf[n] = '\0';
 	return HEADER_OK;
 }
