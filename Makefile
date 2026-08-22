@@ -109,10 +109,16 @@ OBJS_REAL = $(SRCS_REAL:.c=.o)
 clean:
 	rm -f $(BINARIES) $(DEPS_REAL) $(OBJS_REAL) $(SRCS_GENERATED) tags parse.h
 
-HEADERS = charset.h command.h conf.h content-proc.h content.h encoding.h err-fork.h
-HEADERS += header.h imsg-blocking.h mailbox.h maildir.h regress/charset.h
-HEADERS += regress/command.h regress/content-proc.h regress/encoding.h regress/header.h
-HEADERS += regress/mailbox.h regress/maildir.h regress/printable.h
+.PHONY: update-headers
+
+update-headers:
+	@echo HEADERS = > Makefile.headers;				\
+	{								\
+		echo ./parse.h;						\
+		find . -name '*.h' -not -path './parse.h' -print;	\
+	} | sort | sed 's|^./|HEADERS += |' >> Makefile.headers;
+
+include Makefile.headers
 
 tags: $(SRCS_ALL) $(HEADERS)
 	$(CTAGS) -f $@ $(SRCS_ALL) $(HEADERS)
