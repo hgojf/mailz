@@ -77,7 +77,7 @@ SRCS_GENERATED = lex.c parse.c
 
 .PHONY: tidy
 
-TIDYCHECKS = -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-clang-analyzer-unix.Stream
+TIDYCHECKS = cert-*,-cert-err33-c,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-clang-analyzer-unix.Stream
 TIDYFLAGS = -checks=$(TIDYCHECKS)
 tidy:
 	clang-tidy $(TIDYFLAGS) $(SRCS_ALL) -- $(CFLAGS)
