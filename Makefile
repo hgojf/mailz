@@ -77,8 +77,24 @@ SRCS_GENERATED = lex.c parse.c
 
 .PHONY: tidy
 
-TIDYCHECKS = cert-*,-cert-err33-c,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-clang-analyzer-unix.Stream
-TIDYFLAGS = -checks=$(TIDYCHECKS)
+TIDYCHECKS =
+
+TIDYCHECKS += bugprone-*,
+TIDYCHECKS += -bugprone-assignment-in-if-condition,
+TIDYCHECKS += -bugprone-easily-swappable-parameters,
+TIDYCHECKS += -bugprone-macro-parentheses,
+TIDYCHECKS += -bugprone-multi-level-implicit-pointer-conversion,
+TIDYCHECKS += -bugprone-narrowing-conversions,
+TIDYCHECKS += -bugprone-not-null-terminated-result,
+
+TIDYCHECKS += cert-*,
+TIDYCHECKS += -cert-err33-c,
+
+TIDYCHECKS += clang-analyzer-*,
+TIDYCHECKS += -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+TIDYCHECKS += -clang-analyzer-unix.Stream
+
+TIDYFLAGS = -checks="$(TIDYCHECKS)"
 tidy:
 	clang-tidy $(TIDYFLAGS) $(SRCS_ALL) -- $(CFLAGS)
 
