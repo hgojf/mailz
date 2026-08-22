@@ -143,6 +143,8 @@ commands_run(struct command_args *args)
 				case COMMAND_THREAD_EOF:
 					warnx("must provide a message number after 't'");
 					break;
+				default:
+					break;
 				}
 
 				break;
@@ -238,6 +240,9 @@ command_flag(struct letter *letter, struct command_args *args,
 		case MAILDIR_LONG:
 			warnx("%s/cur/%s: filename too long to modify",
 			      args->maildir, letter->path);
+			break;
+		default: /* cant happen */
+			warnx("%s/cur/%s", args->maildir, letter->path);
 			break;
 		}
 		return -1;
