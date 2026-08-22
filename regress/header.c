@@ -397,7 +397,9 @@ header_lex_test(void)
 		while ((error = header_lex(fp, &lex)) != tests[i].error) {
 			if (error < 0)
 				errx(1, "wrong error");
-			if (*out == '\0' || *out++ != error)
+			if (*out == '\0')
+				errx(1, "output too long");
+			if (*out++ != error)
 				errx(1, "wrong output");
 		}
 		if (*out != '\0')
