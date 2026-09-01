@@ -41,23 +41,6 @@ content_letter_close(struct content_letter *letter)
 }
 
 int
-content_letter_finish(struct content_letter *letter)
-{
-	struct imsg msg;
-	int rv;
-
-	while (fgetc(letter->fp) != EOF)
-		;
-
-	if (imsgbuf_get_blocking(&letter->pr->msgbuf, &msg) != 1)
-		return -1;
-
-	rv = imsg_get_type(&msg) == IMSG_CNT_OK ? 0 : -1;
-	imsg_free(&msg);
-	return rv;
-}
-
-int
 content_letter_getc(struct content_letter *letter, char buf[static 4])
 {
 	mbstate_t mbs;
@@ -69,8 +52,18 @@ content_letter_getc(struct content_letter *letter, char buf[static 4])
 		int ch;
 
 		if ((ch = fgetc(letter->fp)) == EOF) {
-			if (i == 0)
-				return 0;
+			if (i == 0) {
+				struct imsg msg;
+				int ok;
+
+				if (imsgbuf_get_blocking(&letter->pr->msgbuf,
+							 &msg) != 1)
+					return -1;
+
+				ok = imsg_get_type(&msg) == IMSG_CNT_OK;
+				imsg_free(&msg);
+				return ok ? 0 : -1;
+			}
 			return -1;
 		}
 

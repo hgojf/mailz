@@ -77,9 +77,6 @@ content_proc_letter_error_test(void)
 			}
 		}
 
-		if (content_letter_finish(&lr) == -1)
-			got_error = 1;
-
 		if (!got_error)
 			errx(1, "no error");
 
@@ -150,9 +147,6 @@ content_proc_letter_test(void)
 			if (memcmp(buf, buf2, n) != 0)
 				errx(1, "wrong output");
 		}
-
-		if (content_letter_finish(&lr) == -1)
-			errx(1, "content_letter_finish");
 
 		content_letter_close(&lr);
 		content_proc_kill(&pr);

@@ -329,9 +329,6 @@ command_more(struct letter *letter, struct command_args *args)
 		}
 	}
 
-	if (content_letter_finish(&lr) == -1)
-		goto pid;
-
 	if (command_read(letter, args) == -1)
 		goto pid;
 
@@ -494,9 +491,6 @@ command_save(struct letter *letter, struct command_args *args)
 		if (fwrite(buf, n, 1, fp) != 1)
 			goto fp;
 	}
-
-	if (content_letter_finish(&lr) == -1)
-		goto fp;
 
 	if (fflush(fp) == EOF)
 		goto fp;
