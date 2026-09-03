@@ -28,9 +28,6 @@ struct content_proc {
 	pid_t pid;
 };
 
-#define CNT_IGNORE_IGNORE 0
-#define CNT_IGNORE_RETAIN 1
-
 int content_proc_ignore(struct content_proc *, const char *, int);
 int content_proc_init(struct content_proc *, const char *);
 int content_proc_kill(struct content_proc *);

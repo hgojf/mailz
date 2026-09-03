@@ -31,9 +31,7 @@ struct mailz_conf {
 	struct mailz_ignore {
 		char **headers;
 		size_t nheader;
-		#define MAILZ_IGNORE_IGNORE 0
-		#define MAILZ_IGNORE_RETAIN 1
-		int type;
+		int retain;
 	} ignore;
 	RB_HEAD(mailz_conf_mailboxes, mailz_conf_mailbox) mailboxes;
 };

@@ -58,12 +58,10 @@
 struct ignore {
 	char **headers;
 	size_t nheader;
-	#define IGNORE_IGNORE 0
-	#define IGNORE_RETAIN 1
-	int type;
+	int retain;
 };
 
-static int handle_ignore(struct imsg *, struct ignore *, int);
+static int handle_ignore(struct imsg *, struct ignore *);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
 static int handle_letter_under(FILE *, FILE *, struct ignore *, int);
 static int handle_reply(struct imsgbuf *, struct imsg *);
@@ -76,33 +74,34 @@ static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
 
 static int
-handle_ignore(struct imsg *msg, struct ignore *ignore, int type)
+handle_ignore(struct imsg *msg, struct ignore *ip)
 {
-	struct content_header header;
+	struct content_ignore ignore;
 	char *s, **t;
 
-	if (ignore->nheader == SIZE_MAX)
+	if (ip->nheader == SIZE_MAX)
 		return -1;
 
-	if (imsg_get_data(msg, &header, sizeof(header)) == -1)
+	if (imsg_get_data(msg, &ignore, sizeof(ignore)) == -1)
 		return -1;
 
-	if (memchr(header.name, '\0', sizeof(header.name)) == NULL)
+	if (memchr(ignore.header, '\0', sizeof(ignore.header)) == NULL)
+		return -1;
+	if (ignore.retain != 0 && ignore.retain != 1)
 		return -1;
 
-	if ((s = strdup(header.name)) == NULL)
+	if ((s = strdup(ignore.header)) == NULL)
 		return -1;
 
-	t = reallocarray(ignore->headers, ignore->nheader + 1,
-			 sizeof(*ignore->headers));
+	t = reallocarray(ip->headers, ip->nheader + 1, sizeof(*ip->headers));
 	if (t == NULL) {
 		free(s);
 		return -1;
 	}
 
-	ignore->headers = t;
-	ignore->headers[ignore->nheader++] = s;
-	ignore->type = type;
+	ip->headers = t;
+	ip->headers[ip->nheader++] = s;
+	ip->retain = ignore.retain;
 	return 0;
 }
 
@@ -706,11 +705,7 @@ ignore_header(const char *name, struct ignore *ignore)
 	size_t i;
 	int rv;
 
-	if (ignore->type == IGNORE_RETAIN)
-		rv = 0;
-	else
-		rv = 1;
-
+	rv = !ignore->retain;
 	for (i = 0; i < ignore->nheader; i++)
 		if (!strcasecmp(name, ignore->headers[i]))
 			return rv;
@@ -776,16 +771,13 @@ main(int argc, char *argv[])
 
 		switch (imsg_get_type(&msg)) {
 		case IMSG_CNT_IGNORE:
-			hv = handle_ignore(&msg, &ignore, IGNORE_IGNORE);
+			hv = handle_ignore(&msg, &ignore);
 			break;
 		case IMSG_CNT_LETTER:
 			hv = handle_letter(&msgbuf, &msg, &ignore);
 			break;
 		case IMSG_CNT_REPLY:
 			hv = handle_reply(&msgbuf, &msg);
-			break;
-		case IMSG_CNT_RETAIN:
-			hv = handle_ignore(&msg, &ignore, IGNORE_RETAIN);
 			break;
 		case IMSG_CNT_SUMMARY:
 			hv = handle_summary(&msgbuf, &msg);

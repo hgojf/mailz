@@ -20,7 +20,6 @@
 enum {
 	IMSG_CNT_IGNORE,
 	IMSG_CNT_OK,
-	IMSG_CNT_RETAIN,
 	IMSG_CNT_LETTER,
 	IMSG_CNT_LETTERPIPE,
 	IMSG_CNT_REPLY,
@@ -30,8 +29,9 @@ enum {
 
 #define CONTENT_PARENT_SOCKET 3
 
-struct content_header {
-	char name[996];
+struct content_ignore {
+	int retain;
+	char header[996];
 };
 
 struct content_reply_setup {

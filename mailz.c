@@ -540,16 +540,10 @@ content_proc_ex_ignore(struct content_proc *pr,
 		       const struct mailz_ignore *ignore)
 {
 	size_t i;
-	int type;
-
-	if (ignore->type == MAILZ_IGNORE_IGNORE)
-		type = CNT_IGNORE_IGNORE;
-	else
-		type = CNT_IGNORE_RETAIN;
 
 	for (i = 0; i < ignore->nheader; i++)
 		if (content_proc_ignore(pr, ignore->headers[i],
-					type) == -1)
+					ignore->retain) == -1)
 			return -1;
 	return 0;
 }

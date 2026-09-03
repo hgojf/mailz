@@ -127,28 +127,18 @@ content_letter_init(struct content_proc *pr,
 }
 
 int
-content_proc_ignore(struct content_proc *pr, const char *s, int type)
+content_proc_ignore(struct content_proc *pr, const char *s, int retain)
 {
-	struct content_header hdr;
-	uint32_t msg_type;
+	struct content_ignore ignore;
 
-	switch (type) {
-	case CNT_IGNORE_IGNORE:
-		msg_type = IMSG_CNT_IGNORE;
-		break;
-	case CNT_IGNORE_RETAIN:
-		msg_type = IMSG_CNT_RETAIN;
-		break;
-	default:
+	memset(&ignore, 0, sizeof(ignore));
+	if (strlcpy(ignore.header, s, sizeof(ignore.header))
+	    >= sizeof(ignore.header))
 		return -1;
-	}
+	ignore.retain = retain;
 
-	memset(&hdr, 0, sizeof(hdr));
-	if (strlcpy(hdr.name, s, sizeof(hdr.name)) >= sizeof(hdr.name))
-		return -1;
-
-	if (imsg_compose(&pr->msgbuf, msg_type, 0, -1, -1,
-			 &hdr, sizeof(hdr)) == -1)
+	if (imsg_compose(&pr->msgbuf, IMSG_CNT_IGNORE, 0, -1, -1,
+			 &ignore, sizeof(ignore)) == -1)
 		return -1;
 
 	if (imsgbuf_flush(&pr->msgbuf) == -1)

@@ -59,7 +59,7 @@ static struct mailz_conf_mailbox *mailbox;
 %token ADDRESS IGNORE MAILBOX MAILDIR OVERLONG PATH RETAIN
 %token<string> STRING
 %type<argv> strings
-%type<number> ignore_type
+%type<number> ignore_retain
 %%
 grammar: /* empty */
 	| grammar address '\n'
@@ -119,12 +119,12 @@ mailbox_opts: /* empty */
 	| mailbox_opts '\n'
 	;
 
-ignore_type: IGNORE { $$ = MAILZ_IGNORE_IGNORE; }
-	| RETAIN { $$ = MAILZ_IGNORE_RETAIN; }
+ignore_retain: IGNORE { $$ = 0; }
+	| RETAIN { $$ = 1; }
 	;
 
-ignore: ignore_type strings {
-		conf->ignore.type = $1;
+ignore: ignore_retain strings {
+		conf->ignore.retain = $1;
 
 		argv_free(conf->ignore.headers, conf->ignore.nheader);
 		conf->ignore.headers = $2.argv;
