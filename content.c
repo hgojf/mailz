@@ -74,7 +74,6 @@ static int handle_reply_to(FILE *, FILE *, const char *, off_t, off_t, off_t);
 static int handle_summary(struct imsgbuf *, struct imsg *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
-static void usage(void);
 
 static int
 handle_ignore(struct imsg *msg, struct ignore *ignore, int type)
@@ -735,41 +734,15 @@ imsg_get_fp(struct imsg *msg, const char *perm)
 	return rv;
 }
 
-static void
-usage(void)
-{
-	fprintf(stderr, "usage: mailz-content\n");
-	exit(2);
-}
-
 int
 main(int argc, char *argv[])
 {
 	struct ignore ignore;
 	struct imsgbuf msgbuf;
 	size_t i;
-	int ch, null, reexec;
+	int null;
 
-	reexec = 0;
-	while ((ch = getopt(argc, argv, "r")) != -1) {
-		switch (ch) {
-		case 'r':
-			reexec = 1;
-			break;
-		default:
-			usage();
-		}
-	}
-
-	argc -= optind;
-	argv += optind;
-
-	(void)argv; /* Suppress set-but-unused variable warning */
-
-	if (argc != 0)
-		usage();
-
-	if (!reexec)
+	if (argc != 2 || strcmp(argv[1], "-r") != 0)
 		errx(1, "mailz-content should not be executed directly");
 
 	/* Make sure the parent didn't forget to set a close-on-exec flag */
