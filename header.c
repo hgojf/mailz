@@ -577,8 +577,14 @@ header_lex(FILE *fp, struct header_lex *lex)
 				continue;
 			}
 
-			if (lex->qstate)
+			if (lex->qstate) {
+				if (ch == '\\') {
+					if ((ch = fgetc(fp)) == EOF)
+						return HEADER_INVALID;
+				}
+
 				return ch;
+			}
 		}
 
 		if (lex->cstate != -1) {
@@ -590,6 +596,12 @@ header_lex(FILE *fp, struct header_lex *lex)
 			}
 
 			if (lex->cstate > 0) {
+				if (ch == '\\') {
+					if (fgetc(fp) == EOF)
+						return HEADER_INVALID;
+					continue;
+				}
+
 				if (ch == ')')
 					lex->cstate--;
 				continue;

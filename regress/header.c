@@ -376,6 +376,9 @@ header_lex_test(void)
 		{ "(hi) hi", " hi", 0, HEADER_EOF },
 		{ "\"hi\" hi", "hi hi", 0, HEADER_EOF },
 
+		{ "(annoying \\(1.0\\))", "", 0, HEADER_EOF },
+		{ "\"annoying \\\"1.0\\\"\"", "annoying \"1.0\"", 0, HEADER_EOF },
+
 		{ "hi(", "hi", 0, HEADER_INVALID },
 		{ "hi\"", "hi", 0, HEADER_INVALID },
 	};
