@@ -2,10 +2,10 @@
 #define HEADER_H
 
 #define HEADER_OK 0
-#define HEADER_EOF -1
-#define HEADER_INVALID -2
-#define HEADER_OUTPUT -3
-#define HEADER_INPUT -4
+#define HEADER_EOF (-1)
+#define HEADER_INVALID (-2)
+#define HEADER_OUTPUT (-3)
+#define HEADER_INPUT (-4)
 
 struct header_address {
 	char *addr;

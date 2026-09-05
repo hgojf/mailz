@@ -20,7 +20,7 @@
 #include "encoding.h"
 
 enum charset_type {
-	#define CHARSET_UNKNOWN -1
+	#define CHARSET_UNKNOWN (-1)
 	CHARSET_ASCII,
 	CHARSET_ISO_8859_1,
 	CHARSET_OTHER,
