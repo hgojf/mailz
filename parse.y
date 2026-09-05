@@ -36,7 +36,8 @@ extern int yylex(void);
 static void argv_free(char **, size_t);
 static int conf_mailbox_cmp(struct mailz_conf_mailbox *, struct mailz_conf_mailbox *);
 static char *maildir_expand(const char *);
-static void yyerror(const char *);
+
+void yyerror(const char *);
 int yywrap(void);
 
 RB_PROTOTYPE_STATIC(mailz_conf_mailboxes, mailz_conf_mailbox, entries, conf_mailbox_cmp)
@@ -305,7 +306,7 @@ mailz_conf_mailbox(struct mailz_conf *c, char *ident)
 	return RB_FIND(mailz_conf_mailboxes, &c->mailboxes, &mb);
 }
 
-static void
+void
 yyerror(const char *s)
 {
 	fprintf(stderr, "%s: %s on line %d\n", filename, s, yylineno);

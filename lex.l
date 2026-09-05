@@ -18,6 +18,9 @@
 #include <string.h>
 
 #include "parse.h"
+
+void yyerror(const char *);
+
 %}
 
 %option noinput nounput
@@ -32,16 +35,20 @@
 
 [a-zA-Z-]+ {
 	if (strlcpy(yylval.string, yytext, sizeof(yylval.string))
-		   >= sizeof(yylval.string))
-		return OVERLONG;
+		   >= sizeof(yylval.string)) {
+		yyerror("overly long string");
+		exit(1);
+	}
 	return STRING;
 }
 
 \"[^\n\"]*\" {
 	yytext[yyleng - 1] = '\0';
 	if (strlcpy(yylval.string, yytext + 1, sizeof(yylval.string))
-		   >= sizeof(yylval.string))
-		return OVERLONG;
+		   >= sizeof(yylval.string)) {
+		yyerror("overly long string");
+		exit(1);
+	}
 	return STRING;
 }
 
