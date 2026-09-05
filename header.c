@@ -547,14 +547,14 @@ header_lex(FILE *fp, struct header_lex *lex)
 		int ch;
 
 		if ((ch = fgetc(fp)) == EOF)
-			goto eof;
+			break;
 		if (ch == '\n') {
 			if ((ch = fgetc(fp)) == EOF)
-				goto eof;
+				break;
 			if (ch != ' ' && ch != '\t') {
 				if (ungetc(ch, fp) == EOF)
 					return HEADER_INPUT;
-				goto eof;
+				break;
 			}
 		}
 
@@ -611,7 +611,6 @@ header_lex(FILE *fp, struct header_lex *lex)
 		return ch;
 	}
 
-	eof:
 	if (lex->echo != NULL) {
 		if (fputc('\n', lex->echo) == EOF)
 			return HEADER_OUTPUT;
