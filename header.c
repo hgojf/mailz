@@ -794,6 +794,7 @@ header_token(FILE *fp, struct header_lex *lex, char *buf,
 	     size_t bufsz, int *eof)
 {
 	size_t n;
+	int ch;
 
 	if (*eof)
 		return HEADER_EOF;
@@ -801,24 +802,19 @@ header_token(FILE *fp, struct header_lex *lex, char *buf,
 	lex->skipws = 1;
 
 	n = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = header_lex(fp, lex)) < 0 && ch != HEADER_EOF)
+	while ((ch = header_lex(fp, lex)) != HEADER_EOF && ch != ' '
+			&& ch != '\t') {
+		if (ch < 0 && ch != HEADER_EOF)
 			return ch;
-		if (ch == HEADER_EOF) {
-			*eof = 1;
-			if (n == 0)
-				return HEADER_EOF;
-			break;
-		}
-
-		if (ch == ' ' || ch == '\t')
-			break;
 
 		if (n == bufsz)
 			return HEADER_INVALID;
 		buf[n++] = ch;
+	}
+	if (ch == HEADER_EOF) {
+		*eof = 1;
+		if (n == 0)
+			return HEADER_EOF;
 	}
 
 	if (n == bufsz)
