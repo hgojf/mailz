@@ -565,6 +565,12 @@ header_lex(FILE *fp, struct header_lex *lex)
 			}
 		}
 
+		if (lex->skipws) {
+			if (ch == ' ' || ch == '\t')
+				continue;
+			lex->skipws = 0;
+		}
+
 		if (lex->qstate != -1) {
 			if (ch == '\"') {
 				lex->qstate = !lex->qstate;
@@ -588,12 +594,6 @@ header_lex(FILE *fp, struct header_lex *lex)
 					lex->cstate--;
 				continue;
 			}
-		}
-
-		if (lex->skipws) {
-			if (ch == ' ' || ch == '\t')
-				continue;
-			lex->skipws = 0;
 		}
 
 		return ch;
