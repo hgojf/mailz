@@ -623,7 +623,6 @@ header_lex(FILE *fp, struct header_lex *lex)
 	return HEADER_EOF;
 }
 
-
 int
 header_message_id(FILE *fp, char *buf, size_t bufsz)
 {
