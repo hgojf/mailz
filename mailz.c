@@ -716,7 +716,7 @@ setup_letters(const char *maildir, int root, int cur)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: mailz [-a] mailbox\n");
+	fprintf(stderr, "usage: mailz [-a] [-f file] mailbox\n");
 	exit(2);
 }
 
@@ -724,7 +724,7 @@ int
 main(int argc, char *argv[])
 {
 	char *home, *slash, tmpdir[PATH_MAX];
-	const char *address, *maildir;
+	const char *address, *confpath, *maildir;
 	struct mailz_conf conf;
 	struct mailz_conf_mailbox *conf_mailbox;
 	struct mailbox mailbox;
@@ -732,11 +732,15 @@ main(int argc, char *argv[])
 
 	rv = 1;
 
+	confpath = NULL;
 	view_all = 0;
-	while ((ch = getopt(argc, argv, "a")) != -1) {
+	while ((ch = getopt(argc, argv, "af:")) != -1) {
 		switch (ch) {
 		case 'a':
 			view_all = 1;
+			break;
+		case 'f':
+			confpath = optarg;
 			break;
 		default:
 			usage();
@@ -759,7 +763,7 @@ main(int argc, char *argv[])
 		errx(1, "setlocale");
 	signal(SIGPIPE, SIG_IGN);
 
-	if (mailz_conf_init(&conf) == -1)
+	if (mailz_conf_init(&conf, confpath) == -1)
 		return 1;
 	if ((conf_mailbox = mailz_conf_mailbox(&conf, argv[0])) != NULL) {
 		if (strlen(conf_mailbox->address) != 0)

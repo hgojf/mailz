@@ -7,6 +7,7 @@
 .Sh SYNOPSIS
 .Nm mailz
 .Op Fl a
+.Op Fl f Ar file
 .Ar mailbox
 .Sh DESCRIPTION
 The
@@ -23,6 +24,10 @@ The options are as follows:
 .Bl -tag -width Ds
 .It Fl a
 Display mail that has already been read.
+.It Fl f Ar file
+Specifies the configuration file.
+The default is
+.Pa $HOME/.mailz.conf .
 .El
 .Pp
 Upon startup,
@@ -64,11 +69,6 @@ Save each message to a temporary file and print its location.
 For each message, list all messages in the same thread.
 .It Ic unread (x)
 Mark each message as not having been read.
-.El
-.Sh ENVIRONMENT
-.Bl -tag -width Ds
-.It Ev MAILZ_CONF
-Path to the configuration file to be used instead of the default.
 .El
 .Sh FILES
 .Bl -tag -width Ds

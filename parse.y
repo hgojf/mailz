@@ -272,27 +272,27 @@ mailz_conf_free(struct mailz_conf *c)
 }
 
 int
-mailz_conf_init(struct mailz_conf *c)
+mailz_conf_init(struct mailz_conf *c, const char *path)
 {
 	struct passwd *pw;
-	char path[PATH_MAX], *pathp;
+	char pathbuf[PATH_MAX];
 
 	memset(c, 0, sizeof(*c));
 
-	if ((pw = getpwuid(getuid())) == NULL)
-		return -1;
-
-	if ((pathp = getenv("MAILZ_CONF")) == NULL) {
+	if (path == NULL) {
 		int n;
 
-		n = snprintf(path, sizeof(path), "%s/.mailz.conf",
-			     pw->pw_dir);
-		if (n < 0 || (size_t)n >= sizeof(path))
+		if ((pw = getpwuid(getuid())) == NULL)
 			return -1;
-		pathp = path;
+
+		n = snprintf(pathbuf, sizeof(pathbuf), "%s/.mailz.conf",
+			     pw->pw_dir);
+		if (n < 0 || (size_t)n >= sizeof(pathbuf))
+			return -1;
+		path = pathbuf;
 	}
 
-	if (configure(c, pathp) == -1)
+	if (configure(c, path) == -1)
 		return -1;
 	return 0;
 }
