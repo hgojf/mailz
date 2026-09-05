@@ -640,14 +640,11 @@ header_message_id(FILE *fp, char *buf, size_t bufsz)
 		return HEADER_INVALID;
 
 	n = 0;
-	for (;;) {
-		ch = header_lex(fp, &lex);
+	while ((ch = header_lex(fp, &lex)) != '>') {
 		if (ch == HEADER_EOF)
 			return HEADER_INVALID;
 		if (ch < 0)
 			return ch;
-		if (ch == '>')
-			break;
 
 		if (!isprint(ch) && ch != ' ' && ch != '\t')
 			return HEADER_INVALID;
@@ -673,15 +670,12 @@ int
 header_name(FILE *fp, char *buf, size_t bufsz)
 {
 	size_t n;
+	int ch;
 
 	n = 0;
-	for (;;) {
-		int ch;
-
-		if ((ch = fgetc(fp)) == EOF)
+	while ((ch = fgetc(fp)) != ':') {
+		if (ch == EOF)
 			return HEADER_INVALID;
-		if (ch == ':')
-			break;
 		if (ch == '\n' && n == 0)
 			return HEADER_EOF;
 
