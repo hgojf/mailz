@@ -716,7 +716,7 @@ setup_letters(const char *maildir, int root, int cur)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: mailz [-a] [-f file] mailbox\n");
+	fprintf(stderr, "usage: mailz [-an] [-f file] mailbox\n");
 	exit(2);
 }
 
@@ -728,19 +728,23 @@ main(int argc, char *argv[])
 	struct mailz_conf conf;
 	struct mailz_conf_mailbox *conf_mailbox;
 	struct mailbox mailbox;
-	int ch, cur, n, root, rv, view_all;
+	int ch, cur, dryrun, n, root, rv, view_all;
 
 	rv = 1;
 
 	confpath = NULL;
+	dryrun = 0;
 	view_all = 0;
-	while ((ch = getopt(argc, argv, "af:")) != -1) {
+	while ((ch = getopt(argc, argv, "af:n")) != -1) {
 		switch (ch) {
 		case 'a':
 			view_all = 1;
 			break;
 		case 'f':
 			confpath = optarg;
+			break;
+		case 'n':
+			dryrun = 1;
 			break;
 		default:
 			usage();
@@ -750,14 +754,23 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1)
-		usage();
+	if (dryrun) {
+		if (argc != 0)
+			usage();
+		if (mailz_conf_init(&conf, confpath) == -1)
+			return 1;
+		printf("configuration OK\n");
+		return 0;
+	}
 
 	/*
 	 * Delete trailing slash to make error messages nicer.
 	 */
 	if ((slash = strrchr(argv[0], '/')) != NULL && slash[1] == '\0')
 		*slash = '\0';
+
+	if (argc != 1)
+		usage();
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		errx(1, "setlocale");

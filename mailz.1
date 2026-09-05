@@ -8,6 +8,7 @@
 .Nm mailz
 .Op Fl a
 .Op Fl f Ar file
+.Op Fl n
 .Ar mailbox
 .Sh DESCRIPTION
 The
@@ -28,6 +29,8 @@ Display mail that has already been read.
 Specifies the configuration file.
 The default is
 .Pa $HOME/.mailz.conf .
+.It Fl n
+Check that the configuration file is valid and exit.
 .El
 .Pp
 Upon startup,
