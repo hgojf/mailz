@@ -244,6 +244,8 @@ header_copy_addresses_test(void)
 		   "tom@bogus.invalid",
 		   " dave@bogus.invalid, Fredrick <fred@bogus.invalid>",
 		   HEADER_OK },
+		
+		{ "dave@bogus.invalid", NULL, " dave@bogus.invalid", HEADER_OK },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {

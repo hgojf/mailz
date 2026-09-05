@@ -278,7 +278,7 @@ header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
 	while ((n = header_address(in, &from, &eof)) != HEADER_EOF) {
 		if (n < 0)
 			return n;
-		if (!strcmp(addr, exclude))
+		if (exclude != NULL && !strcmp(addr, exclude))
 			continue;
 
 		if (*any)

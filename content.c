@@ -330,7 +330,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 		addr = addr_buf;
 	}
 	else
-		addr = setup.addr;
+		addr = setup.addr[0] != '\0' ? setup.addr : NULL;
 
 	cc = -1;
 	date = -1;
@@ -464,7 +464,7 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 			goto out;
 	}
 
-	if (fprintf(out, "From: %s\n", setup.addr) < 0)
+	if (setup.addr[0] != '\0' && fprintf(out, "From: %s\n", setup.addr) < 0)
 		goto out;
 
 	if (handle_reply_references(in, out, msgid, in_reply_to,
