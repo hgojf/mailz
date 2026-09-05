@@ -372,6 +372,7 @@ header_lex_test(void)
 		{ "hi \"there\"", "hi there", 0, HEADER_EOF },
 		{ "hi(\"", "hi(\"", 1, HEADER_EOF },
 		{ "\n", "", 1, HEADER_EOF },
+		{ "\"(hi)\"", "(hi)", 0, HEADER_EOF },
 
 		{ "hi(", "hi", 0, HEADER_INVALID },
 		{ "hi\"", "hi", 0, HEADER_INVALID },

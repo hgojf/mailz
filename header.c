@@ -565,6 +565,16 @@ header_lex(FILE *fp, struct header_lex *lex)
 			}
 		}
 
+		if (lex->qstate != -1) {
+			if (ch == '\"') {
+				lex->qstate = !lex->qstate;
+				continue;
+			}
+
+			if (lex->qstate)
+				return ch;
+		}
+
 		if (lex->cstate != -1) {
 			if (ch == '(') {
 				if (lex->cstate == INT_MAX)
@@ -576,13 +586,6 @@ header_lex(FILE *fp, struct header_lex *lex)
 			if (lex->cstate > 0) {
 				if (ch == ')')
 					lex->cstate--;
-				continue;
-			}
-		}
-
-		if (lex->qstate != -1) {
-			if (ch == '\"') {
-				lex->qstate = !lex->qstate;
 				continue;
 			}
 		}
