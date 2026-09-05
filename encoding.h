@@ -29,7 +29,7 @@ enum encoding_type {
 struct encoding {
 	union {
 		struct encoding_base64 {
-			char buf[2];
+			unsigned char buf[2];
 			int start;
 			int end;
 		} base64;
@@ -38,8 +38,8 @@ struct encoding {
 	enum encoding_type type;
 };
 
-#define ENCODING_EOF -129
-#define ENCODING_ERR -130
+#define ENCODING_EOF -1
+#define ENCODING_ERR -2
 
 int encoding_from_name(const char *);
 void encoding_from_type(struct encoding *, enum encoding_type);

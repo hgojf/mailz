@@ -79,6 +79,10 @@ encoding_getc_test(void)
 		test("\xFF", "", ENCODING_BASE64, ENCODING_ERR),
 		test("\0", "", ENCODING_BASE64, ENCODING_ERR),
 
+		test("//4=", "\xFF\xFE", ENCODING_BASE64, ENCODING_EOF),
+		test("/v8=", "\xFE\xFF", ENCODING_BASE64, ENCODING_EOF),
+		test("iQ==", "\x89", ENCODING_BASE64, ENCODING_EOF),
+
 		test("hi", "hi", ENCODING_BINARY, ENCODING_EOF),
 		test("hi\xFF", "hi\xFF", ENCODING_BINARY, ENCODING_EOF),
 		test("hi\0", "hi\0", ENCODING_BINARY, ENCODING_EOF),
