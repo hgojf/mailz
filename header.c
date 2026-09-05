@@ -138,6 +138,7 @@ header_content_type(FILE *in, FILE *echo, struct content_type *ct,
 {
 	struct header_lex lex;
 	size_t n;
+	int ch;
 
 	lex.cstate = 0;
 	lex.echo = echo;
@@ -146,10 +147,7 @@ header_content_type(FILE *in, FILE *echo, struct content_type *ct,
 
 	n = 0;
 	ct->type_trunc = 0;
-	for (;;) {
-		int ch;
-
-		ch = header_lex(in, &lex);
+	while ((ch = header_lex(in, &lex)) != '/') {
 		if (ch == HEADER_EOF)
 			return HEADER_INVALID;
 		if (ch < 0)
@@ -158,29 +156,30 @@ header_content_type(FILE *in, FILE *echo, struct content_type *ct,
 		if (n == ct->typesz)
 			ct->type_trunc = 1;
 		else
-			ct->type[n++] = (ch == '/') ? '\0' : ch;
-		if (ch == '/')
-			break;
+			ct->type[n++] = ch;
 	}
+	if (n == ct->typesz)
+		ct->type_trunc = 1;
+	else
+		ct->type[n] = '\0';
 
 	n = 0;
 	ct->subtype_trunc = 0;
-	for (;;) {
-		int ch;
-
-		ch = header_lex(in, &lex);
+	while ((ch = header_lex(in, &lex)) != HEADER_EOF && ch != ';') {
 		if (ch != HEADER_EOF && ch < 0)
 			return ch;
+
 		if (n == ct->subtypesz)
 			ct->subtype_trunc = 1;
 		else
-			ct->subtype[n++] = (ch == ';' || ch == HEADER_EOF) ? '\0' : ch;
-		if (ch == HEADER_EOF || ch == ';') {
-			if (ch == HEADER_EOF)
-				*eof = 1;
-			break;
-		}
+			ct->subtype[n++] = ch;
 	}
+	if (ch == HEADER_EOF)
+		*eof = 1;
+	if (n == ct->subtypesz)
+		ct->subtype_trunc = 1;
+	else
+		ct->subtype[n] = '\0';
 
 	return HEADER_OK;
 }
@@ -191,6 +190,7 @@ header_content_type_var(FILE *in, FILE *echo,
 {
 	struct header_lex lex;
 	size_t n;
+	int ch;
 
 	if (*eof)
 		return HEADER_EOF;
@@ -202,11 +202,7 @@ header_content_type_var(FILE *in, FILE *echo,
 
 	n = 0;
 	vp->var_trunc = 0;
-
-	for (;;) {
-		int ch;
-
-		ch = header_lex(in, &lex);
+	while ((ch = header_lex(in, &lex)) != '=') {
 		if (ch == HEADER_EOF) {
 			if (n == 0)
 				return HEADER_EOF;
@@ -216,30 +212,30 @@ header_content_type_var(FILE *in, FILE *echo,
 		if (n == vp->varsz)
 			vp->var_trunc = 1;
 		else
-			vp->var[n++] = (ch == '=') ? '\0' : ch;
-		if (ch == '=')
-			break;
+			vp->var[n++] = ch;
 	}
+	if (n == vp->varsz)
+		vp->var_trunc = 1;
+	else
+		vp->var[n] = '\0';
 
 	n = 0;
 	vp->val_trunc = 0;
-
-	for (;;) {
-		int ch;
-
-		ch = header_lex(in, &lex);
+	while ((ch = header_lex(in, &lex)) != HEADER_EOF && ch != ';') {
 		if (ch != HEADER_EOF && ch < 0)
 			return ch;
+
 		if (n == vp->valsz)
 			vp->val_trunc = 1;
 		else
-			vp->val[n++] = (ch == ';' || ch == HEADER_EOF) ? '\0' : ch;
-		if (ch == ';' || ch == HEADER_EOF) {
-			if (ch == HEADER_EOF)
-				*eof = 1;
-			break;
-		}
+			vp->val[n++] = ch;
 	}
+	if (ch == HEADER_EOF)
+		*eof = 1;
+	if (n == vp->valsz)
+		vp->val_trunc = 1;
+	else
+		vp->val[n] = '\0';
 
 	return HEADER_OK;
 }
