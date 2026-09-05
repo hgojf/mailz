@@ -79,9 +79,6 @@ handle_ignore(struct imsg *msg, struct ignore *ip)
 	struct content_ignore ignore;
 	char *s, **t;
 
-	if (ip->nheader == SIZE_MAX)
-		return -1;
-
 	if (imsg_get_data(msg, &ignore, sizeof(ignore)) == -1)
 		return -1;
 

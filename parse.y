@@ -147,12 +147,6 @@ strings: STRING {
 		$$.argc = 1;
 	}
 	| strings STRING {
-		if ($1.argc == SIZE_MAX) {
-			warnc(ENOMEM, NULL);
-			argv_free($1.argv, $1.argc);
-			YYABORT;
-		}
-
 		$$.argv = reallocarray($1.argv, $1.argc + 1,
 				       sizeof(*$$.argv));
 		if ($$.argv == NULL) {
