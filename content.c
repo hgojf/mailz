@@ -61,7 +61,7 @@ struct ignore {
 	int retain;
 };
 
-static int handle_ignore(struct imsg *, struct ignore *);
+static void handle_ignore(struct imsg *, struct ignore *);
 static int handle_letter(struct imsgbuf *, struct imsg *, struct ignore *);
 static int handle_letter_under(FILE *, FILE *, struct ignore *, int);
 static int handle_reply(struct imsgbuf *, struct imsg *);
@@ -73,33 +73,28 @@ static int handle_summary(struct imsgbuf *, struct imsg *);
 static int ignore_header(const char *, struct ignore *);
 static FILE *imsg_get_fp(struct imsg *, const char *);
 
-static int
+static void
 handle_ignore(struct imsg *msg, struct ignore *ip)
 {
 	struct content_ignore ignore;
-	char *s, **t;
+	char *s;
 
 	if (imsg_get_data(msg, &ignore, sizeof(ignore)) == -1)
-		return -1;
+		errx(1, "parent sent invalid ignore data");
 
 	if (memchr(ignore.header, '\0', sizeof(ignore.header)) == NULL)
-		return -1;
+		errx(1, "parent sent ignore header name without terminator");
 	if (ignore.retain != 0 && ignore.retain != 1)
-		return -1;
+		errx(1, "parent sent bogus value for retain");
 
 	if ((s = strdup(ignore.header)) == NULL)
-		return -1;
+		err(1, NULL);
 
-	t = reallocarray(ip->headers, ip->nheader + 1, sizeof(*ip->headers));
-	if (t == NULL) {
-		free(s);
-		return -1;
-	}
-
-	ip->headers = t;
+	ip->headers = reallocarray(ip->headers, ip->nheader + 1, sizeof(*ip->headers));
+	if (ip->headers == NULL)
+		err(1, NULL);
 	ip->headers[ip->nheader++] = s;
 	ip->retain = ignore.retain;
-	return 0;
 }
 
 static int
@@ -768,7 +763,8 @@ main(int argc, char *argv[])
 
 		switch (imsg_get_type(&msg)) {
 		case IMSG_CNT_IGNORE:
-			hv = handle_ignore(&msg, &ignore);
+			handle_ignore(&msg, &ignore);
+			hv = 0;
 			break;
 		case IMSG_CNT_LETTER:
 			hv = handle_letter(&msgbuf, &msg, &ignore);
