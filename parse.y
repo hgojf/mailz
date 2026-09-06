@@ -177,39 +177,6 @@ argv_free(char **argv, size_t argc)
 }
 
 static int
-configure(struct mailz_conf *c, const char *path)
-{
-	FILE *fp;
-	int rv;
-
-	rv = -1;
-
-	if ((fp = fopen(path, "r")) == NULL) {
-		if (errno != ENOENT)
-			return -1;
-		return 0;
-	}
-
-	conf = c;
-	filename = path;
-	mailbox = NULL;
-	yyin = fp;
-
-	if (yyparse() != 0)
-		goto fp;
-
-	rv = 0;
-	fp:
-	fclose(fp);
-
-	conf = NULL;
-	filename = NULL;
-	mailbox = NULL;
-	yyin = NULL;
-	return rv;
-}
-
-static int
 conf_mailbox_cmp(struct mailz_conf_mailbox *one, struct mailz_conf_mailbox *two)
 {
 	return strcmp(one->ident, two->ident);
@@ -271,30 +238,41 @@ mailz_conf_free(struct mailz_conf *c)
 	}
 }
 
-int
-mailz_conf_init(struct mailz_conf *c, const char *path)
+void
+parse_config(struct mailz_conf *cfg, const char *path)
 {
 	struct passwd *pw;
+	FILE *fp;
 	char pathbuf[PATH_MAX];
 
-	memset(c, 0, sizeof(*c));
+	memset(cfg, 0, sizeof(*cfg));
 
 	if (path == NULL) {
 		int n;
 
 		if ((pw = getpwuid(getuid())) == NULL)
-			return -1;
+			errx(1, "getpwuid");
 
 		n = snprintf(pathbuf, sizeof(pathbuf), "%s/.mailz.conf",
 			     pw->pw_dir);
 		if (n < 0 || (size_t)n >= sizeof(pathbuf))
-			return -1;
+			errx(1, "snprintf");
 		path = pathbuf;
 	}
 
-	if (configure(c, path) == -1)
-		return -1;
-	return 0;
+	if ((fp = fopen(path, "r")) == NULL) {
+		if (errno == ENOENT)
+			return;
+		err(1, "%s", path);
+	}
+
+	conf = cfg;
+	filename = path;
+	yyin = fp;
+
+	if (yyparse() != 0)
+		exit(1); /* yyerror() gave an error message */
+	fclose(fp);
 }
 
 struct mailz_conf_mailbox *

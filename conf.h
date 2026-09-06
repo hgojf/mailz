@@ -38,6 +38,6 @@ struct mailz_conf {
 
 struct mailz_conf_mailbox *mailz_conf_mailbox(struct mailz_conf *, char *);
 void mailz_conf_free(struct mailz_conf *);
-int mailz_conf_init(struct mailz_conf *, const char *);
+void parse_config(struct mailz_conf *, const char *);
 
 #endif /* ! CONF_H */

@@ -757,8 +757,7 @@ main(int argc, char *argv[])
 	if (dryrun) {
 		if (argc != 0)
 			usage();
-		if (mailz_conf_init(&conf, confpath) == -1)
-			return 1;
+		parse_config(&conf, confpath);
 		printf("configuration OK\n");
 		return 0;
 	}
@@ -776,8 +775,7 @@ main(int argc, char *argv[])
 		errx(1, "setlocale");
 	signal(SIGPIPE, SIG_IGN);
 
-	if (mailz_conf_init(&conf, confpath) == -1)
-		return 1;
+	parse_config(&conf, confpath);
 	if ((conf_mailbox = mailz_conf_mailbox(&conf, argv[0])) != NULL) {
 		if (strlen(conf_mailbox->address) != 0)
 			address = conf_mailbox->address;
