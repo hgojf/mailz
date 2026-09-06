@@ -690,9 +690,7 @@ main(int argc, char *argv[])
 	struct config conf;
 	struct config_mailbox *conf_mailbox;
 	struct mailbox mailbox;
-	int ch, cur, dryrun, n, root, rv, view_all;
-
-	rv = 1;
+	int ch, cur, dryrun, n, root, view_all;
 
 	confpath = NULL;
 	dryrun = 0;
@@ -750,50 +748,30 @@ main(int argc, char *argv[])
 		maildir = argv[0];
 	}
 
-	if ((root = open(maildir, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
-		warn("%s", maildir);
-		goto conf;
-	}
-	if ((cur = openat(root, "cur", O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
-		warn("%s/cur", maildir);
-		goto root;
-	}
+	if ((root = open(maildir, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+		err(1, "%s", maildir);
+	if ((cur = openat(root, "cur", O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+		err(1, "%s/cur", maildir);
 
-	if ((home = getenv("HOME")) == NULL) {
-		warnx("HOME not set");
-		goto cur;
-	}
+	if ((home = getenv("HOME")) == NULL)
+		errx(1, "HOME not set");
 
 	n = snprintf(tmpdir, sizeof(tmpdir), "%s/.mailz", home);
-	if (n < 0 || (size_t)n >= sizeof(tmpdir)) {
-		warnx("snprintf overflow due to large HOME");
-		goto cur;
-	}
-	if (mkdir(tmpdir, 0700) == -1 && errno != EEXIST) {
-		warn("%s", tmpdir);
-		goto cur;
-	}
+	if (n < 0 || (size_t)n >= sizeof(tmpdir))
+		errx(1, "snprintf overflow due to large HOME");
+	if (mkdir(tmpdir, 0700) == -1 && errno != EEXIST)
+		err(1, "%s", tmpdir);
 
-	if (unveil(tmpdir, "rwc") == -1) {
-		warn("%s", tmpdir);
-		goto tmpdir;
-	}
-	if (unveil(maildir, "rc") == -1) {
-		warn("%s", maildir);
-		goto tmpdir;
-	}
-	if (unveil(PATH_LESS, "x") == -1) {
-		warn("%s", PATH_LESS);
-		goto tmpdir;
-	}
-	if (unveil(PATH_MAILZ_CONTENT, "x") == -1) {
-		warn("%s", PATH_MAILZ_CONTENT);
-		goto tmpdir;
-	}
-	if (unveil(PATH_SENDMAIL, "x") == -1) {
-		warn("%s", PATH_SENDMAIL);
-		goto tmpdir;
-	}
+	if (unveil(tmpdir, "rwc") == -1)
+		err(1, "%s", tmpdir);
+	if (unveil(maildir, "rc") == -1)
+		err(1, "%s", maildir);
+	if (unveil(PATH_LESS, "x") == -1)
+		err(1, "%s", PATH_LESS);
+	if (unveil(PATH_MAILZ_CONTENT, "x") == -1)
+		err(1, "%s", PATH_MAILZ_CONTENT);
+	if (unveil(PATH_SENDMAIL, "x") == -1)
+		err(1, "%s", PATH_SENDMAIL);
 	if (pledge("stdio rpath wpath cpath sendfd proc exec", NULL) == -1)
 		err(1, "pledge");
 
@@ -819,15 +797,9 @@ main(int argc, char *argv[])
 		commands_run(&args);
 	}
 
-	rv = 0;
 	mailbox_free(&mailbox);
-	tmpdir:
 	rmdir(tmpdir);
-	cur:
 	close(cur);
-	root:
 	close(root);
-	conf:
 	config_free(&conf);
-	return rv;
 }
