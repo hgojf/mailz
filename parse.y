@@ -241,7 +241,6 @@ config_free(struct config *cfg)
 void
 parse_config(struct config *cfg, const char *path)
 {
-	struct passwd *pw;
 	FILE *fp;
 	char pathbuf[PATH_MAX];
 
@@ -249,12 +248,12 @@ parse_config(struct config *cfg, const char *path)
 
 	if (path == NULL) {
 		int n;
+		const char *home;
 
-		if ((pw = getpwuid(getuid())) == NULL)
-			errx(1, "getpwuid");
+		if ((home = getenv("HOME")) == NULL)
+			errx(1, "HOME not set");
 
-		n = snprintf(pathbuf, sizeof(pathbuf), "%s/.mailz.conf",
-			     pw->pw_dir);
+		n = snprintf(pathbuf, sizeof(pathbuf), "%s/.mailz.conf", home);
 		if (n < 0 || (size_t)n >= sizeof(pathbuf))
 			errx(1, "snprintf");
 		path = pathbuf;
