@@ -66,7 +66,8 @@ static int command_unread(struct letter *, struct command_args *);
 static int content_proc_ex_ignore(struct content_proc *,
 				  const struct config_ignore *);
 static int letter_print(size_t, struct letter *);
-static int read_letters(const char *, int, int, struct mailbox *);
+static void read_letters(const char *, int, int, struct mailbox *);
+static void setup_letters(const char *, int, int);
 static void usage(void);
 
 static const struct command {
@@ -569,35 +570,23 @@ letter_print(size_t nth, struct letter *letter)
 	return 0;
 }
 
-static int
+static void
 read_letters(const char *maildir, int ocur, int view_all,
 	     struct mailbox *mailbox)
 {
 	DIR *cur;
 	struct content_proc pr;
-	int curfd, ret;
+	int curfd;
 
-	ret = -1;
+	if ((curfd = dup(ocur)) == -1)
+		err(1, "dup");
+	if (fcntl(curfd, F_SETFD, FD_CLOEXEC) == -1)
+		err(1, "fcntl");
+	if ((cur = fdopendir(curfd)) == NULL)
+		err(1, "fdopendir");
 
-	if ((curfd = dup(ocur)) == -1) {
-		warn("dup");
-		return -1;
-	}
-	if (fcntl(curfd, F_SETFD, FD_CLOEXEC) == -1) {
-		warn("fcntl");
-		close(curfd);
-		return -1;
-	}
-	if ((cur = fdopendir(curfd)) == NULL) {
-		warn("fdopendir");
-		close(curfd);
-		return -1;
-	}
-
-	if (content_proc_init(&pr, PATH_MAILZ_CONTENT) == -1) {
-		warnx("content_proc_init");
-		goto cur;
-	}
+	if (content_proc_init(&pr, PATH_MAILZ_CONTENT) == -1)
+		errx(1, "content_proc_init");
 	mailbox_init(mailbox);
 
 	for (;;) {
@@ -610,8 +599,7 @@ read_letters(const char *maildir, int ocur, int view_all,
 		if ((de = readdir(cur)) == NULL) {
 			if (errno == 0)
 				break;
-			warn("readdir");
-			goto letters;
+			err(1, "readdir");
 		}
 
 		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
@@ -620,55 +608,37 @@ read_letters(const char *maildir, int ocur, int view_all,
 		if (!view_all && maildir_get_flag(de->d_name, 'S'))
 			continue;
 
-		if ((fd = openat(curfd, de->d_name, O_RDONLY | O_CLOEXEC)) == -1) {
-			warn("%s/cur/%s", maildir, de->d_name);
-			goto letters;
-		}
-		if (content_proc_summary(&pr, &sm, fd) == -1) {
-			warnx("content_proc_summary: %s/cur/%s", maildir, de->d_name);
-			goto letters;
-		}
+		if ((fd = openat(curfd, de->d_name, O_RDONLY | O_CLOEXEC)) == -1)
+			err(1, "%s/cur/%s", maildir, de->d_name);
+		if (content_proc_summary(&pr, &sm, fd) == -1)
+			errx(1, "content_proc_summary: %s/cur/%s", maildir, de->d_name);
 
 		letter.date = sm.date;
 		letter.from = sm.from;
 		letter.path = de->d_name;
 		letter.subject = sm.have_subject ? sm.subject : NULL;
 
-		if (mailbox_add_letter(mailbox, &letter) == -1) {
-			warn(NULL); /* errno == ENOMEM */
-			goto letters;
-		}
+		if (mailbox_add_letter(mailbox, &letter) == -1)
+			err(1, NULL); /* errno == ENOMEM */
 	}
 
 	mailbox_sort(mailbox);
-	ret = 0;
-	letters:
-	if (ret == -1)
-		mailbox_free(mailbox);
+
 	content_proc_kill(&pr);
-	cur:
 	closedir(cur);
-	return ret;
 }
 
-static int
+static void
 setup_letters(const char *maildir, int root, int cur)
 {
 	DIR *new;
-	int newfd, rv;
-
-	rv = -1;
+	int newfd;
 
 	if ((newfd = openat(root, "new",
-			    O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1) {
-		warn("%s/new", maildir);
-		return -1;
-	}
-	if ((new = fdopendir(newfd)) == NULL) {
-		warn("fdopendir");
-		close(newfd);
-		return -1;
-	}
+			    O_RDONLY | O_DIRECTORY | O_CLOEXEC)) == -1)
+		err(1, "%s/new", maildir);
+	if ((new = fdopendir(newfd)) == NULL)
+		err(1, "fdopendir");
 
 	for (;;) {
 		char name[NAME_MAX + 1], *namep;
@@ -679,8 +649,7 @@ setup_letters(const char *maildir, int root, int cur)
 		if ((de = readdir(new)) == NULL) {
 			if (errno == 0)
 				break;
-			warn("readdir");
-			goto new;
+			err(1, "readdir");
 		}
 
 		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
@@ -690,27 +659,20 @@ setup_letters(const char *maildir, int root, int cur)
 			int n;
 
 			n = snprintf(name, sizeof(name), "%s:2,", de->d_name);
-			if (n < 0 || (size_t)n >= sizeof(name)) {
-				warnc(ENAMETOOLONG, "rename %s/new/%s to %s/cur/%s:2,",
+			if (n < 0 || (size_t)n >= sizeof(name))
+				errc(1, ENAMETOOLONG, "rename %s/new/%s to %s/cur/%s:2,",
 				     maildir, de->d_name, maildir, de->d_name);
-				goto new;
-			}
 			namep = name;
 		}
 		else
 			namep = de->d_name;
 
-		if (renameat(newfd, de->d_name, cur, namep) == -1) {
-			warn("rename %s/new/%s to %s/cur/%s",
+		if (renameat(newfd, de->d_name, cur, namep) == -1)
+			err(1, "rename %s/new/%s to %s/cur/%s",
 			     maildir, de->d_name, maildir, namep);
-			goto new;
-		}
 	}
 
-	rv = 0;
-	new:
 	closedir(new);
-	return rv;
 }
 
 static void
@@ -835,11 +797,8 @@ main(int argc, char *argv[])
 	if (pledge("stdio rpath wpath cpath sendfd proc exec", NULL) == -1)
 		err(1, "pledge");
 
-	if (setup_letters(maildir, root, cur) == -1)
-		goto tmpdir;
-
-	if (read_letters(maildir, cur, view_all, &mailbox) == -1)
-		goto tmpdir;
+	setup_letters(maildir, root, cur);
+	read_letters(maildir, cur, view_all, &mailbox);
 
 	if (mailbox.nletter == 0)
 		puts("No mail.");
