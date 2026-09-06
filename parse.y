@@ -34,18 +34,18 @@ extern int yylineno;
 extern int yylex(void);
 
 static void argv_free(char **, size_t);
-static int conf_mailbox_cmp(struct mailz_conf_mailbox *, struct mailz_conf_mailbox *);
+static int config_mailbox_cmp(struct config_mailbox *, struct config_mailbox *);
 static char *maildir_expand(const char *);
 
 void yyerror(const char *);
 int yywrap(void);
 
-RB_PROTOTYPE_STATIC(mailz_conf_mailboxes, mailz_conf_mailbox, entries, conf_mailbox_cmp)
-RB_GENERATE_STATIC(mailz_conf_mailboxes, mailz_conf_mailbox, entries, conf_mailbox_cmp)
+RB_PROTOTYPE_STATIC(config_mailboxes, config_mailbox, entries, config_mailbox_cmp)
+RB_GENERATE_STATIC(config_mailboxes, config_mailbox, entries, config_mailbox_cmp)
 
-static struct mailz_conf *conf;
+static struct config *conf;
 static const char *filename;
-static struct mailz_conf_mailbox *mailbox;
+static struct config_mailbox *mailbox;
 %}
 
 %union {
@@ -91,7 +91,7 @@ mailbox: MAILBOX STRING {
 			yyerror("mailbox without maildir");
 			YYERROR;
 		}
-		if (RB_INSERT(mailz_conf_mailboxes, &conf->mailboxes, mailbox) != NULL) {
+		if (RB_INSERT(config_mailboxes, &conf->mailboxes, mailbox) != NULL) {
 			yyerror("duplicate mailbox name");
 			YYERROR;
 		}
@@ -177,7 +177,7 @@ argv_free(char **argv, size_t argc)
 }
 
 static int
-conf_mailbox_cmp(struct mailz_conf_mailbox *one, struct mailz_conf_mailbox *two)
+config_mailbox_cmp(struct config_mailbox *one, struct config_mailbox *two)
 {
 	return strcmp(one->ident, two->ident);
 }
@@ -224,14 +224,14 @@ maildir_expand(const char *maildir)
 }
 
 void
-mailz_conf_free(struct mailz_conf *c)
+config_free(struct config *cfg)
 {
-	struct mailz_conf_mailbox *mb, *t;
+	struct config_mailbox *mb, *t;
 
-	argv_free(c->ignore.headers, c->ignore.nheader);
+	argv_free(cfg->ignore.headers, cfg->ignore.nheader);
 
-	RB_FOREACH_SAFE(mb, mailz_conf_mailboxes, &c->mailboxes, t) {
-		RB_REMOVE(mailz_conf_mailboxes, &c->mailboxes, mb);
+	RB_FOREACH_SAFE(mb, config_mailboxes, &cfg->mailboxes, t) {
+		RB_REMOVE(config_mailboxes, &cfg->mailboxes, mb);
 		free(mb->ident);
 		free(mb->maildir);
 		free(mb);
@@ -239,7 +239,7 @@ mailz_conf_free(struct mailz_conf *c)
 }
 
 void
-parse_config(struct mailz_conf *cfg, const char *path)
+parse_config(struct config *cfg, const char *path)
 {
 	struct passwd *pw;
 	FILE *fp;
@@ -275,13 +275,13 @@ parse_config(struct mailz_conf *cfg, const char *path)
 	fclose(fp);
 }
 
-struct mailz_conf_mailbox *
-mailz_conf_mailbox(struct mailz_conf *c, char *ident)
+struct config_mailbox *
+config_mailbox(struct config *cfg, char *ident)
 {
-	struct mailz_conf_mailbox mb;
+	struct config_mailbox mb;
 
 	mb.ident = ident;
-	return RB_FIND(mailz_conf_mailboxes, &c->mailboxes, &mb);
+	return RB_FIND(config_mailboxes, &cfg->mailboxes, &mb);
 }
 
 void

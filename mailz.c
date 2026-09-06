@@ -43,7 +43,7 @@ struct command_args {
 	const char *addr;
 	const char *maildir;
 	const char *tmpdir;
-	struct mailz_ignore *ignore;
+	struct config_ignore *ignore;
 	struct mailbox *mailbox;
 	int cur;
 };
@@ -64,7 +64,7 @@ static int command_save(struct letter *, struct command_args *);
 static int command_thread(struct letter *, struct command_args *);
 static int command_unread(struct letter *, struct command_args *);
 static int content_proc_ex_ignore(struct content_proc *,
-				  const struct mailz_ignore *);
+				  const struct config_ignore *);
 static int letter_print(size_t, struct letter *);
 static int read_letters(const char *, int, int, struct mailbox *);
 static void usage(void);
@@ -537,7 +537,7 @@ command_unread(struct letter *letter, struct command_args *args)
 
 static int
 content_proc_ex_ignore(struct content_proc *pr,
-		       const struct mailz_ignore *ignore)
+		       const struct config_ignore *ignore)
 {
 	size_t i;
 
@@ -725,8 +725,8 @@ main(int argc, char *argv[])
 {
 	char *home, *slash, tmpdir[PATH_MAX];
 	const char *address, *confpath, *maildir;
-	struct mailz_conf conf;
-	struct mailz_conf_mailbox *conf_mailbox;
+	struct config conf;
+	struct config_mailbox *conf_mailbox;
 	struct mailbox mailbox;
 	int ch, cur, dryrun, n, root, rv, view_all;
 
@@ -776,7 +776,7 @@ main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 
 	parse_config(&conf, confpath);
-	if ((conf_mailbox = mailz_conf_mailbox(&conf, argv[0])) != NULL) {
+	if ((conf_mailbox = config_mailbox(&conf, argv[0])) != NULL) {
 		if (strlen(conf_mailbox->address) != 0)
 			address = conf_mailbox->address;
 		else
@@ -869,6 +869,6 @@ main(int argc, char *argv[])
 	root:
 	close(root);
 	conf:
-	mailz_conf_free(&conf);
+	config_free(&conf);
 	return rv;
 }

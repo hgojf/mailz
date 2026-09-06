@@ -19,25 +19,25 @@
 
 #include <sys/tree.h>
 
-struct mailz_conf_mailbox {
+struct config_mailbox {
 	char *ident;
 	char *maildir;
 	char address[255];
-	RB_ENTRY(mailz_conf_mailbox) entries;
+	RB_ENTRY(config_mailbox) entries;
 };
 
-struct mailz_conf {
+struct config {
 	char address[255];
-	struct mailz_ignore {
+	struct config_ignore {
 		char **headers;
 		size_t nheader;
 		int retain;
 	} ignore;
-	RB_HEAD(mailz_conf_mailboxes, mailz_conf_mailbox) mailboxes;
+	RB_HEAD(config_mailboxes, config_mailbox) mailboxes;
 };
 
-struct mailz_conf_mailbox *mailz_conf_mailbox(struct mailz_conf *, char *);
-void mailz_conf_free(struct mailz_conf *);
-void parse_config(struct mailz_conf *, const char *);
+struct config_mailbox *config_mailbox(struct config *, char *);
+void config_free(struct config *);
+void parse_config(struct config *, const char *);
 
 #endif /* ! CONF_H */
