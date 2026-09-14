@@ -722,14 +722,14 @@ main(int argc, char *argv[])
 		return 0;
 	}
 
+	if (argc != 1)
+		usage();
+
 	/*
 	 * Delete trailing slash to make error messages nicer.
 	 */
 	if ((slash = strrchr(argv[0], '/')) != NULL && slash[1] == '\0')
 		*slash = '\0';
-
-	if (argc != 1)
-		usage();
 
 	if (setlocale(LC_CTYPE, "C.UTF-8") == NULL)
 		errx(1, "setlocale");
