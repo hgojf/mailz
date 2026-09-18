@@ -32,7 +32,8 @@
 #include "content-proc.h"
 #include "err-fork.h"
 #include "imsg-blocking.h"
-#include "printable.h"
+
+static int string_printable(const char *, size_t);
 
 void
 content_letter_close(struct content_letter *letter)
@@ -353,4 +354,23 @@ content_proc_summary(struct content_proc *pr,
 	bad:
 	imsg_free(&msg);
 	return rv;
+}
+
+static int
+string_printable(const char *s, size_t sz)
+{
+	size_t i;
+
+	for (i = 0; i < sz; i++) {
+		int ch;
+
+		ch = (unsigned char)s[i];
+		if (ch == '\0')
+			return 1;
+		if (!isprint(ch) && ch != ' ' && ch != '\t')
+			return 0;
+	}
+
+	/* no NUL terminator */
+	return 0;
 }
