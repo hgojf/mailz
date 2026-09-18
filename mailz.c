@@ -31,7 +31,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "command.h"
 #include "conf.h"
 #include "content-proc.h"
 #include "err-fork.h"
@@ -89,76 +88,62 @@ static const struct command {
 static void
 commands_run(struct command_args *args)
 {
-	struct command_lexer lex;
 	struct letter *letter;
 
-	command_init(&lex, stdin);
 	letter = NULL;
 	for (;;) {
 		const struct command *cmd;
-		char buf[8];
-		int any, error;
+		char *argv[32], *cp, line[1024], *linep;
+		int argc, i;
 
 		printf("> ");
 		fflush(stdout);
 
-		error = command_name(&lex, buf, sizeof(buf));
-		if (error == COMMAND_EOF)
+		if (fgets(line, sizeof(line), stdin) == NULL)
 			break;
-		if (error != COMMAND_OK) {
-			switch (error) {
-			case COMMAND_EMPTY:
-				break;
-			case COMMAND_LONG:
-				warnx("command name too long");
-				break;
-			default:
-				warnx("invalid command name");
-				break;
-			}
+		line[strcspn(line, "\n")] = '\0';
 
-			continue;
+		argc = 0;
+		linep = line;
+		while ((cp = strsep(&linep, " \t")) != NULL) {
+			if (*cp == '\0')
+				continue;
+			if (argc == nitems(argv)) {
+				warnx("too many arguments");
+				goto next;
+			}
+			argv[argc++] = cp;
 		}
 
-		if ((cmd = commands_search(buf)) == NULL) {
+		if (argc == 0)
+			continue;
+
+		if ((cmd = commands_search(argv[0])) == NULL) {
 			warnx("unknown command");
 			continue;
 		}
 
-		any = 0;
-		for (;;) {
-			struct command_letter cmd_letter;
+		for (i = 1; i < argc; i++) {
+			size_t num;
+			int thread;
+			const char *errstr;
 
-			error = command_letter(&lex, &cmd_letter);
-			if (error == COMMAND_EOF)
-				break;
-			any = 1;
-			if (error != COMMAND_OK) {
-				switch (error) {
-				case COMMAND_INVALID:
-					warnx("letter number invalid");
-					break;
-				case COMMAND_LONG:
-					warnx("letter number too long");
-					break;
-				case COMMAND_THREAD_EOF:
+			if ((thread = !strcmp(argv[i], "t"))) {
+				if (++i == argc) {
 					warnx("must provide a message number after 't'");
-					break;
-				default:
-					break;
+					goto next;
 				}
-
-				break;
 			}
 
-			/* These are numbered from 1, so no = */
-			if (cmd_letter.num > args->mailbox->nletter) {
-				warnx("letter number too large");
-				break;
+			num = strtonum(argv[i], 1, args->mailbox->nletter, &errstr);
+			if (errstr) {
+				warnx("message number was %s", errstr);
+				goto next;
 			}
-			letter = &args->mailbox->letters[cmd_letter.num - 1];
 
-			if (cmd_letter.thread) {
+			letter = &args->mailbox->letters[num - 1];
+
+			if (thread) {
 				struct letter *lp;
 				struct mailbox_thread thread;
 
@@ -178,7 +163,7 @@ commands_run(struct command_args *args)
 			}
 		}
 
-		if (!any) {
+		if (argc == 1) {
 			if (letter == NULL) {
 				warnx("no current letter");
 				continue;
