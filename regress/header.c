@@ -74,7 +74,6 @@ header_address_test(void)
 	};
 
 	for (i = 0; i < nitems(tests); i++) {
-		struct header_address address;
 		FILE *fp;
 		char addr[255], name[65];
 		int eof, error;
@@ -84,16 +83,12 @@ header_address_test(void)
 		if (fp == NULL)
 			err(1, "fmemopen");
 
-		address.addr = addr;
-		address.addrsz = tests[i].addrsz;
-		address.name = name;
-		address.namesz = tests[i].namesz;
-
 		if (tests[i].namesz == 0)
 			name[0] = '\0';
 
 		eof = 0;
-		error = header_address(fp, &address, &eof);
+		error = header_address(fp, addr, tests[i].addrsz, name,
+				       tests[i].namesz, &eof);
 		if (error != tests[i].error)
 			errx(1, "wrong error %d", error);
 		if (error == HEADER_OK) {

@@ -40,7 +40,8 @@ static const char *months[] = {
 };
 
 int
-header_address(FILE *fp, struct header_address *from, int *eof)
+header_address(FILE *fp, char *addr, size_t addrsz, char *name, size_t namesz,
+	       int *eof)
 {
 	struct header_lex lex;
 	size_t n;
@@ -49,7 +50,7 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 	if (*eof)
 		return HEADER_EOF;
 
-	if (from->addrsz == 0)
+	if (addrsz == 0)
 		return HEADER_INVALID;
 
 	lex.cstate = 0;
@@ -70,10 +71,10 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 
 		if (state == 0) {
 			if (ch == HEADER_EOF || (ch == ',' && lex.qstate == 0)) {
-				n = strip_trailing(from->addr, n);
-				from->addr[n] = '\0';
-				if (from->namesz != 0)
-					from->name[0] = '\0';
+				n = strip_trailing(addr, n);
+				addr[n] = '\0';
+				if (namesz != 0)
+					name[0] = '\0';
 
 				if (ch == HEADER_EOF) {
 					*eof = 1;
@@ -88,21 +89,21 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 			}
 
 			if (ch == '<') {
-				if (from->namesz != 0) {
-					n = strip_trailing(from->addr, n);
-					if (n >= from->namesz)
+				if (namesz != 0) {
+					n = strip_trailing(addr, n);
+					if (n >= namesz)
 						return HEADER_INVALID;
-					memcpy(from->name, from->addr, n);
-					from->name[n] = '\0';
+					memcpy(name, addr, n);
+					name[n] = '\0';
 				}
 				n = 0;
 				state = 1;
 				continue;
 			}
 
-			if (n == from->addrsz - 1)
+			if (n == addrsz - 1)
 				return HEADER_INVALID;
-			from->addr[n++] = ch;
+			addr[n++] = ch;
 		}
 
 		if (state == 1) {
@@ -115,14 +116,14 @@ header_address(FILE *fp, struct header_address *from, int *eof)
 				continue;
 			}
 
-			if (n == from->addrsz - 1)
+			if (n == addrsz - 1)
 				return HEADER_INVALID;
-			from->addr[n++] = ch;
+			addr[n++] = ch;
 		}
 
 		if (state == 2) {
 			if (ch == HEADER_EOF || (ch == ',' && lex.qstate == 0)) {
-				from->addr[n] = '\0';
+				addr[n] = '\0';
 
 				if (ch == HEADER_EOF)
 					*eof = 1;
@@ -265,17 +266,11 @@ int
 header_copy_addresses(FILE *in, FILE *out, const char *exclude, int *any)
 {
 	char addr[255], name[256];
-	struct header_address from;
 	int eof, n;
 
-	from.addr = addr;
-	from.addrsz = sizeof(addr);
-
-	from.name = name;
-	from.namesz = sizeof(name);
-
 	eof = 0;
-	while ((n = header_address(in, &from, &eof)) != HEADER_EOF) {
+	while ((n = header_address(in, addr, sizeof(addr), name, sizeof(name),
+				   &eof)) != HEADER_EOF) {
 		if (n < 0)
 			return n;
 		if (exclude != NULL && !strcmp(addr, exclude))
@@ -522,12 +517,12 @@ header_encoding(FILE *fp, FILE *echo, char *buf, size_t bufsz)
 }
 
 int
-header_from(FILE *fp, struct header_address *from)
+header_from(FILE *fp, char *addr, size_t addrsz, char *name, size_t namesz)
 {
 	int error, eof;
 
 	eof = 0;
-	if ((error = header_address(fp, from, &eof)) < 0)
+	if ((error = header_address(fp, addr, addrsz, name, namesz, &eof)) < 0)
 		return error;
 
 	if (!eof)

@@ -365,20 +365,13 @@ handle_reply(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "from")) {
-			struct header_address from_p;
-
 			if (from != -1)
 				goto out;
 			if ((from = ftello(in)) == -1)
 				goto out;
 
-			from_p.addr = from_addr;
-			from_p.addrsz = sizeof(from_addr);
-
-			from_p.name = from_name;
-			from_p.namesz = sizeof(from_name);
-
-			if (header_from(in, &from_p) < 0)
+			if (header_from(in, from_addr, sizeof(from_addr),
+					from_name, sizeof(from_name)) < 0)
 				goto out;
 		}
 		else if (!strcasecmp(buf, "in-reply-to")) {
@@ -641,18 +634,10 @@ handle_summary(struct imsgbuf *msgbuf, struct imsg *msg)
 				goto fp;
 		}
 		else if (!strcasecmp(buf, "from")) {
-			struct header_address from;
-
 			if (strlen(sm.from) != 0)
 				goto fp;
 
-			from.addr = sm.from;
-			from.addrsz = sizeof(sm.from);
-
-			from.name = NULL;
-			from.namesz = 0;
-
-			if (header_from(fp, &from) < 0)
+			if (header_from(fp, sm.from, sizeof(sm.from), NULL, 0) < 0)
 				goto fp;
 		}
 		else if (!strcasecmp(buf, "subject")) {
