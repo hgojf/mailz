@@ -762,8 +762,8 @@ header_subject_reply(FILE *in, FILE *out)
 		buf[n] = ch;
 	}
 
-	if ((n != 4 || memcmp(buf, "Re: ", 4) != 0) && n != 0)
-		if (fwrite(buf, n, 1, out) != 1)
+	if (n != 4 || memcmp(buf, "Re: ", 4) != 0)
+		if (fwrite(buf, 1, n, out) != n)
 			return HEADER_OUTPUT;
 
 	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
