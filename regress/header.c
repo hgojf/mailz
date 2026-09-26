@@ -601,6 +601,7 @@ header_subject_reply_test(void)
 		{ "hi", "Subject: Re: hi\n" },
 		{ "Re: hi", "Subject: Re: hi\n" },
 		{ "Resurrection", "Subject: Re: Resurrection\n" },
+		{ "", "Subject: Re: \n" },
 	};
 
 	for (i = 0; i < nitems(tests); i++) {
@@ -609,10 +610,18 @@ header_subject_reply_test(void)
 		size_t osize;
 		int error;
 
-		in = fmemopen(tests[i].in, strlen(tests[i].in),
-			      "r");
-		if (in == NULL)
-			err(1, "fmemopen");
+		if (strlen(tests[i].in) != 0) {
+			in = fmemopen(tests[i].in, strlen(tests[i].in),
+				      "r");
+			if (in == NULL)
+				err(1, "fmemopen");
+		}
+		else {
+			if ((in = fmemopen("a", 1, "r")) == NULL)
+				err(1, "fmemopen");
+			if (fgetc(in) != 'a')
+				err(1, "fgetc");
+		}
 
 		out = open_memstream(&obuf, &osize);
 		if (out == NULL)
