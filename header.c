@@ -742,8 +742,8 @@ int
 header_subject_reply(FILE *in, FILE *out)
 {
 	struct header_lex lex;
-	const char *re;
-	size_t i;
+	size_t n;
+	char buf[4];
 	int ch;
 
 	lex.cstate = -1;
@@ -754,25 +754,21 @@ header_subject_reply(FILE *in, FILE *out)
 	if (fprintf(out, "Subject: Re: ") < 0)
 		return HEADER_OUTPUT;
 
-	re = "Re: ";
-	i = 0;
+	for (n = 0; n < 4; n++) {
+		if ((ch = header_lex(in, &lex)) == HEADER_EOF)
+			break;
+		if (ch < 0)
+			return ch;
+		buf[n] = ch;
+	}
+
+	if ((n != 4 || memcmp(buf, "Re: ", 4) != 0) && n != 0)
+		if (fwrite(buf, n, 1, out) != 1)
+			return HEADER_OUTPUT;
+
 	while ((ch = header_lex(in, &lex)) != HEADER_EOF) {
 		if (ch < 0)
 			return ch;
-
-		if (re[i] != '\0') {
-			if (re[i] == ch) {
-				i++;
-				continue;
-			}
-
-			if (i != 0) {
-				if (fwrite(re, i, 1, out) != 1)
-					return HEADER_OUTPUT;
-			}
-			re = "";
-			i = 0;
-		}
 
 		if (fputc(ch, out) == EOF)
 			return HEADER_OUTPUT;
