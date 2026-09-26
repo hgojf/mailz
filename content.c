@@ -277,7 +277,7 @@ handle_letter_under(FILE *in, FILE *out, struct ignore *ignore,
 				return -1;
 		}
 
-		if (fwrite(buf, 1, n, out) != n)
+		if (fwrite(buf, 1, n, out) != (size_t)n)
 			return -1;
 
 		if (reply && n == 1 && buf[0] == '\n')

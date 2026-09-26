@@ -308,7 +308,7 @@ command_more(struct letter *letter, struct command_args *args)
 		if (n == 0)
 			break;
 
-		if (fwrite(buf, 1, n, fp) != n) {
+		if (fwrite(buf, 1, n, fp) != (size_t)n) {
 			if (ferror(fp) && errno == EPIPE)
 				break;
 			goto pid;
@@ -474,7 +474,7 @@ command_save(struct letter *letter, struct command_args *args)
 		if (n == 0)
 			break;
 
-		if (fwrite(buf, 1, n, fp) != n)
+		if (fwrite(buf, 1, n, fp) != (size_t)n)
 			goto fp;
 	}
 
