@@ -522,8 +522,11 @@ header_from(FILE *fp, char *addr, size_t addrsz, char *name, size_t namesz)
 	int error, eof;
 
 	eof = 0;
-	if ((error = header_address(fp, addr, addrsz, name, namesz, &eof)) < 0)
+	if ((error = header_address(fp, addr, addrsz, name, namesz, &eof)) < 0) {
+		if (error == HEADER_EOF)
+			error = HEADER_INVALID;
 		return error;
+	}
 
 	if (!eof)
 		if ((error = header_skip(fp, NULL)) < 0)
