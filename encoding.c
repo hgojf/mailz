@@ -47,7 +47,7 @@ encoding_from_name(const char *name)
 
 	for (i = 0; i < nitems(encodings); i++) {
 		if (!strcasecmp(name, encodings[i].ident))
-			return i;
+			return encodings[i].type;
 	}
 
 	return ENCODING_UNKNOWN;
