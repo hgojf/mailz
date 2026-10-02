@@ -42,7 +42,7 @@ struct content_reply_setup {
 struct content_summary {
 	time_t date;
 	char from[255];
-	char subject[120];
+	char subject[160];
 	int have_subject;
 };
 
